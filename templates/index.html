@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>弗一把 / 鸣潮角色猜谜游戏</title>
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+
+        <!-- ================= 主菜单 ================= -->
+        <div class="view" id="view-mainmenu">
+            <h1><img src="{{ url_for('static', filename='favicon.ico') }}"></h1>
+            <h1>鸣潮角色猜谜游戏</h1>
+            <p class="subtitle">弗一把，猜出Ta的身份！</p>
+
+            <div class="main-menu">
+                <button class="menu-btn" onclick="enterSingle()">
+                    <span class="menu-icon">🎯</span>
+                    <span class="menu-label">单人模式</span>
+                </button>
+                <button class="menu-btn" onclick="enterMultiMenu()">
+                    <span class="menu-icon">⚔️</span>
+                    <span class="menu-label">多人模式</span>
+                </button>
+                <button class="menu-btn" onclick="enterLeaderboard()">
+                    <span class="menu-icon">🏆</span>
+                    <span class="menu-label">排行榜</span>
+                </button>
+                <button class="menu-btn" onclick="enterRules()">
+                    <span class="menu-icon">📖</span>
+                    <span class="menu-label">游戏规则</span>
+                </button>
+            </div>
+
+            <div class="player-card">
+                <span class="player-card-label">我的ID</span>
+                <span class="player-id-display" id="mainPlayerId">--</span>
+                <span class="player-score-display" id="mainPlayerScore">(0 分)</span>
+                <button class="btn btn-small" onclick="openIdEditor()">✏️ 修改ID</button>
+            </div>
+        </div>
+
+        <!-- ================= 单人模式 ================= -->
+        <div class="view" id="view-single" style="display:none">
+            <div class="single-header">
+                <button class="btn btn-back" onclick="goBackToMenu()">← 主菜单</button>
+                <h2>🎯 单人模式</h2>
+            </div>
+            <p class="subtitle">有 <strong>4</strong> 次机会猜出Ta，开始吧！</p>
+
+            <div class="top-bar">
+                <span class="attempt-badge" id="attemptBadge">第 1 / 4 次猜测</span>
+                <div class="top-actions">
+                    <button class="btn btn-play-again" onclick="startGame()">🔄 再来一把</button>
+                    <button class="btn btn-view-answer" id="btnViewAnswer" onclick="viewAnswer()">👀 查看答案</button>
+                </div>
+            </div>
+
+            <div class="legend">
+                <div class="item"><span class="color-box color-green"></span> 完全一样</div>
+                <div class="item"><span class="color-box color-orange"></span> 相差不大(版本±0.2)</div>
+                <div class="item"><span class="color-box color-gray"></span> 完全不一样</div>
+            </div>
+
+            <div class="table-wrapper">
+                <table class="data-table" id="singleTable">
+                    <thead>
+                        <tr>
+                            <th>序号</th>
+                            <th>姓名</th>
+                            <th>属性</th>
+                            <th>星级</th>
+                            <th>武器</th>
+                            <th>出生地</th>
+                            <th>实装版本</th>
+                        </tr>
+                    </thead>
+                    <tbody id="singleTbody"></tbody>
+                </table>
+                <div class="empty-state" id="singleEmptyState">请输入角色名开始猜测 👆</div>
+            </div>
+
+            <footer>提示：根据每个字段的底色判断与目标数据的接近程度，逐步缩小范围！</footer>
+
+            <div class="bottom-input-area">
+                <div class="autocomplete-wrap" id="autocompleteWrapSingle">
+                    <input type="text" id="guessInput" placeholder="输入角色名，可用 Tab 补全..." autocomplete="off">
+                    <div class="autocomplete-list" id="autocompleteList"></div>
+                </div>
+                <button class="btn btn-guess" id="btnGuess" onclick="guessCharacter()">🔍 提交猜测</button>
+            </div>
+        </div>
+
+        <!-- ================= 多人二级菜单 ================= -->
+        <div class="view" id="view-multimenu" style="display:none">
+            <div class="single-header">
+                <button class="btn btn-back" onclick="goBackToMenu()">← 主菜单</button>
+                <h2>⚔️ 多人模式</h2>
+            </div>
+            <p class="subtitle">三局两胜，两人对抗，先猜中者胜！</p>
+
+            <div class="multi-menu">
+                <button class="menu-btn" onclick="createRoom()">
+                    <span class="menu-icon">🏠</span>
+                    <span class="menu-label">创建房间</span>
+                </button>
+                <button class="menu-btn" onclick="randomMatch()">
+                    <span class="menu-icon">🎲</span>
+                    <span class="menu-label">随机匹配</span>
+                </button>
+                <button class="menu-btn" onclick="openJoinDialog()">
+                    <span class="menu-icon">🔑</span>
+                    <span class="menu-label">加入房间</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- ================= 多人游戏 ================= -->
+        <div class="view" id="view-multi" style="display:none">
+            <div class="single-header">
+                <button class="btn btn-back" onclick="leaveMulti()">← 退出对战</button>
+                <h2>⚔️ 多人对战</h2>
+            </div>
+
+            <div class="multi-topinfo">
+                <div class="round-badge" id="roundBadge">第 1 / 3 局</div>
+                <div class="timer-badge" id="timerBadge">⏱ 1:30</div>
+            </div>
+
+            <div class="score-strip">
+                <div class="score-item" id="myScoreItem">我 0</div>
+                <div class="score-vs">VS</div>
+                <div class="score-item" id="oppScoreItem">对手 0</div>
+            </div>
+
+            <div class="legend">
+                <div class="item"><span class="color-box color-green"></span> 完全一样</div>
+                <div class="item"><span class="color-box color-orange"></span> 相差不大(版本±0.2)</div>
+                <div class="item"><span class="color-box color-gray"></span> 完全不一样</div>
+            </div>
+
+            <h3 class="side-title mine">我的猜测</h3>
+            <div class="table-wrapper">
+                <table class="data-table" id="myTable">
+                    <thead>
+                        <tr>
+                            <th>序号</th>
+                            <th>姓名</th>
+                            <th>属性</th>
+                            <th>星级</th>
+                            <th>武器</th>
+                            <th>出生地</th>
+                            <th>实装版本</th>
+                        </tr>
+                    </thead>
+                    <tbody id="myTbody"></tbody>
+                </table>
+                <div class="empty-state" id="myEmptyState">等待你的猜测...</div>
+            </div>
+
+            <h3 class="side-title opp">对手的猜测 <span class="opp-id" id="oppIdLabel"></span></h3>
+            <div class="table-wrapper">
+                <table class="data-table" id="oppTable">
+                    <thead>
+                        <tr>
+                            <th>序号</th>
+                            <th>姓名</th>
+                            <th>属性</th>
+                            <th>星级</th>
+                            <th>武器</th>
+                            <th>出生地</th>
+                            <th>实装版本</th>
+                        </tr>
+                    </thead>
+                    <tbody id="oppTbody"></tbody>
+                </table>
+                <div class="empty-state" id="oppEmptyState">对手尚未猜测...</div>
+            </div>
+
+            <div class="bottom-input-area">
+                <div class="autocomplete-wrap" id="autocompleteWrapMulti">
+                    <input type="text" id="multiGuessInput" placeholder="输入角色名..." autocomplete="off">
+                    <div class="autocomplete-list" id="multiAutocompleteList"></div>
+                </div>
+                <button class="btn btn-guess" id="btnMultiGuess" onclick="multiGuessCharacter()">🔍 提交猜测</button>
+            </div>
+        </div>
+
+        <!-- ================= 排行榜 ================= -->
+        <div class="view" id="view-leaderboard" style="display:none">
+            <div class="single-header">
+                <button class="btn btn-back" onclick="goBackToMenu()">← 主菜单</button>
+                <h2>🏆 排行榜</h2>
+            </div>
+            <div class="table-wrapper">
+                <table class="data-table" id="leaderboardTable">
+                    <thead>
+                        <tr>
+                            <th>排名</th>
+                            <th>玩家ID</th>
+                            <th>得分</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaderboardTbody"></tbody>
+                </table>
+                <div class="empty-state" id="lbEmptyState">暂无数据</div>
+            </div>
+        </div>
+
+        <!-- ================= 游戏规则 ================= -->
+        <div class="view" id="view-rules" style="display:none">
+            <div class="single-header">
+                <button class="btn btn-back" onclick="goBackToMenu()">← 主菜单</button>
+                <h2>📖 游戏规则</h2>
+            </div>
+
+            <!-- 重要提醒 -->
+            <div class="rules-notice">
+                ⚠️ 本网站灵感来源于：<b>弗一把(shnlfriberg.online)</b><br>
+                ⚠️ <b>请使用同一个设备的同一个浏览器</b>进行游戏。<br>
+                如果换号了（更换设备 / 浏览器），请<b>截图证明你是某个玩家</b>，后台会帮你转移数据。<br>
+                （一般情况下，请不要麻烦后台管理员 🛠️）<br>
+				⚠️ 本网站基本由<b>Deepseek</b>开发，如有bug请私信UP主。<br>
+                ⚠️ 本网站数据来源于<b>库街区</b>，并且是UP主手动复制的数据，如有错误欢迎私信勘误。<br>
+                ⚠️ <b>本网站完全免费且开源，不收集任何个人信息，所有数据仅存于浏览器本地。</b>
+            </div>
+
+            <div class="rules-section">
+                <h3>🎯 单人模式</h3>
+                <p>游戏会从鸣潮所有角色中<strong>随机抽取一个角色</strong>作为目标，你有 <strong>4 次机会</strong>猜出它。</p>
+                <p>输入角色名提交猜测后，系统会按「属性 / 星级 / 武器 / 出生地 / 实装版本」逐项对比，并用<strong>底色</strong>告诉你每一项与目标的接近程度：</p>
+                <div class="legend">
+                    <div class="item"><span class="color-box color-green"></span> 绿色 = 完全一样</div>
+                    <div class="item"><span class="color-box color-orange"></span> 橙色 = 相差不大（版本差 ≤ 0.2）</div>
+                    <div class="item"><span class="color-box color-gray"></span> 灰色 = 完全不一样</div>
+                </div>
+                <p><strong>提示：</strong>实装版本列在猜测值低于目标版本时显示 <strong>↑</strong>，高于目标时显示 <strong>↓</strong>，帮助你缩小范围。全部 <strong>5 项都对上（全绿）</strong>即猜中胜利！</p>
+
+                <!-- 单人示例：目标 = 弗洛洛 -->
+                <h4>📌 单人模式示例（目标角色：弗洛洛 · 湮灭 · ★5 · 音感仪 · 未知 · 2.5）</h4>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr><th>序号</th><th>姓名</th><th>属性</th><th>星级</th><th>武器</th><th>出生地</th><th>实装版本</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="rownum">1</td>
+                                <td>菲比</td>
+                                <td class="match-gray">衍射</td>
+                                <td class="match-green">★★★★★</td>
+                                <td class="match-green">音感仪</td>
+                                <td class="match-gray">黎那汐塔</td>
+                                <td class="match-gray">2.1 ↑</td>
+                            </tr>
+                            <tr>
+                                <td class="rownum">2</td>
+                                <td>坎特蕾拉</td>
+                                <td class="match-green">湮灭</td>
+                                <td class="match-green">★★★★★</td>
+                                <td class="match-green">音感仪</td>
+                                <td class="match-gray">黎那汐塔</td>
+                                <td class="match-gray">2.2 ↑</td>
+                            </tr>
+                            <tr>
+                                <td class="rownum">3</td>
+                                <td>露帕</td>
+                                <td class="match-gray">热熔</td>
+                                <td class="match-green">★★★★★</td>
+                                <td class="match-gray">长刃</td>
+                                <td class="match-gray">黎那汐塔</td>
+                                <td class="match-orange">2.4 ↑</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p style="font-size:13px;color:#aaa">⬆ 这是「单人模式」一局内连续 3 次猜测的示意</p>
+            </div>
+
+            <div class="rules-section">
+                <h3>⚔️ 多人模式</h3>
+                <p>真人两人对战，<strong>三局两胜</strong>，每局限时 <strong>1 分 30 秒</strong>，每人最多 <strong>4 次猜测</strong>。谁先在本局猜中目标谁赢一局，先拿下两局者胜出整场。</p>
+                <p>胜者 <strong>+30 分</strong>，败者 <strong>-30 分</strong>。</p>
+                <p>如果二人都没有在限定时间内猜中，视为<strong>平局</strong>，二者仍以当前比分继续下一回合。</p>
+                <p>如果中途<strong>意外退出</strong>，请回到该网站，并且点击<strong>多人模式\创建房间</strong>，即可返回当前房间。</p>
+                <p>如果中途<strong>自己点了退出按键</strong>，视为<strong>逃逸</strong>，<strong>立刻判负</strong>。</p>
+                <p>在多人对战中，<strong>你自己的猜测会完整显示</strong>；而<strong>对手的猜测会被打码</strong>（显示为 <strong>***</strong>），你只能看到<strong>底色反馈</strong>（绿/橙/灰）来推断对手猜测进度。</p>
+
+                <h4>📌 多人模式示例（假设答案为弗洛洛）—— 你的猜测</h4>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr><th>序号</th><th>姓名</th><th>属性</th><th>星级</th><th>武器</th><th>出生地</th><th>实装版本</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="rownum">1</td>
+                                <td>坎特蕾拉</td>
+                                <td class="match-green">湮灭</td>
+                                <td class="match-green">★★★★★</td>
+                                <td class="match-green">音感仪</td>
+                                <td class="match-gray">黎那汐塔</td>
+                                <td class="match-gray">2.2 ↑</td>
+                            </tr>
+                            <tr>
+                                <td class="rownum">2</td>
+                                <td>露帕</td>
+                                <td class="match-gray">热熔</td>
+                                <td class="match-green">★★★★★</td>
+                                <td class="match-gray">长刃</td>
+                                <td class="match-gray">黎那汐塔</td>
+                                <td class="match-orange">2.4 ↑</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h4>📌 多人模式示例 —— 对手的猜测</h4>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr><th>序号</th><th>姓名</th><th>属性</th><th>星级</th><th>武器</th><th>出生地</th><th>实装版本</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="rownum">1</td>
+                                <td class="masked-cell">***</td>
+                                <td class="match-gray masked-cell">***</td>
+                                <td class="match-green masked-cell">***</td>
+                                <td class="match-green masked-cell">***</td>
+                                <td class="match-gray masked-cell">***</td>
+                                <td class="match-gray masked-cell">***</td>
+                            </tr>
+                            <tr>
+                                <td class="rownum">2</td>
+                                <td class="masked-cell">***</td>
+                                <td class="match-gray masked-cell">***</td>
+                                <td class="match-green masked-cell">***</td>
+                                <td class="match-gray masked-cell">***</td>
+                                <td class="match-gray masked-cell">***</td>
+                                <td class="match-orange masked-cell">***</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p style="font-size:13px;color:#aaa">⬆ 对手的每一格都被打码，但底色仍在：你能看出对手星级/版本猜得比较接近，却不知道具体填写了什么角色名。</p>
+            </div>
+
+            <div class="rules-section">
+                <h3>📍 快速上手</h3>
+                <ul class="rules-list">
+                    <li>输入框支持<b>自动补全</b>快速填入角色名。</li>
+                    <li>优先锁定<b>实装版本</b>，信息量最大。</li>
+                    <li>属性、武器、出生地留意「完全不一样（灰）」也能大幅缩小范围。</li>
+                </ul>
+            </div>
+
+            <div style="height:20px"></div>
+        </div>
+    </div>
+
+    <!-- ================= 游戏结束弹窗（单人） ================= -->
+    <div class="modal-overlay" id="gameOverModal">
+        <div class="modal" id="resultModal">
+            <div class="result-icon" id="resultIcon"></div>
+            <h2 id="resultTitle"></h2>
+            <div class="correct-answer" id="correctAnswer"></div>
+            <p id="resultDetail"></p>
+            <div class="modal-actions">
+                <button class="btn btn-guess" id="btnContinue" onclick="closeModal()">👍 知道了</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= 多人局结束弹窗 ================= -->
+    <div class="modal-overlay" id="roundModal">
+        <div class="modal" id="roundModalBox">
+            <div class="result-icon" id="roundIcon"></div>
+            <h2 id="roundTitle"></h2>
+            <div class="correct-answer" id="roundAnswer"></div>
+            <p id="roundDetail"></p>
+            <p class="round-timer-hint" id="roundTimerHint" style="display:none">⏳ 5 秒后自动进入下一局 ...</p>
+            <div class="modal-actions">
+                <button class="btn btn-guess" id="roundNextBtn" onclick="closeRoundModal()">下一步 ▶</button>
+                <button class="btn btn-restart" id="roundDoneBtn" onclick="leaveMulti()">🏁 返回主菜单</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= 加入房间弹窗 ================= -->
+    <div class="modal-overlay" id="joinDialog">
+        <div class="modal">
+            <h2>🔑 加入房间</h2>
+            <input type="text" id="joinCodeInput" placeholder="请输入6位房间号" maxlength="6"
+                   style="width:100%;padding:12px;margin:12px 0;border-radius:8px;border:2px solid #3a3a5a;background:rgba(255,255,255,0.1);color:#fff;font-size:16px;">
+            <div class="modal-actions" style="justify-content:flex-end">
+                <button class="btn btn-restart" onclick="closeJoinDialog()">取消</button>
+                <button class="btn btn-guess" onclick="joinRoom()">加入</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= 房间等待页弹窗 ================= -->
+    <div class="modal-overlay" id="waitDialog">
+        <div class="modal">
+            <h2 id="waitTitle">等待中...</h2>
+            <div id="waitRoomCode" class="room-code-block"></div>
+            <p id="waitDesc"></p>
+            <div class="modal-actions">
+                <button class="btn btn-restart" onclick="cancelWait()">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= 修改ID弹窗 ================= -->
+    <div class="modal-overlay" id="idEditor">
+        <div class="modal">
+            <h2>✏️ 修改玩家ID</h2>
+            <p style="color:#ccc;font-size:13px;margin-top:4px;">每个设备拥有唯一ID，新ID不可与其他玩家重复。</p>
+            <input type="text" id="idInput" placeholder="输入新的玩家ID" maxlength="64"
+                   style="width:100%;padding:12px;margin:12px 0;border-radius:8px;border:2px solid #3a3a5a;background:rgba(255,255,255,0.1);color:#fff;font-size:16px;">
+            <p id="idError" class="error-text"></p>
+            <div class="modal-actions">
+                <button class="btn btn-restart" onclick="closeIdEditor()">取消</button>
+                <button class="btn btn-guess" onclick="saveId()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= 对手弃权提示弹窗 ================= -->
+    <div class="modal-overlay" id="forfeitModal">
+        <div class="modal win">
+            <div class="result-icon" id="forfeitIcon">🏆</div>
+            <h2 id="forfeitTitle">对方已放弃对局</h2>
+            <p id="forfeitDetail"></p>
+            <div class="modal-actions">
+                <button class="btn btn-guess" onclick="closeForfeitModal()">👍 知道了</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= 左下角：返回房间按钮 ================= -->
+    <button class="room-nav-btn" id="btnRoomNav" style="display:none" onclick="goToMyRoom()">🏠 返回对战</button>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
