@@ -86,7 +86,7 @@ def compare_field(target_val, guess_val, field_name):
         return 'near'
 
     if field_name == 'version':
-        if abs(float(target_val) - float(guess_val)) <= 0.2:
+        if abs(float(target_val) - float(guess_val)) <= 0.25:
             return 'near'
         return 'different'
 
