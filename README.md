@@ -37,7 +37,11 @@
 ## 📁 项目结构
 
 ```
-├── app.py              # Flask 后端主程序（单人/多人/排行榜逻辑）
+├── app.py              # Flask 后端主程序+单人主要路由
+├── core.py             # 调用
+├── multi.py            # 多人主要路由
+├── auth_routes.py      # 验证码生成、账号相关
+├── dbfixer.py          # 简便的数据库修改工具（独立文件，需要重新配置数据库连接地址等等）
 ├── config.py           # 数据库连接配置
 ├── database_init.sql   # 数据库初始化脚本（角色表 + 玩家表）
 ├── requirements.txt    # Python 依赖
