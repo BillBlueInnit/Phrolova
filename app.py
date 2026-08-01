@@ -36,10 +36,11 @@ ROOM_LOCK = threading.Lock()        # 保护上述状态
 FORFEIT_NOTICES = {}                # winner_id -> 强制胜利通知（等待对方前端拉取）
 
 BEST_OF = 3                         # 三局两胜
-ROUND_TIME_LIMIT = 92               # 每局 1分30秒(多两秒准备)
+ROUND_TIME_LIMIT = 90               # 每局 1分30秒
 MULTI_WIN = 30                      # 多人胜 +30
 MULTI_LOSE = -30                    # 多人负 -30
 MAX_ATTEMPTS = 4                    # 每局（双方）最多 4 次猜测
+ENTER_GAME_DELAY = 2                # 匹配/加入成功后，双方统一等待 2 秒再进入对局（此时才开始计时）
 
 
 def get_connection():
@@ -415,16 +416,23 @@ def new_room(player1):
         'round_winner': None,                # 0 / 1 / None
         'target': None,
         'overall_winner': None,
+        'round_ready_at': None,              # 第一局计划开启时刻（匹配后延迟 ENTER_GAME_DELAY 秒）
     }
     ROOMS[code] = room
     return code, room
 
 
 def add_player(room, player_id):
-    """第二名玩家加入并开赛。"""
+    """第二名玩家加入。
+
+    不再立即开启第一局计时，而是把真正开局安排到 ENTER_GAME_DELAY 秒之后，
+    与客户端「匹配/加入成功后统一等待 2 秒再进入对局」的节奏对齐，
+    避免客户端进入对局时第一局计时已经空耗掉数秒。
+    真正的第一局由后台房间管理器线程在 round_ready_at 到达时通过 start_round 开启。
+    """
     room['players'].append(new_slot(player_id))
     room['status'] = 'playing'
-    start_round(room)
+    room['round_ready_at'] = time.time() + ENTER_GAME_DELAY
 
 
 def draw_target():
@@ -723,6 +731,13 @@ def _run_room_manager(done_event):
                 changed_codes = []
                 for code, room in list(ROOMS.items()):
                     before = (room['round_status'], room['status'])
+                    # 延迟开局：匹配/加入成功后等待 ENTER_GAME_DELAY 秒再开启第一局计时，
+                    # 与客户端「等待 2 秒后进入对局」同步，保证进入对局时计时从整段开始。
+                    if (room['status'] == 'playing'
+                            and room['round_status'] == 'idle'
+                            and room.get('round_ready_at') is not None
+                            and time.time() >= room['round_ready_at']):
+                        start_round(room)
                     # 超时自动结算
                     if room['round_status'] == 'active' and round_time_left(room) <= 0:
                         w = resolve_round(room)
@@ -902,6 +917,13 @@ def multi_room_state():
         idx = player_index(room, pid)
         if idx < 0:
             return jsonify({'status': 'error', 'message': '你不在该房间中'})
+        # 延迟开局：匹配成功后等待窗口到期时，把第一局正式开启
+        # （round_status 仍为 idle 时才会触发，避免重复 start_round）。
+        if (room['status'] == 'playing'
+                and room['round_status'] == 'idle'
+                and room.get('round_ready_at') is not None
+                and time.time() >= room['round_ready_at']):
+            start_round(room)
 
         # 超时自动结算
         if room['round_status'] == 'active' and round_time_left(room) <= 0:
