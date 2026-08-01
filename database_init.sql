@@ -31,6 +31,7 @@ CREATE TABLE players (
     id          INT UNSIGNED    NOT NULL AUTO_INCREMENT COMMENT '主键,自增ID',
     player_id   VARCHAR(64)     NOT NULL                COMMENT '玩家ID(每设备唯一)',
     score       INT             NOT NULL DEFAULT 0      COMMENT '玩家总分',
+    secret      VARCHAR(64)     NOT NULL DEFAULT ''     COMMENT '设备身份凭证token(防冒充)',
     PRIMARY KEY (id),
     UNIQUE KEY uk_player_id (player_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='玩家得分表';

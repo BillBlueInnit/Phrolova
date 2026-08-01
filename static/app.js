@@ -8,7 +8,9 @@ const MAX_ATTEMPTS = 4;                 // 单人 & 多人每局 4 次机会
 
 // 玩家ID（每设备唯一，存于 localStorage）
 const ID_KEY = 'phrolova_player_id';
+const TOKEN_KEY = 'phrolova_player_secret';
 let myPlayerId = localStorage.getItem(ID_KEY) || '';
+let myToken = localStorage.getItem(TOKEN_KEY) || '';
 let myScore = 0;
 let myIdTouched = false;   // 是否已初始化
 
@@ -25,6 +27,20 @@ let multiTarget = null;
 let multiGameRef = null;   // 最近一次 room_state
 let myCurrentRoom = null;  // { room_code, room_status } —— 左下角返回按钮用
 let roomNavCheckTimer = null;
+
+// WebSocket 实时推送（代替秒级 HTTP 轮询）
+let ws = null;              // 全局 WebSocket 连接
+let wsReady = false;        // 是否已连接并完成鉴权
+let wsOpen = false;         // 连接是否处于打开状态
+
+// 计时器：客户端本地平滑倒计时
+let timerInterval = null;
+
+// 进入对局倒计时（双方匹配成功后统一等待 2 秒）
+let enterCountdownTimer = null;
+
+// 防止「对手弃权」通知被 WS 推送与 HTTP 兜底重复弹出
+let wsForfeitShown = false;
 
 // 自动补全数据
 let allNames = [];
@@ -76,11 +92,20 @@ async function initPlayer() {
         const data = await res.json();
         if (data.status === 'success') {
             myScore = data.player.score;
-            localStorage.setItem(ID_KEY, data.player.player_id);
-            myPlayerId = data.player.player_id;
+            // 设备凭证：首次拿到 token 便写入 localStorage；
+            // 若服务端重签/返回了 token，则更新本地。
+            if (data.token) {
+                myToken = data.token;
+                localStorage.setItem(TOKEN_KEY, myToken);
+            }
+            if (data.player && data.player.player_id) {
+                localStorage.setItem(ID_KEY, data.player.player_id);
+                myPlayerId = data.player.player_id;
+            }
         }
     } catch (e) { /* 忽略 */ }
     refreshPlayerDisplay();
+    connectWS();   // 玩家身份就绪后，建立 WebSocket 实时通道
 }
 
 function refreshPlayerDisplay() {
@@ -103,12 +128,16 @@ async function saveId() {
         const res = await fetch('/api/player/update_id', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ old_id: myPlayerId, new_id: newId })
+            body: JSON.stringify({ old_id: myPlayerId, new_id: newId, token: myToken })
         });
         const data = await res.json();
         if (data.status === 'success') {
             myPlayerId = data.player.player_id;
             myScore = data.player.score;
+            if (data.token) {
+                myToken = data.token;
+                localStorage.setItem(TOKEN_KEY, myToken);
+            }
             localStorage.setItem(ID_KEY, myPlayerId);
             refreshPlayerDisplay();
             closeIdEditor();
@@ -371,12 +400,94 @@ function openJoinDialog() {
 }
 function closeJoinDialog() { hideModal('joinDialog'); }
 
+// ==================== WebSocket 实时推送 ====================
+function getWsUrl() {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    return `${proto}://${location.hostname}:5001/ws`;
+}
+
+function connectWS() {
+    try { if (ws) ws.close(); } catch (e) {}
+    wsOpen = false;
+    wsReady = false;
+    if (!myPlayerId || !myToken) return;
+    try {
+        ws = new WebSocket(getWsUrl());
+    } catch (e) { return; }
+    ws.onopen = () => {
+        wsOpen = true;
+        try { ws.send(JSON.stringify({ type: 'auth', player_id: myPlayerId, token: myToken })); } catch (e) {}
+    };
+    ws.onmessage = (ev) => {
+        let msg = null;
+        try { msg = JSON.parse(ev.data); } catch (e) { return; }
+        if (!msg || !msg.type) return;
+        // 服务端鉴权成功会返回 auth_ack，表示推送通道就此就绪
+        if (msg.type === 'auth_ack') { wsReady = true; return; }
+        wsReady = true;
+        handleWsMessage(msg);
+    };
+    ws.onclose = () => { wsOpen = false; wsReady = false; };
+    ws.onerror = () => { /* 保持静默，后续靠 HTTP 兜底 */ };
+}
+
+function handleWsMessage(msg) {
+    if (msg.type === 'game_started') {
+        // 匹配/加入成功：服务端同时推送给双方，统一等待 2 秒后进入对局
+        const code = msg.room_code || multiRoomCode;
+        enterGameCountdown(code);
+    } else if (msg.type === 'room_updated') {
+        // 对局状态变化（出牌/开局/超时等）：立即渲染
+        renderMultiGame(msg);
+    } else if (msg.type === 'forfeit') {
+        // 对手主动退出，判定本玩家胜利
+        stopPolling();
+        wsForfeitShown = true;
+        $('forfeitIcon').textContent = '🏆';
+        $('forfeitTitle').textContent = '对方已放弃对局';
+        $('forfeitDetail').textContent = msg.message || '对手已放弃对局，判定你获得胜利！';
+        showModal('forfeitModal');
+    } else if (msg.type === 'matching') {
+        // 重新连接后仍处于匹配排队中：恢复等待界面
+        $('waitTitle').textContent = '正在匹配中...';
+        $('waitRoomCode').innerHTML = '';
+        $('waitDesc').textContent = '正在为你寻找对手，请稍候';
+        showModal('waitDialog');
+    }
+}
+
+function enterGameCountdown(code) {
+    if (!code) return;
+    // 避免重复进入
+    if (multiRoomCode === code && $('view-multi').style.display === 'block') return;
+    multiRoomCode = code;
+    stopPolling();
+    // 显示「即将开始」等待窗，2 秒后自动进入房间
+    $('waitTitle').textContent = '对手已加入！';
+    $('waitRoomCode').innerHTML = '';
+    $('waitDesc').textContent = '即将开始对局...';
+    showModal('waitDialog');
+    clearTimeout(enterCountdownTimer);
+    enterCountdownTimer = setTimeout(() => {
+        hideModal('waitDialog');
+        enterMultiGame(code);
+    }, 2000);
+}
+
+function wsSendText(text) {
+    try { if (ws && ws.readyState === WebSocket.OPEN) ws.send(text); } catch (e) {}
+}
+
+// 心跳：保持连接活跃并探测存活
+setInterval(() => { wsSendText(JSON.stringify({ type: 'ping' })); }, 20000);
+
+
 async function createRoom() {
     try {
         const res = await fetch('/api/multi/create', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ player_id: myPlayerId })
+            body: JSON.stringify({ player_id: myPlayerId, token: myToken })
         });
         const data = await res.json();
         if (data.status === 'error') { alert(data.message || '创建失败'); return; }
@@ -395,8 +506,8 @@ function showWaitRoom(code) {
     $('waitRoomCode').innerHTML = `房间号<br>${code}`;
     $('waitDesc').textContent = '请将房间号告知另一位玩家，或稍后在匹配中等待';
     showModal('waitDialog');
-    // 轮询等待对手加入
-    startWaitPolling();
+    // WebSocket 会在对手加入时推送「game_started」；此兜底仅在 WS 未联通时启用
+    startWaitFallback(code);
 }
 
 async function randomMatch() {
@@ -405,7 +516,7 @@ async function randomMatch() {
         const res = await fetch('/api/multi/random_match', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ player_id: myPlayerId })
+            body: JSON.stringify({ player_id: myPlayerId, token: myToken })
         });
         const data = await res.json();
         if (data.status === 'error') { alert(data.message || '匹配失败'); return; }
@@ -415,9 +526,11 @@ async function randomMatch() {
             $('waitRoomCode').innerHTML = '';
             $('waitDesc').textContent = '正在为你寻找对手，请稍候';
             showModal('waitDialog');
-            startWaitPolling();
+            // WebSocket 在配对成功时推送「game_started」；兜底仅在 WS 未联通时启用
+            startWaitFallback(null);
         } else if (data.room_code) {
-            enterMultiGame(data.room_code);
+            // 本次配对立即完成：双方统一等待 2 秒后进入
+            enterGameCountdown(data.room_code);
         } else if (data.already_in_room) {
             hideModal('waitDialog');
             stopPolling();
@@ -426,16 +539,19 @@ async function randomMatch() {
     } catch (e) { alert('无法连接服务器'); }
 }
 
-function startWaitPolling() {
+// WebSocket 不可用时的 HTTP 兜底轮询（正常联机时不会触发，仅在 WS 失败时兜底）
+function startWaitFallback(codeOrNull) {
     stopPolling();
     multiPollTimer = setInterval(async () => {
-        // 检查随机匹配是否已配对（未拿到 room_code 的情况）
+        // WS 已就绪：一切交给实时推送，此兜底轮询不再工作
+        if (wsReady && wsOpen) return;
+        // 随机匹配排队中（尚无 room_code）：周期重询，检查是否配对
         if (!multiRoomCode) {
             try {
                 const res = await fetch('/api/multi/random_match', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ player_id: myPlayerId })
+                    body: JSON.stringify({ player_id: myPlayerId, token: myToken })
                 });
                 const data = await res.json();
                 if (data.status !== 'success') return;
@@ -443,7 +559,7 @@ function startWaitPolling() {
                     multiRoomCode = data.room_code;
                     hideModal('waitDialog');
                     stopPolling();
-                    enterMultiGame(data.room_code);
+                    enterGameCountdown(data.room_code);
                     return;
                 }
                 if (data.already_in_room) {
@@ -452,14 +568,11 @@ function startWaitPolling() {
                     enterGameByExistingRoom(data.room_code, data.room_status);
                     return;
                 }
-                if (data.in_queue) return;
-            } catch (e) {
-                return;
-            }
+            } catch (e) { return; }
             return;
         }
-        // 已有房间：检查是否开始
-        const res = await fetch(`/api/multi/room_state?player_id=${encodeURIComponent(myPlayerId)}&room_code=${multiRoomCode}`);
+        // 已有房间：检查是否已开始
+        const res = await fetch(`/api/multi/room_state?player_id=${encodeURIComponent(myPlayerId)}&room_code=${multiRoomCode}&token=${encodeURIComponent(myToken)}`);
         const data = await res.json();
         if (data.status === 'success' && (data.room_status === 'playing' || data.room_status === 'finished')) {
             hideModal('waitDialog');
@@ -491,14 +604,14 @@ function cancelWait() {
         fetch('/api/multi/leave_room', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ player_id: myPlayerId, room_code: multiRoomCode })
+            body: JSON.stringify({ player_id: myPlayerId, room_code: multiRoomCode, token: myToken })
         });
     } else {
         // 随机匹配排队中：取消排队
         fetch('/api/multi/cancel_match', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ player_id: myPlayerId })
+            body: JSON.stringify({ player_id: myPlayerId, token: myToken })
         });
     }
     multiRoomCode = '';
@@ -511,7 +624,7 @@ async function checkMyRoom() {
         // 这个每 3 秒运行的检查也能稳定弹出「对手放弃、判定你胜利」提示。
         await checkForfeitNotice();
 
-        const res = await fetch(`/api/multi/my_room?player_id=${encodeURIComponent(myPlayerId)}`);
+        const res = await fetch(`/api/multi/my_room?player_id=${encodeURIComponent(myPlayerId)}&token=${encodeURIComponent(myToken)}`);
         const data = await res.json();
         const btn = $('btnRoomNav');
         if (data.status === 'success' && data.in_room) {
@@ -560,18 +673,21 @@ async function joinRoom() {
         const res = await fetch('/api/multi/join', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ player_id: myPlayerId, room_code: code })
+            body: JSON.stringify({ player_id: myPlayerId, room_code: code, token: myToken })
         });
         const data = await res.json();
         if (data.status === 'error') { alert(data.message || '加入失败'); return; }
         hideModal('joinDialog');
         multiRoomCode = data.room_code;
-        enterMultiGame(data.room_code);
+        // 与房主（创建者）同步：等待 2 秒后一同进入对局
+        enterGameCountdown(data.room_code);
     } catch (e) { alert('无法连接服务器'); }
 }
 
 function leaveMulti() {
     stopPolling();
+    stopTimer();
+    clearTimeout(enterCountdownTimer);
     hideModal('roundModal');
     hideModal('waitDialog');
     if (multiRoomCode) {
@@ -579,7 +695,7 @@ function leaveMulti() {
         fetch('/api/multi/leave_room', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ player_id: myPlayerId, room_code: multiRoomCode })
+            body: JSON.stringify({ player_id: myPlayerId, room_code: multiRoomCode, token: myToken })
         }).then(r => r.json()).catch(() => {});
     }
     multiRoomCode = '';
@@ -592,9 +708,18 @@ function enterMultiGame(roomCode) {
     multiRoomCode = roomCode;
     showView('view-multi');
     setupMultiInput();
+    // 先拉取一次最新状态（覆盖进入瞬间的显示）
     pollRoom();
     stopPolling();
-    multiPollTimer = setInterval(pollRoom, 1500);
+    // 不再每秒轮询 —— 实时更新由 WebSocket 推送驱动；
+    // 仅保留一个低频兜底（WS 断开时保护，避免界面永久卡住）
+    multiPollTimer = setInterval(pollRoomFallback, 4000);
+}
+
+async function pollRoomFallback() {
+    // WebSocket 已联通时，由推送驱动，兜底轮询不再重复请求
+    if (wsReady && wsOpen) return;
+    await pollRoom();
 }
 
 function setupMultiInput() {
@@ -612,7 +737,7 @@ function setupMultiInput() {
 async function pollRoom() {
     if (!multiRoomCode) return;
     try {
-        const res = await fetch(`/api/multi/room_state?player_id=${encodeURIComponent(myPlayerId)}&room_code=${multiRoomCode}`);
+        const res = await fetch(`/api/multi/room_state?player_id=${encodeURIComponent(myPlayerId)}&room_code=${multiRoomCode}&token=${encodeURIComponent(myToken)}`);
         const data = await res.json();
         if (data.status === 'error') {
             // 房间已消失：可能是对手主动退出（强制胜利），也可能是房间结束/被清理
@@ -628,10 +753,11 @@ async function pollRoom() {
 async function checkForfeitNotice() {
     if (!myPlayerId) return false;
     try {
-        const res = await fetch(`/api/multi/forfeit_notice?player_id=${encodeURIComponent(myPlayerId)}`);
+        const res = await fetch(`/api/multi/forfeit_notice?player_id=${encodeURIComponent(myPlayerId)}&token=${encodeURIComponent(myToken)}`);
         const data = await res.json();
-        if (data.status === 'success' && data.forfeit) {
+        if (data.status === 'success' && data.forfeit && !wsForfeitShown) {
             stopPolling();
+            wsForfeitShown = true;
             $('forfeitIcon').textContent = '🏆';
             $('forfeitTitle').textContent = '对方已放弃对局';
             $('forfeitDetail').textContent = data.message;
@@ -644,6 +770,7 @@ async function checkForfeitNotice() {
 
 function closeForfeitModal() {
     hideModal('forfeitModal');
+    wsForfeitShown = false;
     $('btnRoomNav').style.display = 'none';
 }
 
@@ -653,17 +780,40 @@ function formatTime(sec) {
     return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+// 客户端本地平滑倒计时：基于服务端提供的「本局开始时刻」逐秒刷新，
+// 不依赖网络往返，因此显示不会忽快忽慢，且终局用时仍由服务端权威结算。
+function stopTimer() {
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+}
+
+function startTimer(data) {
+    stopTimer();
+    const limit = data.time_limit || 90;
+    const roundStart = data.round_start;
+
+    const update = () => {
+        let left;
+        if (roundStart == null) {
+            left = limit;
+        } else {
+            left = Math.max(0, Math.ceil(limit - (Date.now() / 1000 - roundStart)));
+        }
+        $('timerBadge').textContent = '⏱ ' + formatTime(left);
+        $('timerBadge').classList.toggle('warn', left <= 15);
+        if (left <= 0) stopTimer();
+    };
+    update();
+    timerInterval = setInterval(update, 1000);
+}
+
 function renderMultiGame(data) {
     multiGameRef = data;
     const round = data.round;
     const maxRound = data.best_of;
     $('roundBadge').textContent = `第 ${round} 局`;
 
-    // 计时器
-    const timerEl = $('timerBadge');
-    const tl = data.time_left;
-    timerEl.textContent = '⏱ ' + formatTime(tl);
-    timerEl.classList.toggle('warn', tl <= 15);
+    // 计时器（毫秒级本地平滑倒计时，不再随轮询跳动）
+    startTimer(data);
 
     // 比分（局胜）
     const wins = data.round_wins || [0, 0];
@@ -725,6 +875,8 @@ function handleRoundEnd(data) {
     if (roundModalShown === key) return;
     roundModalShown = key;
 
+    // 本局结束：暂停本地倒计时（下一局开始时会由 renderMultiGame 重新拉起）
+    stopTimer();
     $('multiGuessInput').disabled = true;
     $('btnMultiGuess').disabled = true;
     $('roundTimerHint').style.display = 'none';
@@ -794,7 +946,7 @@ async function nextRound() {
         await fetch('/api/multi/next_round', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ player_id: myPlayerId, room_code: multiRoomCode })
+            body: JSON.stringify({ player_id: myPlayerId, room_code: multiRoomCode, token: myToken })
         });
     } catch (e) { /* 忽略 */ }
     await pollRoom();
@@ -814,7 +966,7 @@ async function multiGuessCharacter() {
         const res = await fetch('/api/multi/guess', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ player_id: myPlayerId, room_code: multiRoomCode, guess: name })
+            body: JSON.stringify({ player_id: myPlayerId, room_code: multiRoomCode, guess: name, token: myToken })
         });
         const data = await res.json();
         if (data.status === 'error') { alert(data.message); return; }

@@ -14,11 +14,16 @@ import string
 import time
 import threading
 import os
+import secrets
+import asyncio
+import json
 
 from flask import Flask, jsonify, request, render_template, send_from_directory
 import pymysql
 from pymysql.cursors import DictCursor
 from config import DB_CONFIG
+import websockets
+from websockets.asyncio.server import serve as ws_serve
 
 app = Flask(__name__)
 
@@ -111,6 +116,43 @@ def match_count(compare):
 # ------------------------------------------------------------------
 # 玩家 / 得分 相关
 # ------------------------------------------------------------------
+def generate_token():
+    """生成一个不可猜测的设备凭证 token。"""
+    return secrets.token_hex(16)
+
+
+SECRET_PREPARED = False
+
+
+def ensure_secret_column():
+    """确保 players 表存在 secret 列（用于设备身份鉴权，防止伪造 player_id 冒充他人）。
+
+    兼容旧库：若首次执行时数据库尚未就绪，则延后到首个请求（player_init）再重试。
+    仅在首次成功时执行一次，避免每次请求都重复 ALTER。
+    """
+    global SECRET_PREPARED
+    if SECRET_PREPARED:
+        return
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute("ALTER TABLE players ADD COLUMN secret VARCHAR(64) NOT NULL DEFAULT ''")
+                conn.commit()
+            except Exception:
+                conn.rollback()  # 列已存在，忽略
+        SECRET_PREPARED = True
+    finally:
+        conn.close()
+
+
+# 进程启动时执行一次，兼容旧库；失败无碍，将在首个 player_init 请求时重试
+try:
+    ensure_secret_column()
+except Exception:
+    pass
+
+
 def get_player(player_id):
     """按 player_id 查询玩家，不存在返回 None。"""
     conn = get_connection()
@@ -125,22 +167,41 @@ def get_player(player_id):
 
 def create_player(player_id):
     """新建玩家（初始 0 分），返回新行。"""
+    secret = generate_token()
     conn = get_connection()
     try:
         with conn.cursor() as cursor:
-            cursor.execute("INSERT INTO players (player_id, score) VALUES (%s, 0)", (player_id,))
+            cursor.execute(
+                "INSERT INTO players (player_id, score, secret) VALUES (%s, 0, %s)",
+                (player_id, secret),
+            )
         conn.commit()
     finally:
         conn.close()
-    return {'player_id': player_id, 'score': 0}
+    return {'player_id': player_id, 'score': 0, 'secret': secret}
+
+
+def set_player_secret(player_id):
+    """为已有玩家生成并写入 secret，返回该 secret。"""
+    secret = generate_token()
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("UPDATE players SET secret = %s WHERE player_id = %s", (secret, player_id))
+        conn.commit()
+    finally:
+        conn.close()
+    return secret
 
 
 def ensure_player(player_id):
-    """确保玩家存在，返回其信息。"""
+    """确保玩家存在，返回其信息；若已有玩家缺少 secret 则补上。"""
     p = get_player(player_id)
-    if p:
-        return p
-    return create_player(player_id)
+    if not p:
+        return create_player(player_id)
+    if not p.get('secret'):
+        p['secret'] = set_player_secret(player_id)
+    return p
 
 
 def apply_score(player_id, delta):
@@ -155,6 +216,28 @@ def apply_score(player_id, delta):
         conn.commit()
     finally:
         conn.close()
+
+
+def authenticate_player(data_or_args):
+    """根据请求数据（dict，含 player_id 与 token）校验玩家身份。
+
+    本游戏以「设备凭证 token」为鉴权依据：仅当请求方提供的 token 与数据库
+    中该 player_id 记录的 secret 一致时，才认定该请求出自该设备本人，
+    从而防止外部伪造/冒充 player_id 执行越权操作。
+
+    返回玩家 dict（含 secret）；校验失败返回 None。
+    """
+    pid = (data_or_args.get('player_id') or '').strip()
+    token = (data_or_args.get('token') or '').strip()
+    if not pid or not token:
+        return None
+    p = get_player(pid)
+    if not p or not p.get('secret'):
+        return None
+    # 常量时间比较，避免时序侧信道
+    if not secrets.compare_digest(p['secret'], token):
+        return None
+    return p
 
 
 # ------------------------------------------------------------------
@@ -237,13 +320,17 @@ def guess():
 # ------------------------------------------------------------------
 @app.route('/api/player/init', methods=['POST'])
 def player_init():
-    """前端加载时调用，确保设备 player_id 存在，返回玩家信息。"""
+    """前端加载时调用，确保设备 player_id 存在，返回玩家信息与设备凭证 token。"""
+    try:
+        ensure_secret_column()  # 若启动时未就绪，首个请求时补齐 secret 列
+    except Exception:
+        pass
     data = request.get_json() or {}
     pid = (data.get('player_id') or '').strip()
     if not pid:
         return jsonify({'status': 'error', 'message': '缺少玩家ID'})
     p = ensure_player(pid)
-    return jsonify({'status': 'success', 'player': p})
+    return jsonify({'status': 'success', 'player': p, 'token': p['secret']})
 
 
 @app.route('/api/player/update_id', methods=['POST'])
@@ -256,6 +343,9 @@ def player_update_id():
         return jsonify({'status': 'error', 'message': '参数不完整'})
     if len(new_id) > 64:
         return jsonify({'status': 'error', 'message': 'ID 过长'})
+    # 鉴权：只能用本人设备的凭证来修改本人 ID，防止冒名改他人。
+    if not authenticate_player({'player_id': old_id, 'token': data.get('token')}):
+        return jsonify({'status': 'error', 'message': '身份校验失败'})
     other = get_player(new_id)
     if other and other['player_id'] != old_id:
         return jsonify({'status': 'error', 'message': '该玩家ID已被占用'})
@@ -271,7 +361,7 @@ def player_update_id():
     finally:
         conn.close()
     p = get_player(new_id)
-    return jsonify({'status': 'success', 'player': p})
+    return jsonify({'status': 'success', 'player': p, 'token': p['secret']})
 
 
 @app.route('/api/player/score', methods=['POST'])
@@ -471,6 +561,7 @@ def build_room_view(room, viewer_idx):
         'round_wins': [slot['round_wins'] for slot in room['players']],
         'time_left': round_time_left(room),
         'time_limit': ROUND_TIME_LIMIT,
+        'round_start': room['round_start'],
         'target': target,
         'target_version': room['target']['version'] if room['target'] else None,
         'overall_winner': room['overall_winner'],
@@ -493,6 +584,178 @@ def build_room_view(room, viewer_idx):
 
 
 # ------------------------------------------------------------------
+# WebSocket 实时推送（多人模式）
+# 架构说明：
+# - 每个已鉴权的设备在 /ws 建立一个长连接，服务器据此把房间状态变化
+#   （开局、出牌、超时、弃权等）毫秒级推送给双方，取代原先的秒级 HTTP 轮询。
+# - 所有 HTTP 接口仍是权威状态来源；WebSocket 只负责「通知」。
+# - 后台房间管理器（ROOM_MANAGER_THREAD）每秒扫描一次，主动结算超时、
+#   推进下一局并推送，使对局完全由服务器驱动、客户端被动渲染。
+# ------------------------------------------------------------------
+WS_PORT = 5001               # WebSocket 服务端口（与主服务分离）
+CLIENT_CONNS = {}            # player_id -> 该玩家的 WebSocket 连接（运行在 WS 专属线程）
+WS_LOOP = None               # WS 专属事件循环句柄（供其他线程向它投递发送任务）
+
+WS_LOCK = threading.Lock()   # 保护 CLIENT_CONNS 的跨线程读写
+ws_send_pool = []            # 简单任务队列： (player_id, payload) 由 ws 线程批量发送
+WS_POOL_LOCK = threading.Lock()
+
+
+def ws_push_to_loop(player_id, payload):
+    """把要向某玩家推送的消息投递到 WS 线程的执行队列，线程安全。"""
+    with WS_POOL_LOCK:
+        ws_send_pool.append((player_id, payload))
+
+
+async def _ws_flush():
+    """在 WS 事件循环内批量发送队列中的消息。"""
+    while True:
+        tasks = []
+        with WS_POOL_LOCK:
+            if ws_send_pool:
+                tasks = ws_send_pool[:]
+                ws_send_pool.clear()
+        for player_id, payload in tasks:
+            conn = CLIENT_CONNS.get(player_id)
+            if conn is None:
+                continue
+            try:
+                await conn.send(json.dumps(payload, ensure_ascii=False))
+            except Exception:
+                with WS_LOCK:
+                    if CLIENT_CONNS.get(player_id) is conn:
+                        CLIENT_CONNS.pop(player_id, None)
+        # 每次发送后稍微让步，避免空转占用过多 CPU
+        await asyncio.sleep(0.01)
+
+
+def ws_send(player_id, payload):
+    """向指定玩家推送一条 JSON 消息（跨线程安全）。"""
+    if not player_id:
+        return
+    ws_push_to_loop(player_id, payload)
+
+
+def notify_room_players(room, event='room_updated'):
+    """把当前房间视图推送给该房间内所有玩家。"""
+    for i, slot in enumerate(room.get('players', [])):
+        view = build_room_view(room, i)
+        view['player_index'] = i
+        view['type'] = event
+        ws_send(slot['player_id'], view)
+
+
+async def _ws_handler(ws):
+    """单个 WebSocket 连接的会话逻辑：先鉴权，再保持连接接收心跳。"""
+    player_id = None
+    try:
+        async for raw in ws:
+            if not raw:
+                continue
+            try:
+                msg = json.loads(raw)
+            except Exception:
+                continue
+            mtype = msg.get('type')
+            if mtype == 'auth' and player_id is None:
+                p = authenticate_player({
+                    'player_id': (msg.get('player_id') or '').strip(),
+                    'token': (msg.get('token') or '').strip(),
+                })
+                if p is not None:
+                    player_id = p['player_id']
+                    with WS_LOCK:
+                        CLIENT_CONNS[player_id] = ws
+                    try:
+                        await ws.send(json.dumps({'type': 'auth_ack'}))
+                    except Exception:
+                        pass
+                    # 连接建立后，若玩家已在某个对局中，立即推送当前房间状态，
+                    # 让刷新/重连的玩家能无缝回到对局。
+                    with ROOM_LOCK:
+                        for room in ROOMS.values():
+                            if any(s['player_id'] == player_id for s in room['players']):
+                                if room['status'] in ('playing', 'finished'):
+                                    notify_room_players(room, 'room_updated')
+                    # 若正在随机匹配排队中，也回一个排队状态，以便 UI 恢复
+                    with ROOM_LOCK:
+                        if any(q.get('player_id') == player_id for q in MATCH_QUEUE):
+                            ws_send(player_id, {'type': 'matching'})
+            elif mtype == 'ping':
+                try:
+                    await ws.send(json.dumps({'type': 'pong'}))
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    finally:
+        if player_id is not None:
+            with WS_LOCK:
+                if CLIENT_CONNS.get(player_id) is ws:
+                    CLIENT_CONNS.pop(player_id, None)
+
+
+def _run_ws_server(done_event):
+    """在独立线程中运行 asyncio 的 WebSocket 服务器。"""
+    global WS_LOOP
+
+    async def main():
+        global WS_LOOP
+        WS_LOOP = asyncio.get_running_loop()
+        # 启动常驻的消息冲刷协程
+        asyncio.get_running_loop().create_task(_ws_flush())
+        async with ws_serve(_ws_handler, "0.0.0.0", WS_PORT):
+            await asyncio.Future()   # 永远运行
+    try:
+        asyncio.run(main())
+    except Exception:
+        pass
+    finally:
+        done_event.set()
+
+
+def _run_room_manager(done_event):
+    """后台房间管理器线程：秒级扫描房间，主动结算超时/推进对局并推送。"""
+    while True:
+        try:
+            time.sleep(0.8)
+            with ROOM_LOCK:
+                changed_codes = []
+                for code, room in list(ROOMS.items()):
+                    before = (room['round_status'], room['status'])
+                    # 超时自动结算
+                    if room['round_status'] == 'active' and round_time_left(room) <= 0:
+                        w = resolve_round(room)
+                        finish_round(room, w)
+                    # 兜底：单局结算超过 60s 仍无客户端推进下一局时自动推进
+                    r_at = room.get('round_resolved_at')
+                    if (room['round_status'] == 'finished'
+                            and room['status'] != 'finished'
+                            and r_at and (time.time() - r_at) >= 60):
+                        start_round(room)
+                    if (before[0], before[1]) != (room['round_status'], room['status']):
+                        changed_codes.append(code)
+                    # 清理过期房间
+                for code in changed_codes:
+                    room = ROOMS.get(code)
+                    if room:
+                        notify_room_players(room, 'room_updated')
+        except Exception:
+            pass
+
+
+def start_background_threads():
+    """启动 WebSocket 服务器线程与房间管理器线程（在 __main__ 中调用）。"""
+    ws_done = threading.Event()
+    t_ws = threading.Thread(target=_run_ws_server, args=(ws_done,), daemon=True)
+    t_ws.start()
+    r_done = threading.Event()
+    t_mgr = threading.Thread(target=_run_room_manager, args=(r_done,), daemon=True)
+    t_mgr.start()
+    return ws_done, r_done
+
+
+# ------------------------------------------------------------------
 # 多人模式：接口
 # ------------------------------------------------------------------
 @app.route('/api/multi/create', methods=['POST'])
@@ -502,6 +765,8 @@ def multi_create():
     pid = (data.get('player_id') or '').strip()
     if not pid:
         return jsonify({'status': 'error', 'message': '缺少玩家ID'})
+    if not authenticate_player(data):
+        return jsonify({'status': 'error', 'message': '身份校验失败'})
     ensure_player(pid)
 
     with ROOM_LOCK:
@@ -526,6 +791,8 @@ def multi_join():
     code = (data.get('room_code') or '').strip().upper()
     if not pid or not code:
         return jsonify({'status': 'error', 'message': '参数不完整'})
+    if not authenticate_player(data):
+        return jsonify({'status': 'error', 'message': '身份校验失败'})
     ensure_player(pid)
 
     with ROOM_LOCK:
@@ -545,6 +812,13 @@ def multi_join():
             return jsonify({'status': 'error', 'message': '你正在匹配中'})
 
         add_player(room, pid)
+        _game_started = True
+    # 双方向各自推送「开局」，使其在 2 秒倒计时后同时进入对局
+    if _game_started:
+        with ROOM_LOCK:
+            room = ROOMS.get(code)
+            if room:
+                notify_room_players(room, 'game_started')
     return jsonify({'status': 'success', 'room_code': code})
 
 
@@ -555,6 +829,8 @@ def multi_random_match():
     pid = (data.get('player_id') or '').strip()
     if not pid:
         return jsonify({'status': 'error', 'message': '缺少玩家ID'})
+    if not authenticate_player(data):
+        return jsonify({'status': 'error', 'message': '身份校验失败'})
     ensure_player(pid)
 
     with ROOM_LOCK:
@@ -579,9 +855,20 @@ def multi_random_match():
             opp_id = opponent['player_id']
             code, room = new_room(opp_id)
             add_player(room, pid)
-            return jsonify({'status': 'success', 'room_code': code, 'in_queue': False,
-                            'opponent': opp_id})
-        MATCH_QUEUE.append({'player_id': pid, 'since': time.time()})
+            # 随机匹配配对成功：推送给双方「开局」，使其 2 秒后同时进入
+            _paired = True
+        else:
+            _paired = False
+    if _paired:
+        with ROOM_LOCK:
+            room = ROOMS.get(code)
+            if room:
+                notify_room_players(room, 'game_started')
+        return jsonify({'status': 'success', 'room_code': code, 'in_queue': False,
+                        'opponent': opp_id})
+    else:
+        with ROOM_LOCK:
+            MATCH_QUEUE.append({'player_id': pid, 'since': time.time()})
     return jsonify({'status': 'success', 'room_code': None, 'in_queue': True})
 
 
@@ -590,6 +877,8 @@ def multi_cancel_match():
     """取消随机匹配排队。"""
     data = request.get_json() or {}
     pid = (data.get('player_id') or '').strip()
+    if not authenticate_player(data):
+        return jsonify({'status': 'error', 'message': '身份校验失败'})
     with ROOM_LOCK:
         MATCH_QUEUE[:] = [q for q in MATCH_QUEUE if q.get('player_id') != pid]
     return jsonify({'status': 'success'})
@@ -602,6 +891,9 @@ def multi_room_state():
     code = (request.args.get('room_code') or '').strip().upper()
     if not pid or not code:
         return jsonify({'status': 'error', 'message': '参数不完整'})
+    # 鉴权：防止拿着他人 player_id 查看/触发房间结算
+    if not authenticate_player(request.args):
+        return jsonify({'status': 'error', 'message': '身份校验失败，无权访问该房间'})
 
     with ROOM_LOCK:
         room = ROOMS.get(code)
@@ -637,6 +929,9 @@ def multi_guess():
     guess_name = (data.get('guess') or '').strip()
     if not pid or not code or not guess_name:
         return jsonify({'status': 'error', 'message': '参数不完整'})
+    # 鉴权：只能用本人的设备凭证为自己的身份提交猜测
+    if not authenticate_player(data):
+        return jsonify({'status': 'error', 'message': '身份校验失败'})
 
     with ROOM_LOCK:
         room = ROOMS.get(code)
@@ -673,14 +968,22 @@ def multi_guess():
 
         if won:
             finish_round(room, idx)
-            return jsonify(result)
-
-        # 双方都用尽猜测则本局提前结算
-        if all(p['attempts'] >= MAX_ATTEMPTS for p in room['players']):
+            _notify = True
+        elif all(p['attempts'] >= MAX_ATTEMPTS for p in room['players']):
             w = resolve_round(room)
             finish_round(room, w)
+            _notify = True
+        else:
+            _notify = True
+        _guess_room_code = code
 
-        return jsonify(result)
+    # 猜测导致状态变化：把最新房间视图实时推送给双方
+    if _notify:
+        with ROOM_LOCK:
+            room = ROOMS.get(_guess_room_code)
+            if room:
+                notify_room_players(room, 'room_updated')
+    return jsonify(result)
 
 
 @app.route('/api/multi/next_round', methods=['POST'])
@@ -691,6 +994,8 @@ def multi_next_round():
     code = (data.get('room_code') or '').strip().upper()
     if not pid or not code:
         return jsonify({'status': 'error', 'message': '参数不完整'})
+    if not authenticate_player(data):
+        return jsonify({'status': 'error', 'message': '身份校验失败'})
 
     with ROOM_LOCK:
         room = ROOMS.get(code)
@@ -702,6 +1007,16 @@ def multi_next_round():
         # 仅在单局已结束且还未整场结束时启动下一局；由加锁保证不会重复 start_round
         if room['round_status'] == 'finished' and room['status'] != 'finished':
             start_round(room)
+            _started = True
+        else:
+            _started = False
+        _nr_code = code
+    # 下一局开始：实时通知双方刷新为新的对局视图（含新的计时起点）
+    if _started:
+        with ROOM_LOCK:
+            room = ROOMS.get(_nr_code)
+            if room:
+                notify_room_players(room, 'room_updated')
     return jsonify({'status': 'success'})
 
 
@@ -711,6 +1026,8 @@ def multi_my_room():
     pid = (request.args.get('player_id') or '').strip()
     if not pid:
         return jsonify({'status': 'error', 'message': '缺少玩家ID'})
+    if not authenticate_player(request.args):
+        return jsonify({'status': 'error', 'message': '身份校验失败'})
     with ROOM_LOCK:
         for code, room in ROOMS.items():
             if any(p['player_id'] == pid for p in room['players']):
@@ -733,6 +1050,8 @@ def multi_forfeit_notice():
     pid = (request.args.get('player_id') or '').strip()
     if not pid:
         return jsonify({'status': 'error', 'message': '缺少玩家ID'})
+    if not authenticate_player(request.args):
+        return jsonify({'status': 'error', 'message': '身份校验失败'})
     with ROOM_LOCK:
         notice = FORFEIT_NOTICES.pop(pid, None)
     if notice:
@@ -756,6 +1075,10 @@ def multi_leave_room():
     data = request.get_json() or {}
     pid = (data.get('player_id') or '').strip()
     code = (data.get('room_code') or '').strip().upper()
+    # 身份鉴权：必须是「本人设备」凭证才能代表该玩家退出，
+    # 否则攻击者可伪造对手的 player_id 使其被判负。
+    if not authenticate_player(data):
+        return jsonify({'status': 'error', 'message': '身份校验失败，无权执行该操作'})
     with ROOM_LOCK:
         # 先从中立处理匹配队列
         MATCH_QUEUE[:] = [q for q in MATCH_QUEUE if q.get('player_id') != pid]
@@ -770,11 +1093,20 @@ def multi_leave_room():
                 apply_score(room['players'][loser_idx]['player_id'], MULTI_LOSE)
                 apply_score(room['players'][winner_idx]['player_id'], MULTI_WIN)
                 # 记录强制胜利通知，供对方前端拉取并提示
-                FORFEIT_NOTICES[room['players'][winner_idx]['player_id']] = {
-                    'winner_id': room['players'][winner_idx]['player_id'],
-                    'loser_id': room['players'][loser_idx]['player_id'],
+                winner_id = room['players'][winner_idx]['player_id']
+                loser_id = room['players'][loser_idx]['player_id']
+                FORFEIT_NOTICES[winner_id] = {
+                    'winner_id': winner_id,
+                    'loser_id': loser_id,
                 }
                 ROOMS.pop(code, None)
+                # 实时推送「对手弃权，判定你胜利」给获胜方
+                ws_send(winner_id, {
+                    'type': 'forfeit',
+                    'winner_id': winner_id,
+                    'loser_id': loser_id,
+                    'message': f'对手 {loser_id} 已主动放弃对局，判定你获得胜利！',
+                })
             else:
                 room['players'] = [p for p in room['players'] if p['player_id'] != pid]
                 if len(room['players']) < 2:
@@ -794,4 +1126,12 @@ def favicon():
 # 主入口
 # ------------------------------------------------------------------
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # 启动 WebSocket 服务器线程 + 房间管理器线程。
+    # 先启动后台线程，再阻塞运行 Flask（关闭 debug 自动重载以避开双进程抢端口）。
+    try:
+        start_background_threads()
+        print(f'[startup] WebSocket 推送服务已启动于端口 {WS_PORT}')
+    except Exception as e:
+        print(f'[startup] WebSocket 服务启动失败：{e}')
+
+    app.run(host='0.0.0.0', port=5000, debug=True, use_reloader=False)
