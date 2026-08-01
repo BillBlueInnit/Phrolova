@@ -619,15 +619,51 @@ def player_score():
 
 @app.route('/api/leaderboard')
 def leaderboard():
-    """返回排行榜（玩家ID + 得分，降序）。"""
+    """返回排行榜（玩家ID + 得分，降序），仅取前 40 名以优化性能。
+
+    若请求方提供了自己的 player_id（已登录玩家）且不在前 40 名，
+    则额外返回该玩家的个人名次（my_info），方便前端在榜单底部单独标注。
+    """
+    TOP_N = 40
     conn = get_connection()
     try:
         with conn.cursor() as cursor:
-            cursor.execute("SELECT player_id, score FROM players ORDER BY score DESC, player_id ASC")
-            rows = cursor.fetchall()
+            # 只读取前 40 名，避免全表扫描/传输
+            cursor.execute(
+                "SELECT player_id, score FROM players "
+                "ORDER BY score DESC, player_id ASC LIMIT %s",
+                (TOP_N,),
+            )
+            top = cursor.fetchall()
+
+            # 查询请求方（当前登录玩家）的个人名次
+            my_info = None
+            pid = (request.args.get('player_id') or '').strip()
+            if pid:
+                in_top = any(r['player_id'] == pid for r in top)
+                if in_top:
+                    my_info = {'player_id': pid, 'in_top': True}
+                else:
+                    # 玩家不在前 40：用两次 COUNT 精确计算名次，不读取全表
+                    cursor.execute("SELECT score FROM players WHERE player_id = %s", (pid,))
+                    row = cursor.fetchone()
+                    if row:
+                        cursor.execute("SELECT COUNT(*) AS c FROM players WHERE score > %s", (row['score'],))
+                        greater = cursor.fetchone()['c']
+                        cursor.execute(
+                            "SELECT COUNT(*) AS c FROM players WHERE score = %s AND player_id < %s",
+                            (row['score'], pid),
+                        )
+                        same_before = cursor.fetchone()['c']
+                        my_info = {
+                            'player_id': pid,
+                            'score': row['score'],
+                            'rank': greater + same_before + 1,
+                            'in_top': False,
+                        }
     finally:
         conn.close()
-    return jsonify({'status': 'success', 'leaderboard': rows})
+    return jsonify({'status': 'success', 'leaderboard': top, 'my_info': my_info})
 
 
 # ------------------------------------------------------------------

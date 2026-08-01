@@ -340,10 +340,13 @@ async function loadLeaderboard() {
     const empty = $('lbEmptyState');
     tbody.innerHTML = '';
     try {
-        const res = await fetch('/api/leaderboard');
+        // 传入当前玩家ID，服务端据此决定是否返回其个人名次
+        const q = myPlayerId ? `?player_id=${encodeURIComponent(myPlayerId)}` : '';
+        const res = await fetch('/api/leaderboard' + q);
         const data = await res.json();
         if (data.status === 'success' && data.leaderboard.length) {
             empty.style.display = 'none';
+            // 前 40 名榜单：玩家自己的ID标黄
             data.leaderboard.forEach((row, i) => {
                 const tr = document.createElement('tr');
                 tr.appendChild(makeCell(String(i + 1), 'rownum'));
@@ -355,6 +358,21 @@ async function loadLeaderboard() {
                 tr.appendChild(makeCell(String(row.score)));
                 tbody.appendChild(tr);
             });
+
+            // 玩家不在前 40 名：在最底部单独标出个人位置（黄色）
+            const mi = data.my_info;
+            if (myPlayerId && mi && !mi.in_top && mi.rank) {
+                const cr = document.createElement('tr');
+                cr.style.borderTop = '2px dashed rgba(255,255,255,0.25)';
+                cr.appendChild(makeCell(String(mi.rank), 'rownum'));
+                const nameTd = document.createElement('td');
+                nameTd.textContent = mi.player_id + '（我的位置）';
+                nameTd.style.color = '#ffd700';
+                nameTd.style.fontWeight = 'bold';
+                cr.appendChild(nameTd);
+                cr.appendChild(makeCell(String(mi.score)));
+                tbody.appendChild(cr);
+            }
         } else {
             empty.style.display = 'block';
         }
