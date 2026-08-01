@@ -36,7 +36,7 @@ ROOM_LOCK = threading.Lock()        # 保护上述状态
 FORFEIT_NOTICES = {}                # winner_id -> 强制胜利通知（等待对方前端拉取）
 
 BEST_OF = 3                         # 三局两胜
-ROUND_TIME_LIMIT = 90               # 每局 1分30秒
+ROUND_TIME_LIMIT = 92               # 每局 1分30秒(多两秒准备)
 MULTI_WIN = 30                      # 多人胜 +30
 MULTI_LOSE = -30                    # 多人负 -30
 MAX_ATTEMPTS = 4                    # 每局（双方）最多 4 次猜测
