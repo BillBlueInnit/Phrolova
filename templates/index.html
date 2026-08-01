@@ -32,16 +32,56 @@
                 <button class="menu-btn" onclick="enterRules()">
                     <span class="menu-icon">📖</span>
                     <span class="menu-label">游戏规则</span>
-                </button>
+                                </button>
             </div>
 
             <div class="player-card">
-                <span class="player-card-label">我的ID</span>
+                <span class="player-card-label" id="mainIdLabel">我的ID</span>
                 <span class="player-id-display" id="mainPlayerId">--</span>
                 <span class="player-score-display" id="mainPlayerScore">(0 分)</span>
-                <button class="btn btn-small" onclick="openIdEditor()">✏️ 修改ID</button>
+                <button class="btn btn-small" id="btnAuth" onclick="enterAuth()" style="display:none">🔑 注册/登录</button>
+                <span id="loggedInControls" style="display:none">
+                    <button class="btn btn-small" onclick="openIdEditor()">✏️ 修改ID</button>
+                    <button class="btn btn-small btn-logout" onclick="logout()">🚪 退出</button>
+                </span>
             </div>
         </div>
+
+        <!-- ================= 登录 / 注册 ================= -->
+        <div class="view" id="view-auth" style="display:none">
+            <div class="single-header">
+                <button class="btn btn-back" onclick="goBackToMenu()">← 主菜单</button>
+                <h2 id="authTitle">🔑 登录</h2>
+            </div>
+
+            <!-- 登录表单 -->
+            <div class="auth-box" id="loginForm">
+                <p class="auth-tip">登录后即可使用同名账号跨设备同步分数</p>
+                <input type="text" id="loginUsername" placeholder="账号（登录后将作为你的ID）" autocomplete="off">
+                <input type="password" id="loginPassword" placeholder="密码">
+                <div class="captcha-row">
+                    <img id="loginCaptchaImg" alt="验证码" onclick="loadCaptcha('loginCaptcha')" title="点击刷新">
+                    <input type="text" id="loginCaptchaInput" placeholder="验证码" maxlength="5" autocomplete="off">
+                </div>
+                <div class="btn btn-guess" onclick="doLogin()">登录</div>
+                <div class="auth-switch">还没有账号？<span onclick="showRegisterForm()">去注册</span></div>
+            </div>
+
+            <!-- 注册表单 -->
+            <div class="auth-box" id="registerForm" style="display:none">
+                <p class="auth-tip">注册成功后，账号名即为你的默认ID，并自动登录</p>
+                <input type="text" id="regUsername" placeholder="账号（注册后作为你的ID）" autocomplete="off">
+                <input type="password" id="regPassword" placeholder="密码（至少6位）">
+                <div class="captcha-row">
+                    <img id="registerCaptchaImg" alt="验证码" onclick="loadCaptcha('registerCaptcha')" title="点击刷新">
+                    <input type="text" id="registerCaptchaInput" placeholder="验证码" maxlength="5" autocomplete="off">
+                </div>
+                <p id="authError" class="error-text"></p>
+                <div class="btn btn-guess" onclick="doRegister()">注册</div>
+                <div class="auth-switch">已有账号？<span onclick="showLoginForm()">去登录</span></div>
+            </div>
+        </div>
+
 
         <!-- ================= 单人模式 ================= -->
         <div class="view" id="view-single" style="display:none">
@@ -220,12 +260,9 @@
             <!-- 重要提醒 -->
             <div class="rules-notice">
                 ⚠️ 本网站灵感来源于：<b>弗一把(shnlfriberg.online)</b><br>
-                ⚠️ <b>请使用同一个设备的同一个浏览器</b>进行游戏。<br>
-                如果换号了（更换设备 / 浏览器），请<b>截图证明你是某个玩家</b>，后台会帮你转移数据。<br>
-                （一般情况下，请不要麻烦后台管理员 🛠️）<br>
 				⚠️ 本网站基本由<b>Deepseek</b>开发，如有bug请私信UP主。<br>
                 ⚠️ 本网站数据来源于<b>库街区</b>，并且是UP主手动复制的数据，如有错误欢迎私信勘误。<br>
-                ⚠️ <b>本网站完全免费且开源，不收集任何个人信息，所有数据仅存于浏览器本地。</b>
+                ⚠️ <b>本网站完全免费且开源，不收集任何个人信息。</b>
             </div>
 
             <div class="rules-section">

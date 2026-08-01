@@ -121,6 +121,48 @@ h2 {
 .player-card-label { color: #aaa; font-size: 14px; }
 .player-id-display { color: #ffd700; font-weight: bold; font-size: 17px; }
 .player-score-display { color: #ccc; font-size: 14px; }
+.btn-logout { background: rgba(255,255,255,0.15) !important; border: 1px solid rgba(255,255,255,0.2); }
+
+/* ============ 登录 / 注册页面 ============ */
+.auth-box {
+    max-width: 380px;
+    margin: 20px auto;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    padding: 28px 26px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+.auth-box input {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 2px solid #3a3a5a;
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.3s;
+}
+.auth-box input:focus { border-color: #ffd700; }
+.auth-box input::placeholder { color: #888; }
+.auth-tip { color: #aaa; font-size: 13px; text-align: center; line-height: 1.6; margin-bottom: 2px; }
+.auth-switch { text-align: center; color: #aaa; font-size: 14px; margin-top: 4px; }
+.auth-switch span { color: #ffd700; cursor: pointer; font-weight: bold; text-decoration: underline; }
+.captcha-row { display: flex; align-items: center; gap: 12px; }
+.captcha-row img {
+    width: 132px;
+    height: 46px;
+    border-radius: 10px;
+    cursor: pointer;
+    border: 2px solid #3a3a5a;
+    flex: none;
+    background: #16162a;
+}
+.captcha-row input { flex: 1; font-family: monospace; letter-spacing: 3px; text-align: center; }
+
 
 /* ============ 顶部信息栏 ============ */
 .top-bar {

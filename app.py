@@ -17,15 +17,25 @@ import os
 import secrets
 import asyncio
 import json
+import io
+import base64
 
 from flask import Flask, jsonify, request, render_template, send_from_directory
 import pymysql
 from pymysql.cursors import DictCursor
+from werkzeug.security import generate_password_hash, check_password_hash
 from config import DB_CONFIG
 import websockets
 from websockets.asyncio.server import serve as ws_serve
 
+try:
+    from PIL import Image, ImageDraw, ImageFont
+    _PIL_AVAILABLE = True
+except Exception:
+    _PIL_AVAILABLE = False
+
 app = Flask(__name__)
+app.secret_key = secrets.token_hex(16)   # 用于会话（验证码暂用内存存储）
 
 # ------------------------------------------------------------------
 # 多人模式全局内存状态
@@ -150,6 +160,151 @@ def ensure_secret_column():
 # 进程启动时执行一次，兼容旧库；失败无碍，将在首个 player_init 请求时重试
 try:
     ensure_secret_column()
+except Exception:
+    pass
+
+
+# ------------------------------------------------------------------
+# 人机验证码（本地运行，自动生成 3数字+2字母 图片 + 干扰线条）
+# ------------------------------------------------------------------
+CAPTCHA_LOCK = threading.Lock()
+CAPTCHAS = {}            # captcha_id -> {'text':..., 'expire':...}
+CAPTCHA_TTL = 180        # 3 分钟有效
+
+
+def _clean_captchas():
+    """清理过期验证码。"""
+    now = time.time()
+    expired = [k for k, v in CAPTCHAS.items() if v['expire'] < now]
+    for k in expired:
+        CAPTCHAS.pop(k, None)
+
+
+def _gen_captcha_text():
+    """生成 3 个数字 + 2 个字母 的验证码文本（统一转大写便于人眼识别）。"""
+    digits = ''.join(random.choices('0123456789', k=3))
+    letters = ''.join(random.choices('ABCDEFGHJKLMNPQRSTUVWXYZ', k=2))  # 去除易混淆的 O/I
+    chars = list(digits + letters)
+    random.shuffle(chars)
+    return ''.join(chars)
+
+
+_FONT_CANDIDATES = [
+    '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+    '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
+    'C:/Windows/Fonts/arialbd.ttf',
+    'C:/Windows/Fonts/arial.ttf',
+    'C:/Windows/Fonts/segoeuib.ttf',
+]
+
+
+def _load_font(size):
+    """尝试加载一个可用的字体文件，找不到则用 PIL 默认字体。"""
+    for path in _FONT_CANDIDATES:
+        try:
+            if os.path.exists(path):
+                return ImageFont.truetype(path, size)
+        except Exception:
+            continue
+    try:
+        return ImageFont.load_default()
+    except Exception:
+        return None
+
+
+def _make_captcha_image(text):
+    """根据验证码文本生成带干扰线条与噪点的 PNG 图片，返回 png 字节。"""
+    width, height = 132, 46
+    img = Image.new('RGB', (width, height), (22, 27, 47))
+    draw = ImageDraw.Draw(img)
+    font = _load_font(28)
+
+    # 背景噪点
+    for _ in range(150):
+        x = random.randint(0, width - 1)
+        y = random.randint(0, height - 1)
+        c = random.randint(120, 255)
+        draw.point((x, y), fill=(c, c, c))
+
+    # 干扰线条（让脚本难以识别，但仍可读）
+    for _ in range(5):
+        x1 = random.randint(-10, width)
+        y1 = random.randint(0, height)
+        x2 = random.randint(-10, width)
+        y2 = random.randint(0, height)
+        draw.line((x1, y1, x2, y2), fill=(random.randint(70, 190),
+                                          random.randint(70, 190),
+                                          random.randint(70, 190)), width=1)
+
+    # 逐字绘制，轻微位移
+    step = width // (len(text) + 1)
+    for i, ch in enumerate(text):
+        color = (random.randint(200, 255),
+                 random.randint(180, 255),
+                 random.randint(120, 220))
+        x = step + i * step + random.randint(-3, 3)
+        y = random.randint(6, 14)
+        draw.text((x, y), ch, font=font, fill=color)
+
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    buf.seek(0)
+    return buf.getvalue()
+
+
+@app.route('/api/auth/captcha', methods=['GET'])
+def auth_captcha():
+    """生成验证码，返回图片（base64）与验证码 ID。验证码全部在本地/内存中运行。"""
+    if not _PIL_AVAILABLE:
+        return jsonify({'status': 'error', 'message': '验证码服务不可用（缺少 Pillow）'})
+    text = _gen_captcha_text()
+    captcha_id = secrets.token_hex(8)
+    raw = _make_captcha_image(text)
+    data_uri = 'data:image/png;base64,' + base64.b64encode(raw).decode('ascii')
+    with CAPTCHA_LOCK:
+        _clean_captchas()
+        CAPTCHAS[captcha_id] = {'text': text, 'expire': time.time() + CAPTCHA_TTL}
+    return jsonify({'status': 'success', 'captcha_id': captcha_id, 'image': data_uri})
+
+
+def verify_captcha(captcha_id, user_input):
+    """校验验证码。通过则消费掉（一次性使用）。返回 True/False。"""
+    if not captcha_id or not user_input:
+        return False
+    with CAPTCHA_LOCK:
+        rec = CAPTCHAS.pop(captcha_id, None)   # 弹出即消费，只能用一次
+        if not rec or rec['expire'] < time.time():
+            return False
+        return secrets.compare_digest(rec['text'].upper(),
+                                      user_input.strip().upper())
+
+
+# ------------------------------------------------------------------
+# 账号（注册 / 登录）相关
+# ------------------------------------------------------------------
+PASSWORD_PREPARED = False
+
+
+def ensure_password_column():
+    """确保 players 表存在 password 列（账号密码哈希）。"""
+    global PASSWORD_PREPARED
+    if PASSWORD_PREPARED:
+        return
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute("ALTER TABLE players ADD COLUMN password VARCHAR(255) NOT NULL DEFAULT ''")
+                conn.commit()
+            except Exception:
+                conn.rollback()  # 列已存在，忽略
+        PASSWORD_PREPARED = True
+    finally:
+        conn.close()
+
+
+try:
+    ensure_password_column()
 except Exception:
     pass
 
@@ -324,6 +479,7 @@ def player_init():
     """前端加载时调用，确保设备 player_id 存在，返回玩家信息与设备凭证 token。"""
     try:
         ensure_secret_column()  # 若启动时未就绪，首个请求时补齐 secret 列
+        ensure_password_column()
     except Exception:
         pass
     data = request.get_json() or {}
@@ -363,6 +519,91 @@ def player_update_id():
         conn.close()
     p = get_player(new_id)
     return jsonify({'status': 'success', 'player': p, 'token': p['secret']})
+
+
+# ------------------------------------------------------------------
+# 账号：注册 / 登录 / 退出
+# ------------------------------------------------------------------
+def _set_password(player_id, password):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("UPDATE players SET password = %s WHERE player_id = %s",
+                           (generate_password_hash(password), player_id))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+@app.route('/api/auth/register', methods=['POST'])
+def auth_register():
+    """注册账号：账号=用户名(即默认ID)，密码 + 人机验证码。成功后自动登录(返回 token)。"""
+    try:
+        ensure_password_column()
+    except Exception:
+        pass
+    data = request.get_json() or {}
+    username = (data.get('username') or '').strip()
+    password = (data.get('password') or '')
+    captcha_id = (data.get('captcha_id') or '').strip()
+    captcha_text = (data.get('captcha_text') or '').strip()
+
+    if not username:
+        return jsonify({'status': 'error', 'message': '账号不能为空'})
+    if len(username) > 64:
+        return jsonify({'status': 'error', 'message': '账号过长（最多64字符）'})
+    if len(password) < 6:
+        return jsonify({'status': 'error', 'message': '密码至少 6 位'})
+    if not verify_captcha(captcha_id, captcha_text):
+        return jsonify({'status': 'error', 'message': '验证码错误或已过期'})
+
+    if get_player(username):
+        return jsonify({'status': 'error', 'message': '该账号已被注册'})
+
+    # 创建玩家行，并写入密码；返回新 secret 作为登录凭证
+    p = create_player(username)
+    _set_password(username, password)
+    p = get_player(username)
+    return jsonify({'status': 'success', 'player': p, 'token': p['secret'],
+                    'message': '注册成功，已自动登录'})
+
+
+@app.route('/api/auth/login', methods=['POST'])
+def auth_login():
+    """账号密码 + 验证码 登录。成功后返回玩家信息与 token(自动登录)。"""
+    try:
+        ensure_password_column()
+    except Exception:
+        pass
+    data = request.get_json() or {}
+    username = (data.get('username') or '').strip()
+    password = (data.get('password') or '')
+    captcha_id = (data.get('captcha_id') or '').strip()
+    captcha_text = (data.get('captcha_text') or '').strip()
+
+    if not username or not password:
+        return jsonify({'status': 'error', 'message': '请输入账号和密码'})
+    if not verify_captcha(captcha_id, captcha_text):
+        return jsonify({'status': 'error', 'message': '验证码错误或已过期'})
+
+    p = get_player(username)
+    if not p or not p.get('password'):
+        return jsonify({'status': 'error', 'message': '账号不存在'})
+    if not check_password_hash(p['password'], password):
+        return jsonify({'status': 'error', 'message': '账号或密码错误'})
+
+    # 登录成功后，若账号尚未有 secret 凭证则生成一个；保持 secret 稳定，
+    # 这样同一账号可在多个设备登录并共用同一凭证，实现跨设备同步分数。
+    if not p.get('secret'):
+        p['secret'] = set_player_secret(username)
+    return jsonify({'status': 'success', 'player': p, 'token': p['secret'],
+                    'message': '登录成功'})
+
+
+@app.route('/api/auth/logout', methods=['POST'])
+def auth_logout():
+    """退出登录：仅前端清除本地登录状态即可。此处返回成功。"""
+    return jsonify({'status': 'success', 'message': '已退出登录'})
 
 
 @app.route('/api/player/score', methods=['POST'])

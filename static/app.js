@@ -9,10 +9,11 @@ const MAX_ATTEMPTS = 4;                 // 单人 & 多人每局 4 次机会
 // 玩家ID（每设备唯一，存于 localStorage）
 const ID_KEY = 'phrolova_player_id';
 const TOKEN_KEY = 'phrolova_player_secret';
+const AUTH_KEY = 'phrolova_logged_in';   // '1' = 已登录账号
 let myPlayerId = localStorage.getItem(ID_KEY) || '';
 let myToken = localStorage.getItem(TOKEN_KEY) || '';
+let loggedIn = localStorage.getItem(AUTH_KEY) === '1';
 let myScore = 0;
-let myIdTouched = false;   // 是否已初始化
 
 // 单人游戏状态
 let currentTarget = null;
@@ -69,48 +70,62 @@ function showView(id) {
 function showModal(id) { $(id).classList.add('active'); }
 function hideModal(id) { $(id).classList.remove('active'); }
 
-function genDeviceId() {
-    // 生成设备唯一 ID
-    const cryptoObj = window.crypto || window.msCrypto;
-    if (cryptoObj && cryptoObj.randomUUID) return 'P-' + cryptoObj.randomUUID().slice(0, 13);
-    return 'P-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8).toUpperCase();
+// ==================== 玩家 ID 管理 ====================
+function refreshAuthControls() {
+    // 未登录：显示「注册/登录」按钮；已登录：显示 ID/分数/修改ID/退出
+    const authBtn = $('btnAuth');
+    const loggedControls = $('loggedInControls');
+    if (!authBtn || !loggedControls) return;
+    if (loggedIn) {
+        authBtn.style.display = 'none';
+        loggedControls.style.display = 'inline-block';
+    } else {
+        authBtn.style.display = 'inline-block';
+        loggedControls.style.display = 'none';
+    }
 }
 
-// ==================== 玩家 ID 管理 ====================
 async function initPlayer() {
-    if (!myPlayerId) {
-        myPlayerId = genDeviceId();
-        localStorage.setItem(ID_KEY, myPlayerId);
-        myIdTouched = true;
-    }
     try {
-        const res = await fetch('/api/player/init', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ player_id: myPlayerId })
-        });
-        const data = await res.json();
-        if (data.status === 'success') {
-            myScore = data.player.score;
-            // 设备凭证：首次拿到 token 便写入 localStorage；
-            // 若服务端重签/返回了 token，则更新本地。
-            if (data.token) {
-                myToken = data.token;
-                localStorage.setItem(TOKEN_KEY, myToken);
-            }
-            if (data.player && data.player.player_id) {
-                localStorage.setItem(ID_KEY, data.player.player_id);
-                myPlayerId = data.player.player_id;
+        // 仅已登录账号才同步分数（用账号名作为 player_id）
+        if (loggedIn && myPlayerId) {
+            const res = await fetch('/api/player/init', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ player_id: myPlayerId })
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                myScore = data.player.score;
+                if (data.token) { myToken = data.token; localStorage.setItem(TOKEN_KEY, myToken); }
             }
         }
+        // 未登录：不做任何初始化 —— 不生成临时账号、不写入数据库、不建立玩家凭证
     } catch (e) { /* 忽略 */ }
     refreshPlayerDisplay();
-    connectWS();   // 玩家身份就绪后，建立 WebSocket 实时通道
+    refreshAuthControls();
+    // 已登录且具备凭证时才建立 WebSocket 实时通道；未登录则跳过
+    if (loggedIn && myPlayerId && myToken) connectWS();
 }
 
 function refreshPlayerDisplay() {
-    $('mainPlayerId').textContent = myPlayerId;
-    $('mainPlayerScore').textContent = `(${myScore} 分)`;
+    const idLab = $('mainPlayerId');
+    const scoreLab = $('mainPlayerScore');
+    const label = $('mainIdLabel');
+    // 未登录时隐藏 ID、分数及其标签，仅保留「注册/登录」按钮
+    if (loggedIn) {
+        idLab.textContent = myPlayerId || '--';
+        scoreLab.textContent = `(${myScore} 分)`;
+        if (label) label.style.display = '';
+        idLab.style.display = '';
+        scoreLab.style.display = '';
+    } else {
+        idLab.textContent = '';
+        scoreLab.textContent = '';
+        if (label) label.style.display = 'none';
+        idLab.style.display = 'none';
+        scoreLab.style.display = 'none';
+    }
 }
 
 function openIdEditor() {
@@ -150,14 +165,165 @@ async function saveId() {
     }
 }
 
+// ==================== 账号：注册 / 登录 / 退出 ====================
+// 每个表单分别缓存最新验证码 ID，避免来回切换导致验证码错乱
+let loginCaptchaId = '';
+let registerCaptchaId = '';
+let currentAuthView = 'login';   // 'login' / 'register'
+
+function enterAuth() {
+    if (loggedIn) return;   // 已登录则无需进入
+    showView('view-auth');
+    currentAuthView = 'login';
+    showLoginForm();
+}
+
+function showLoginForm() {
+    currentAuthView = 'login';
+    $('authTitle').textContent = '🔑 登录';
+    $('loginForm').style.display = 'flex';
+    $('registerForm').style.display = 'none';
+    $('authError').textContent = '';
+    loadCaptcha('loginCaptcha');
+}
+
+function showRegisterForm() {
+    currentAuthView = 'register';
+    $('authTitle').textContent = '📝 注册';
+    $('loginForm').style.display = 'none';
+    $('registerForm').style.display = 'flex';
+    $('authError').textContent = '';
+    loadCaptcha('registerCaptcha');
+}
+
+async function loadCaptcha(which) {
+    // which ∈ {'loginCaptcha', 'registerCaptcha'}
+    const imgId = which === 'loginCaptcha' ? 'loginCaptchaImg' : 'registerCaptchaImg';
+    const img = $(imgId);
+    if (!img) return;
+    img.src = '';
+    try {
+        const res = await fetch('/api/auth/captcha');
+        const data = await res.json();
+        if (data.status !== 'success') { img.title = '生成失败，点击重试'; return; }
+        img.src = data.image;
+        if (which === 'loginCaptcha') loginCaptchaId = data.captcha_id;
+        else registerCaptchaId = data.captcha_id;
+    } catch (e) {
+        img.title = '无法连接服务器';
+    }
+}
+
+function applyLoginSuccess(data) {
+    myPlayerId = data.player.player_id;
+    myScore = data.player.score;
+    myToken = data.token;
+    loggedIn = true;
+    localStorage.setItem(ID_KEY, myPlayerId);
+    localStorage.setItem(TOKEN_KEY, myToken);
+    localStorage.setItem(AUTH_KEY, '1');
+    refreshPlayerDisplay();
+    refreshAuthControls();
+    connectWS();      // 账号变更后重建 WebSocket 通道
+    showView('view-mainmenu');
+}
+
+async function doLogin() {
+    const username = $('loginUsername').value.trim();
+    const password = $('loginPassword').value;
+    const captcha_text = $('loginCaptchaInput').value.trim();
+    $('authError').textContent = '';
+    if (!username || !password) { $('authError').textContent = '请输入账号和密码'; loadCaptcha('loginCaptcha'); $('loginCaptchaInput').value=''; return; }
+    if (!captcha_text) { $('authError').textContent = '请输入验证码'; loadCaptcha('loginCaptcha'); return; }
+    try {
+        const res = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password, captcha_id: loginCaptchaId, captcha_text })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            alert('登录成功！');
+            applyLoginSuccess(data);
+        } else {
+            $('authError').textContent = data.message || '登录失败';
+            loadCaptcha('loginCaptcha');
+            $('loginCaptchaInput').value = '';
+        }
+    } catch (e) {
+        $('authError').textContent = '无法连接服务器';
+        loadCaptcha('loginCaptcha');
+    }
+}
+
+async function doRegister() {
+    const username = $('regUsername').value.trim();
+    const password = $('regPassword').value;
+    const captcha_text = $('registerCaptchaInput').value.trim();
+    $('authError').textContent = '';
+    if (!username) { $('authError').textContent = '请输入账号'; loadCaptcha('registerCaptcha'); return; }
+    if (password.length < 6) { $('authError').textContent = '密码至少 6 位'; loadCaptcha('registerCaptcha'); return; }
+    if (!captcha_text) { $('authError').textContent = '请输入验证码'; loadCaptcha('registerCaptcha'); return; }
+    try {
+        const res = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password, captcha_id: registerCaptchaId, captcha_text })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            alert('注册成功，已自动登录！');
+            applyLoginSuccess(data);
+        } else {
+            $('authError').textContent = data.message || '注册失败';
+            loadCaptcha('registerCaptcha');
+            $('registerCaptchaInput').value = '';
+        }
+    } catch (e) {
+        $('authError').textContent = '无法连接服务器';
+        loadCaptcha('registerCaptcha');
+    }
+}
+
+function logout() {
+    // 清除本地登录状态，回到「未登录」状态（不自动创建临时账号）
+    try { fetch('/api/auth/logout', { method: 'POST' }); } catch (e) {}
+    loggedIn = false;
+    localStorage.removeItem(AUTH_KEY);
+    localStorage.removeItem(ID_KEY);
+    localStorage.removeItem(TOKEN_KEY);
+    myPlayerId = '';
+    myToken = '';
+    myScore = 0;
+    // 断开 WebSocket（未登录时无身份凭证）
+    try { if (ws) ws.close(); } catch (e) {}
+    ws = null;
+    wsReady = false;
+    wsOpen = false;
+    refreshPlayerDisplay();
+    refreshAuthControls();
+    showView('view-mainmenu');
+}
+
 // ==================== 视图导航 ====================
 function goBackToMenu() { showView('view-mainmenu'); }
+
+// 未登录不允许进入多人对战：跳转到登录页并提示
+function requireLogin() {
+    if (loggedIn) return true;
+    alert('请先注册/登录账号，再进行多人游戏');
+    showView('view-auth');
+    showLoginForm();
+    return false;
+}
+
 function enterSingle() {
     refreshPlayerDisplay();
     showView('view-single');
     startGame();
 }
 function enterMultiMenu() {
+    if (!requireLogin()) return;   // 未登录不允许多人对战
     showView('view-multimenu');
 }
 async function enterLeaderboard() {
@@ -483,6 +649,7 @@ setInterval(() => { wsSendText(JSON.stringify({ type: 'ping' })); }, 20000);
 
 
 async function createRoom() {
+    if (!requireLogin()) return;
     try {
         const res = await fetch('/api/multi/create', {
             method: 'POST',
@@ -511,6 +678,7 @@ function showWaitRoom(code) {
 }
 
 async function randomMatch() {
+    if (!requireLogin()) return;
     // 先取消可能的排队后重新匹配
     try {
         const res = await fetch('/api/multi/random_match', {
@@ -619,6 +787,11 @@ function cancelWait() {
 
 // -------------------- 左下角：返回房间按钮 --------------------
 async function checkMyRoom() {
+    if (!loggedIn || !myPlayerId) {   // 未登录无需检查房间/弃权
+        $('btnRoomNav').style.display = 'none';
+        myCurrentRoom = null;
+        return;
+    }
     try {
         // 兜底检查「对手弃权」通知：即使 pollRoom 在轮询竞态中漏掉，
         // 这个每 3 秒运行的检查也能稳定弹出「对手放弃、判定你胜利」提示。
@@ -667,6 +840,7 @@ function stopRoomNavCheck() {
 }
 
 async function joinRoom() {
+    if (!requireLogin()) return;
     const code = $('joinCodeInput').value.trim().toUpperCase();
     if (!code) { alert('请输入房间号'); return; }
     try {
