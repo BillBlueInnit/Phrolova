@@ -183,7 +183,7 @@ function showLoginForm() {
     $('authTitle').textContent = '🔑 登录';
     $('loginForm').style.display = 'flex';
     $('registerForm').style.display = 'none';
-    $('authError').textContent = '';
+    if ($('loginError')) $('loginError').textContent = '';
     loadCaptcha('loginCaptcha');
 }
 
@@ -192,7 +192,7 @@ function showRegisterForm() {
     $('authTitle').textContent = '📝 注册';
     $('loginForm').style.display = 'none';
     $('registerForm').style.display = 'flex';
-    $('authError').textContent = '';
+    if ($('registerError')) $('registerError').textContent = '';
     loadCaptcha('registerCaptcha');
 }
 
@@ -232,9 +232,9 @@ async function doLogin() {
     const username = $('loginUsername').value.trim();
     const password = $('loginPassword').value;
     const captcha_text = $('loginCaptchaInput').value.trim();
-    $('authError').textContent = '';
-    if (!username || !password) { $('authError').textContent = '请输入账号和密码'; loadCaptcha('loginCaptcha'); $('loginCaptchaInput').value=''; return; }
-    if (!captcha_text) { $('authError').textContent = '请输入验证码'; loadCaptcha('loginCaptcha'); return; }
+    $('loginError').textContent = '';
+    if (!username || !password) { $('loginError').textContent = '请输入账号和密码'; loadCaptcha('loginCaptcha'); $('loginCaptchaInput').value=''; return; }
+    if (!captcha_text) { $('loginError').textContent = '请输入验证码'; loadCaptcha('loginCaptcha'); return; }
     try {
         const res = await fetch('/api/auth/login', {
             method: 'POST',
@@ -246,12 +246,12 @@ async function doLogin() {
             alert('登录成功！');
             applyLoginSuccess(data);
         } else {
-            $('authError').textContent = data.message || '登录失败';
+            $('loginError').textContent = data.message || '登录失败';
             loadCaptcha('loginCaptcha');
             $('loginCaptchaInput').value = '';
         }
     } catch (e) {
-        $('authError').textContent = '无法连接服务器';
+        $('loginError').textContent = '无法连接服务器';
         loadCaptcha('loginCaptcha');
     }
 }
@@ -260,10 +260,10 @@ async function doRegister() {
     const username = $('regUsername').value.trim();
     const password = $('regPassword').value;
     const captcha_text = $('registerCaptchaInput').value.trim();
-    $('authError').textContent = '';
-    if (!username) { $('authError').textContent = '请输入账号'; loadCaptcha('registerCaptcha'); return; }
-    if (password.length < 6) { $('authError').textContent = '密码至少 6 位'; loadCaptcha('registerCaptcha'); return; }
-    if (!captcha_text) { $('authError').textContent = '请输入验证码'; loadCaptcha('registerCaptcha'); return; }
+    $('registerError').textContent = '';
+    if (!username) { $('registerError').textContent = '请输入账号'; loadCaptcha('registerCaptcha'); return; }
+    if (password.length < 6) { $('registerError').textContent = '密码至少 6 位'; loadCaptcha('registerCaptcha'); return; }
+    if (!captcha_text) { $('registerError').textContent = '请输入验证码'; loadCaptcha('registerCaptcha'); return; }
     try {
         const res = await fetch('/api/auth/register', {
             method: 'POST',
@@ -275,12 +275,12 @@ async function doRegister() {
             alert('注册成功，已自动登录！');
             applyLoginSuccess(data);
         } else {
-            $('authError').textContent = data.message || '注册失败';
+            $('registerError').textContent = data.message || '注册失败';
             loadCaptcha('registerCaptcha');
             $('registerCaptchaInput').value = '';
         }
     } catch (e) {
-        $('authError').textContent = '无法连接服务器';
+        $('registerError').textContent = '无法连接服务器';
         loadCaptcha('registerCaptcha');
     }
 }
