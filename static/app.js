@@ -208,7 +208,7 @@ function updateMsUi() {
     }
     const boLabel = 'BO' + bo;
     const diffLabel = s.type === 'skeleton' ? (s.diff === 'easy' ? '简单' : '困难') : '';
-    $('msNote').innerHTML = `${typeName} · ${boLabel}（三局${bo}后整场结束）· ${diffLabel || '无难度'}
+    $('msNote').innerHTML = `${typeName} · ${boLabel}（一共${bo}局，先赢${Math.ceil(bo/2)}局者获胜）· ${diffLabel || '无难度'}
         <br><span class="ms-score-preview">胜负各 ±${score} 分</span>`;
     $('msConfirmBtn').textContent = s.mode === 'rank' ? '确认匹配' : '确认创建';
 }
@@ -642,6 +642,7 @@ async function loadLeaderboard() {
                 nameTd.style.fontWeight = 'bold';
                 tr.appendChild(nameTd);
                 tr.appendChild(makeCell(String(row.score)));
+                tr.appendChild(makeCell(row.matches ? row.win_rate + '%' : '100%'));
                 tbody.appendChild(tr);
             });
 
@@ -657,6 +658,7 @@ async function loadLeaderboard() {
                 nameTd.style.fontWeight = 'bold';
                 cr.appendChild(nameTd);
                 cr.appendChild(makeCell(String(mi.score)));
+                cr.appendChild(makeCell(mi.matches ? mi.win_rate + '%' : '100%'));
                 tbody.appendChild(cr);
             }
         } else {

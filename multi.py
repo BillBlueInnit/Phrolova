@@ -32,6 +32,8 @@ from core import (
     draw_target_by_type,
     all_match,
     apply_score,
+    record_match,
+    ensure_stats_columns,
     authenticate_player,
     ensure_player,
 )
@@ -232,8 +234,12 @@ def finish_round(room, winner_index):
             # 整场结算：胜者 +score，负者 -score（按 类型+难度+局制）
             score = multi_score(room.get('quiz_type', 'resonator'),
                                 room.get('difficulty', 'normal'), best_of)
-            apply_score(room['players'][idx]['player_id'], score)
-            apply_score(room['players'][1 - idx]['player_id'], -score)
+            winner_id = room['players'][idx]['player_id']
+            loser_id = room['players'][1 - idx]['player_id']
+            apply_score(winner_id, score)
+            apply_score(loser_id, -score)
+            # 记录本场胜率数据：胜者胜场+1，双方总场次各+1
+            record_match(winner_id, loser_id)
             return
 
 
@@ -861,11 +867,13 @@ def multi_leave_room():
                 score = multi_score(room.get('quiz_type', 'resonator'),
                                     room.get('difficulty', 'normal'),
                                     room.get('best_of', BEST_OF))
-                apply_score(room['players'][loser_idx]['player_id'], -score)
-                apply_score(room['players'][winner_idx]['player_id'], score)
-                # 记录强制胜利通知，供对方前端拉取并提示
-                winner_id = room['players'][winner_idx]['player_id']
                 loser_id = room['players'][loser_idx]['player_id']
+                winner_id = room['players'][winner_idx]['player_id']
+                apply_score(loser_id, -score)
+                apply_score(winner_id, score)
+                # 记录本场胜率数据：胜者胜场+1，双方总场次各+1
+                record_match(winner_id, loser_id)
+                # 记录强制胜利通知，供对方前端拉取并提示
                 FORFEIT_NOTICES[winner_id] = {
                     'winner_id': winner_id,
                     'loser_id': loser_id,

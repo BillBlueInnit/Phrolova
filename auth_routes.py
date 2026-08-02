@@ -21,6 +21,7 @@ from core import (
     authenticate_player,
     ensure_secret_column,
     ensure_password_column,
+    ensure_stats_columns,
     set_password,
 )
 
@@ -138,6 +139,7 @@ def player_init():
     try:
         ensure_secret_column()
         ensure_password_column()
+        ensure_stats_columns()
     except Exception:
         pass
     data = request.get_json() or {}
@@ -186,15 +188,23 @@ def player_score():
 @auth_bp.route('/api/leaderboard')
 def leaderboard():
     TOP_N = 40
+    try:
+        ensure_stats_columns()
+    except Exception:
+        pass
     conn = get_connection()
     try:
         with conn.cursor() as cursor:
             cursor.execute(
-                "SELECT player_id, score FROM players "
+                "SELECT player_id, score, wins, matches FROM players "
                 "ORDER BY score DESC, player_id ASC LIMIT %s",
                 (TOP_N,),
             )
             top = cursor.fetchall()
+            # 胜率：胜场 / 总场次。从未参加过比赛时默认 100%
+            for r in top:
+                r['win_rate'] = (round(r['wins'] * 100.0 / r['matches'], 1)
+                                 if r['matches'] else 100.0)
             my_info = None
             pid = (request.args.get('player_id') or '').strip()
             if pid:
@@ -202,7 +212,7 @@ def leaderboard():
                 if in_top:
                     my_info = {'player_id': pid, 'in_top': True}
                 else:
-                    cursor.execute("SELECT score FROM players WHERE player_id = %s", (pid,))
+                    cursor.execute("SELECT score, wins, matches FROM players WHERE player_id = %s", (pid,))
                     row = cursor.fetchone()
                     if row:
                         cursor.execute("SELECT COUNT(*) AS c FROM players WHERE score > %s", (row['score'],))
@@ -215,6 +225,10 @@ def leaderboard():
                         my_info = {
                             'player_id': pid,
                             'score': row['score'],
+                            'wins': row['wins'],
+                            'matches': row['matches'],
+                            'win_rate': (round(row['wins'] * 100.0 / row['matches'], 1)
+                                         if row['matches'] else 100.0),
                             'rank': greater + same_before + 1,
                             'in_top': False,
                         }

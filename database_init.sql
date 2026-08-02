@@ -33,6 +33,8 @@ CREATE TABLE players (
     score       INT             NOT NULL DEFAULT 0      COMMENT '玩家总分',
     secret      VARCHAR(64)     NOT NULL DEFAULT ''     COMMENT '设备身份凭证token(防冒充)',
     password    VARCHAR(255)    NOT NULL DEFAULT ''     COMMENT '账号密码哈希(空串=未注册任意设备玩家)',
+    wins        INT             NOT NULL DEFAULT 0      COMMENT '多人整场比赛胜场数',
+    matches     INT             NOT NULL DEFAULT 0      COMMENT '多人整场比赛总场次',
     PRIMARY KEY (id),
     UNIQUE KEY uk_player_id (player_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='玩家得分表';

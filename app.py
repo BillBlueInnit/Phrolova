@@ -9,7 +9,7 @@ from core import (
     get_connection, compare_field, build_compare, all_match, match_count,
     generate_token, ensure_secret_column, get_player, create_player,
     set_player_secret, ensure_player, apply_score, authenticate_player,
-    ensure_password_column,
+    ensure_password_column, ensure_stats_columns,
     draw_target_by_type, build_compare_by_type, get_skeleton_names
 )
 from auth_routes import auth_bp
@@ -117,6 +117,14 @@ app.register_blueprint(multi_bp)
 # ------------------------------------------------------------------
 if __name__ == '__main__':
     from multi import start_background_threads, WS_PORT
+    # 启动前确保 players 表已具备 胜场/总场次 列（幂等）
+    try:
+        ensure_secret_column()
+        ensure_password_column()
+        ensure_stats_columns()
+        print('[startup] players 表结构已就绪')
+    except Exception as e:
+        print(f'[startup] 表结构初始化失败：{e}')
     try:
         start_background_threads()
         print(f'[startup] WebSocket 推送服务已启动于端口 {WS_PORT}')

@@ -441,6 +441,27 @@ def ensure_password_column():
     finally:
         conn.close()
 
+STATS_PREPARED = False
+
+def ensure_stats_columns():
+    """为已存在的 players 表补充 胜场(wins) / 总场次(matches) 两列（幂等）。"""
+    global STATS_PREPARED
+    if STATS_PREPARED:
+        return
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            for _col, _ddl in (('wins', 'wins INT NOT NULL DEFAULT 0'),
+                               ('matches', 'matches INT NOT NULL DEFAULT 0')):
+                try:
+                    cursor.execute(f"ALTER TABLE players ADD COLUMN {_ddl}")
+                except Exception:
+                    conn.rollback()   # 列已存在则跳过
+        conn.commit()
+        STATS_PREPARED = True
+    finally:
+        conn.close()
+
 def get_player(player_id):
     conn = get_connection()
     try:
@@ -491,6 +512,23 @@ def apply_score(player_id, delta):
             cursor.execute(
                 "UPDATE players SET score = score + %s WHERE player_id = %s",
                 (delta, player_id),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+def record_match(winner_id, loser_id):
+    """结算一场已完成的整场比赛胜率数据：两名玩家总场次各 +1，胜者胜场 +1。"""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "UPDATE players SET matches = matches + 1, wins = wins + 1 WHERE player_id = %s",
+                (winner_id,),
+            )
+            cursor.execute(
+                "UPDATE players SET matches = matches + 1 WHERE player_id = %s",
+                (loser_id,),
             )
         conn.commit()
     finally:
