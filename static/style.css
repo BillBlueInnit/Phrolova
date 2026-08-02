@@ -294,7 +294,7 @@ h2 {
 .cell-different { background: rgba(127, 140, 141, 0.30) !important; }
 /* 声骸套装 / 掉落位置 / 技能属性 组合单元格 */
 .set-wrap { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; }
-.set-text-chip { display: inline-block; padding: 6px 10px; border-radius: 6px; font-weight: bold; color: #0a0a0a; font-size: 14px; white-space: nowrap; }
+.set-text-chip { display: inline-block; padding: 6px 10px; border-radius: 6px; font-weight: bold; font-size: 14px; white-space: nowrap; }
 .loc-chip { display: inline-block; padding: 4px 9px; border-radius: 6px; font-size: 13px; margin: 2px; }
 
 

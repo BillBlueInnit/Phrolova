@@ -1382,7 +1382,13 @@ function startTimer(data) {
 }
 
 function renderMultiGame(data) {
+    // 检测换局：进入新的一局时清空输入框与自动补全，避免上一局遗留内容
+    const prevRound = multiGameRef ? multiGameRef.round : null;
     multiGameRef = data;
+    if (prevRound != null && data.round != null && data.round !== prevRound) {
+        $('multiGuessInput').value = '';
+        hideMultiSuggestions();
+    }
     multiQuizType = data.quiz_type || 'resonator';
     const round = data.round;
     const maxRound = data.best_of;
