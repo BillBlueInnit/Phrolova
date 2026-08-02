@@ -4,7 +4,11 @@
 // ============================================================
 
 // ---------------- 全局配置 ----------------
-const MAX_ATTEMPTS = 4;                 // 单人 & 多人每局 4 次机会
+const RESONATOR_ATTEMPTS = 4;           // 猜共鸣者：每局 4 次机会
+const SKELETON_ATTEMPTS = 8;            // 猜声骸：每局 8 次机会
+function maxAttempts(qtype) {           // 根据猜谜类型返回本局最多猜测次数
+    return qtype === 'skeleton' ? SKELETON_ATTEMPTS : RESONATOR_ATTEMPTS;
+}
 
 // 玩家ID（每设备唯一，存于 localStorage）
 const ID_KEY = 'phrolova_player_id';
@@ -19,9 +23,17 @@ let myScore = 0;
 let currentTarget = null;
 let guessHistory = [];
 let gameOver = false;
+let singleQuizType = 'resonator';   // 'resonator' 猜共鸣者 / 'skeleton' 猜声骸
+
+// 猜谜类型选择弹窗：确认后的回调
+let pendingQuizTypeCallback = null;
+
+// 多人开局配置弹窗：类型 / 局制(bo) / 难度
+let multiSetupState = { mode: 'create', type: 'resonator', bo: 3, diff: 'hard', boLocked: false };
 
 // 多人游戏状态
 let multiRoomCode = '';
+let multiQuizType = 'resonator';   // 本房间猜谜类型
 let multiPollTimer = null;
 let multiGuessInputHandler = null;
 let multiTarget = null;
@@ -45,6 +57,7 @@ let wsForfeitShown = false;
 
 // 自动补全数据
 let allNames = [];
+let allSkeletonNames = [];
 let singleSuggestions = [];
 let singleActive = -1;
 let multiSuggestions = [];
@@ -58,6 +71,12 @@ function statusClass(status) {
     if (status === 'near') return 'match-orange';
     return 'match-gray';
 }
+// 逗号分离字段的「整格底色」状态：绿=数量全对，黄=数量不对，灰=全没猜中
+function cellStatusClass(cell) {
+    if (cell === 'match') return 'cell-match';
+    if (cell === 'partial') return 'cell-partial';
+    return 'cell-different';
+}
 
 function $(id) { return document.getElementById(id); }
 
@@ -69,6 +88,102 @@ function showView(id) {
 
 function showModal(id) { $(id).classList.add('active'); }
 function hideModal(id) { $(id).classList.remove('active'); }
+
+// ==================== 猜谜类型选择（共鸣者 / 声骸） ====================
+function showQuizTypeModal(callback) {
+    pendingQuizTypeCallback = callback;
+    showModal('quizTypeModal');
+}
+function hideQuizTypeModal() { hideModal('quizTypeModal'); pendingQuizTypeCallback = null; }
+
+function confirmQuizType(type) {
+    const cb = pendingQuizTypeCallback;
+    hideQuizTypeModal();
+    if (cb) cb(type);
+}
+
+// ==================== 多人开局配置弹窗（选类型 / BO 局制 / 声骸难度） ====================
+function openMultiSetup(mode) {
+    // mode: 'create'（创建房间，可自定义BO） / 'rank'（排位，BO 固定 3）
+    multiSetupState = {
+        mode,
+        type: 'resonator',
+        bo: mode === 'rank' ? 3 : 3,
+        diff: 'hard',
+        boLocked: mode === 'rank',
+    };
+    $('msTitle').textContent = mode === 'rank' ? '排位匹配' : '创建房间';
+    $('msConfig').style.display = 'none';
+    $('msNote').textContent = '';
+    showModal('multiSetupModal');
+}
+
+function msPickType(type) {
+    multiSetupState.type = type;
+    $('msConfig').style.display = 'block';
+    // 声骸才显示难度选择
+    $('msDiffRow').style.display = type === 'skeleton' ? 'flex' : 'none';
+    updateMsUi();
+}
+
+function msPickBo(bo) {
+    if (multiSetupState.boLocked) return;   // 排位 BO 固定 3
+    multiSetupState.bo = bo;
+    updateMsUi();
+}
+
+function msPickDiff(diff) {
+    multiSetupState.diff = diff;
+    updateMsUi();
+}
+
+// 根据当前选择刷新弹窗里的激活态与提示文案
+function updateMsUi() {
+    const s = multiSetupState;
+    // BO 选择激活态
+    $('msBo1').classList.toggle('active', s.bo === 1 && !s.boLocked);
+    $('msBo3').classList.toggle('active', s.bo === 3 && !s.boLocked);
+    $('msBo5').classList.toggle('active', s.bo === 5 && !s.boLocked);
+    // 排位锁定 BO3
+    $('msBo1').classList.toggle('locked', s.boLocked);
+    $('msBo3').classList.toggle('locked', s.boLocked);
+    $('msBo5').classList.toggle('locked', s.boLocked);
+    if (s.boLocked) {
+        $('msBo3').classList.add('active');
+    }
+    // 难度激活态
+    $('msDiffEasy').classList.toggle('active', s.diff === 'easy');
+    $('msDiffHard').classList.toggle('active', s.diff === 'hard');
+
+    // 提示 + 分值预览
+    const bo = s.boLocked ? 3 : s.bo;
+    const typeName = s.type === 'skeleton' ? '声骸' : '共鸣者';
+    let score = '';
+    if (s.type === 'skeleton') {
+        score = s.diff === 'easy'
+            ? ({ 1: 5, 3: 10, 5: 15 }[bo] ?? 10)
+            : ({ 1: 30, 3: 50, 5: 70 }[bo] ?? 50);
+    } else {
+        score = ({ 1: 10, 3: 30, 5: 50 }[bo] ?? 30);
+    }
+    const boLabel = 'BO' + bo;
+    const diffLabel = s.type === 'skeleton' ? (s.diff === 'easy' ? '简单' : '困难') : '';
+    $('msNote').innerHTML = `${typeName} · ${boLabel}（三局${bo}后整场结束）· ${diffLabel || '无难度'}
+        <br><span class="ms-score-preview">胜负各 ±${score} 分</span>`;
+    $('msConfirmBtn').textContent = s.mode === 'rank' ? '确认匹配' : '确认创建';
+}
+
+// 确认后调用真正创建/匹配接口
+async function msConfirm() {
+    const s = multiSetupState;
+    hideModal('multiSetupModal');
+    multiQuizType = s.type;
+    if (s.mode === 'rank') {
+        await doRandomMatch(s.type, s.diff);
+    } else {
+        await doCreateRoom(s.type, s.bo, s.diff);
+    }
+}
 
 // ==================== 玩家 ID 管理 ====================
 function refreshAuthControls() {
@@ -319,8 +434,12 @@ function requireLogin() {
 
 function enterSingle() {
     refreshPlayerDisplay();
-    showView('view-single');
-    startGame();
+    // 先询问猜谜类型，再进入单人模式开始随机抽题
+    showQuizTypeModal((type) => {
+        singleQuizType = type;
+        showView('view-single');
+        startGame();
+    });
 }
 function enterMultiMenu() {
     if (!requireLogin()) return;   // 未登录不允许多人对战
@@ -332,6 +451,130 @@ async function enterLeaderboard() {
 }
 function enterRules() {
     showView('view-rules');
+}
+
+// ==================== 数据库预览 ====================
+let dbCharacters = [];
+let dbSkeletons = [];
+let dbActiveTab = 'characters';   // 当前显示的页签：'characters' / 'skeletons'
+const DB_PAGE_SIZE = 30;          // 每页显示条数
+let dbPage = 1;                   // 当前页码
+
+function enterDbPreview() {
+    showView('view-dbpreview');
+    loadDbPreview();
+}
+
+async function loadDbPreview() {
+    try {
+        const res = await fetch('/api/db_preview');
+        const data = await res.json();
+        if (data.status === 'success') {
+            dbCharacters = data.characters || [];
+            dbSkeletons = data.skeletons || [];
+            $('dbCountInfo').textContent =
+                `数据库共收录 共鸣者 ${dbCharacters.length} 条 · 声骸 ${dbSkeletons.length} 条`;
+            switchDbTab('characters');
+        } else {
+            $('dbEmptyState').textContent = '加载失败';
+            $('dbEmptyState').style.display = 'block';
+        }
+    } catch (e) {
+        $('dbEmptyState').textContent = '无法连接服务器';
+        $('dbEmptyState').style.display = 'block';
+    }
+}
+
+// 切换页签（角色 / 声骸），并重置到第一页
+function switchDbTab(tab) {
+    dbActiveTab = tab;
+    dbPage = 1;
+    $('tabCharacters').classList.toggle('active', tab === 'characters');
+    $('tabSkeletons').classList.toggle('active', tab === 'skeletons');
+    renderDbTable();
+}
+
+function dbPrevPage() {
+    if (dbPage <= 1) return;
+    dbPage--;
+    renderDbTable();
+}
+
+function dbNextPage() {
+    const total = dbActiveTab === 'characters' ? dbCharacters.length : dbSkeletons.length;
+    const maxPage = Math.max(1, Math.ceil(total / DB_PAGE_SIZE));
+    if (dbPage >= maxPage) return;
+    dbPage++;
+    renderDbTable();
+}
+
+function renderDbTable() {
+    const thead = $('dbThead');
+    const tbody = $('dbTbody');
+    const empty = $('dbEmptyState');
+    let rows;
+    let columns = [];   // 每列为 {key, label}
+
+    if (dbActiveTab === 'characters') {
+        rows = dbCharacters;
+        columns = [
+            { key: 'id',          label: 'ID' },
+            { key: 'name',        label: '姓名' },
+            { key: 'attribute',   label: '属性' },
+            { key: 'star_rating', label: '星级',  stars: true },
+            { key: 'weapon',      label: '武器' },
+            { key: 'birthplace',  label: '出生地' },
+            { key: 'version',     label: '实装版本', version: true },
+        ];
+    } else {
+        rows = dbSkeletons;
+        columns = [
+            { key: 'id',             label: 'ID' },
+            { key: 'name',           label: '声骸名称' },
+            { key: 'skill_attribute',label: '技能属性' },
+            { key: 'cost',           label: 'COST' },
+            { key: 'is_aberration',  label: '异相' },
+            { key: 'set_name',       label: '所属套装' },
+            { key: 'drop_location',  label: '掉落位置' },
+        ];
+    }
+
+    // 表头
+    thead.innerHTML = '<tr>' + columns.map(c => `<th>${c.label}</th>`).join('') + '</tr>';
+
+    // 分页
+    const total = rows.length;
+    const maxPage = Math.max(1, Math.ceil(total / DB_PAGE_SIZE));
+    if (dbPage > maxPage) dbPage = maxPage;
+    const start = (dbPage - 1) * DB_PAGE_SIZE;
+    const pageRows = rows.slice(start, start + DB_PAGE_SIZE);
+
+    $('dbPageInfo').textContent = `第 ${dbPage} / ${maxPage} 页（共 ${total} 条）`;
+    $('dbPrevBtn').disabled = dbPage <= 1;
+    $('dbNextBtn').disabled = dbPage >= maxPage;
+
+    tbody.innerHTML = '';
+    if (!pageRows.length) {
+        empty.style.display = 'block';
+        return;
+    }
+    empty.style.display = 'none';
+
+    pageRows.forEach((r, idx) => {
+        const tr = document.createElement('tr');
+        columns.forEach(c => {
+            let text = r[c.key];
+            const td = document.createElement('td');
+            if (c.stars) {
+                text = starStr(Number(text) || 0);
+            } else if (c.version) {
+                text = formatVersion(text);
+            }
+            td.textContent = (text === null || text === undefined) ? '' : String(text);
+            tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+    });
 }
 
 // ==================== 排行榜 ====================
@@ -385,7 +628,8 @@ async function loadLeaderboard() {
 // ==================== 单人模式 ====================
 function renderAttemptBadge() {
     const used = guessHistory.length;
-    $('attemptBadge').textContent = used >= MAX_ATTEMPTS ? '游戏结束' : `第 ${used + 1} / ${MAX_ATTEMPTS} 次猜测`;
+    const limit = maxAttempts(singleQuizType);
+    $('attemptBadge').textContent = used >= limit ? '游戏结束' : `第 ${used + 1} / ${limit} 次猜测`;
 }
 
 function renderSingleTable() {
@@ -398,17 +642,25 @@ function renderSingleTable() {
         const g = rec.guess, c = rec.compare;
         const tr = document.createElement('tr');
         tr.appendChild(makeCell(String(idx + 1), 'rownum'));
-        tr.appendChild(makeCell(g.name));
-        tr.appendChild(makeCell(g.attribute, null, null, c.attribute));
-        tr.appendChild(makeCell(starStr(g.star_rating), null, null, c.star_rating));
-        tr.appendChild(makeCell(g.weapon, null, null, c.weapon));
-        tr.appendChild(makeCell(g.birthplace, null, null, c.birthplace));
-        const gv = parseFloat(g.version);
-        const tv = currentTarget ? parseFloat(currentTarget.version) : null;
-        let verText = formatVersion(g.version);
-        if (tv != null && gv < tv) verText += ' ↑';
-        else if (tv != null && gv > tv) verText += ' ↓';
-        tr.appendChild(makeCell(verText, null, null, c.version));
+                tr.appendChild(makeCell(g.name));
+                if (singleQuizType === 'skeleton') {
+            tr.appendChild(renderAttrCell(c.skill_attribute, false));
+            tr.appendChild(makeCell(String(g.cost), null, null, c.cost));
+            tr.appendChild(makeCell(g.is_aberration, null, null, c.is_aberration));
+            tr.appendChild(renderSetCell(c.set_name, false));
+            tr.appendChild(renderLocCell(c.drop_location, false));
+        } else {
+            tr.appendChild(makeCell(g.attribute, null, null, c.attribute));
+            tr.appendChild(makeCell(starStr(g.star_rating), null, null, c.star_rating));
+            tr.appendChild(makeCell(g.weapon, null, null, c.weapon));
+            tr.appendChild(makeCell(g.birthplace, null, null, c.birthplace));
+            const gv = parseFloat(g.version);
+            const tv = currentTarget ? parseFloat(currentTarget.version) : null;
+            let verText = formatVersion(g.version);
+            if (tv != null && gv < tv) verText += ' ↑';
+            else if (tv != null && gv > tv) verText += ' ↓';
+            tr.appendChild(makeCell(verText, null, null, c.version));
+        }
         tbody.appendChild(tr);
     });
 }
@@ -422,9 +674,45 @@ function makeCell(text, extraClass = '', cellClass = '', status = null) {
     return td;
 }
 
+// -------------------- 声骸逗号分离字段（技能属性/所属套装/掉落位置）单格渲染 -------------------- 
+// 每个字段返回 {cell, items:[...]}：cell 表示整格底色（数量对不对），items 中每项单独上底色。
+// 通用渲染：chipClass 用于每项色块样式，labelFn 从 item 中取出要显示的文本。
+function renderCommaCell(fieldObj, masked, chipClass, labelFn) {
+    const td = document.createElement('td');
+    if (!fieldObj || !fieldObj.items || !fieldObj.items.length) { td.textContent = ''; return td; }
+    // 整格底色（依据数量判断：全对绿 / 缺项黄 / 全错灰）
+    td.classList.add(cellStatusClass(fieldObj.cell));
+    const wrap = document.createElement('div');
+    wrap.className = 'set-wrap';
+    fieldObj.items.forEach(item => {
+        const chip = document.createElement('span');
+        chip.className = chipClass + ' ' + statusClass(item.status);
+        if (masked) { chip.classList.add('masked-cell'); chip.textContent = '***'; }
+        else chip.textContent = labelFn(item);
+        wrap.appendChild(chip);
+    });
+    td.appendChild(wrap);
+    return td;
+}
+
+// skill_attribute：逗号分离，每项为独立色块
+function renderAttrCell(fieldObj, masked) {
+    return renderCommaCell(fieldObj, masked, 'loc-chip', item => item.attr);
+}
+
+// set_name：拆分“，”后每项为独立色块
+function renderSetCell(fieldObj, masked) {
+    return renderCommaCell(fieldObj, masked, 'set-text-chip', item => item.set);
+}
+
+// drop_location：拆分“，”后每项为独立色块
+function renderLocCell(fieldObj, masked) {
+    return renderCommaCell(fieldObj, masked, 'loc-chip', item => item.loc);
+}
+
 async function startGame() {
     try {
-        const res = await fetch('/api/draw');
+        const res = await fetch('/api/draw?type=' + singleQuizType);
         const data = await res.json();
         if (data.status === 'success') {
             currentTarget = data.character;
@@ -434,17 +722,31 @@ async function startGame() {
             $('guessInput').disabled = false;
             $('btnGuess').disabled = false;
             $('btnViewAnswer').disabled = false;
-            $('singleEmptyState').textContent = '请输入角色名开始猜测 👆';
+            $('singleEmptyState').textContent = singleQuizType === 'skeleton' ? '请输入声骸名称开始猜测 👆' : '请输入角色名开始猜测 👆';
             hideSingleSuggestions();
+            renderSingleThead();
             renderAttemptBadge();
             renderSingleTable();
             $('guessInput').focus();
         } else {
-            alert(data.message || '抽取角色失败');
+            alert(data.message || '抽取目标失败');
         }
     } catch (e) {
         alert('无法连接服务器，请确认后端已启动');
     }
+}
+
+// 渲染单人表格表头（按猜谜类型切换字段）
+function renderSingleThead() {
+    const thead = $('singleThead');
+    if (!thead) return;
+        let ths;
+    if (singleQuizType === 'skeleton') {
+        ths = ['序号', '名称', '技能属性', 'COST', '异相', '所属套装', '掉落位置'];
+    } else {
+        ths = ['序号', '姓名', '属性', '星级', '武器', '出生地', '实装版本'];
+    }
+    thead.innerHTML = '<tr>' + ths.map(t => `<th>${t}</th>`).join('') + '</tr>';
 }
 
 async function guessCharacter() {
@@ -452,11 +754,11 @@ async function guessCharacter() {
     const name = $('guessInput').value.trim();
     if (!name) { alert('请输入角色名！'); return; }
 
-    try {
+        try {
         const res = await fetch('/api/guess', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ target: currentTarget, guess: name })
+            body: JSON.stringify({ target: currentTarget, guess: name, type: singleQuizType })
         });
         const data = await res.json();
         if (data.status === 'error') { alert(data.message); return; }
@@ -467,8 +769,12 @@ async function guessCharacter() {
         renderAttemptBadge();
         renderSingleTable();
 
-        const allMatch = Object.values(data.compare).every(v => v === 'match');
-        if (allMatch || guessHistory.length >= MAX_ATTEMPTS) {
+                                const allMatch = Object.values(data.compare).every(v => {
+                    if (v && typeof v === 'object' && Array.isArray(v.items)) return v.items.length > 0 && v.cell === 'match';
+                    if (Array.isArray(v)) return v.length > 0 && v.every(x => x.status === 'match');
+                    return v === 'match';
+                });
+        if (allMatch || guessHistory.length >= maxAttempts(singleQuizType)) {
             endGame(allMatch, data.target);
         }
     } catch (e) {
@@ -489,11 +795,12 @@ function endGame(isWin, target, viaAnswer) {
     $('resultTitle').textContent = isWin ? '恭喜你，猜对了！' : viaAnswer ? '你查看了答案' : '很遗憾，机会用完了';
     $('correctAnswer').style.display = 'block';
     $('correctAnswer').innerHTML = `正确答案是：<br><strong>${target.name}</strong>`;
+        const limit = maxAttempts(singleQuizType);
     $('resultDetail').textContent = isWin
-        ? `你用了 ${guessHistory.length} / ${MAX_ATTEMPTS} 次就猜出了正确答案！`
+        ? `你用了 ${guessHistory.length} / ${limit} 次就猜出了正确答案！`
         : viaAnswer
             ? '你选择了查看答案，答案揭晓啦！'
-            : '4 次机会都用完了，来看看正确答案吧！';
+            : `${limit} 次机会都用完了，来看看正确答案吧！`;
     $('btnContinue').style.display = 'inline-block';
     showModal('gameOverModal');
 }
@@ -513,25 +820,40 @@ async function loadNames() {
         const data = await res.json();
         if (data.status === 'success') allNames = data.names;
     } catch (e) { allNames = []; }
+    try {
+        const res2 = await fetch('/api/skeleton_names');
+        const data2 = await res2.json();
+        if (data2.status === 'success') allSkeletonNames = data2.names;
+    } catch (e) { allSkeletonNames = []; }
 }
 
-function filterSuggestions(keyword) {
+function currentSuggestionPool(qtype) {
+    return qtype === 'skeleton' ? allSkeletonNames : allNames;
+}
+
+function filterSuggestions(keyword, qtype) {
     if (!keyword) return [];
     const kw = keyword.toLowerCase();
-    return allNames.filter(n => n.name.toLowerCase().includes(kw)).slice(0, 10);
+    return currentSuggestionPool(qtype)
+        .filter(n => (n.name || '').toLowerCase().includes(kw))
+        .slice(0, 10);
 }
 
 function renderSingleSuggestions() {
     const list = $('autocompleteList');
     const keyword = $('guessInput').value.trim();
-    singleSuggestions = filterSuggestions(keyword);
+    singleSuggestions = filterSuggestions(keyword, singleQuizType);
     singleActive = -1;
     if (!singleSuggestions.length) { hideSingleSuggestions(); return; }
     list.innerHTML = '';
     singleSuggestions.forEach((item, i) => {
         const div = document.createElement('div');
         div.className = 'ac-item' + (i === singleActive ? ' active' : '');
-        div.innerHTML = `<span class="ac-name">${item.name}</span><span class="ac-attr">${item.attribute}</span><span class="ac-stars">${starStr(item.star_rating)}</span>`;
+        if (singleQuizType === 'skeleton') {
+            div.innerHTML = `<span class="ac-name">${item.name}</span><span class="ac-attr">${item.set_name || ''}</span><span class="ac-stars">COST${item.cost}</span>`;
+        } else {
+            div.innerHTML = `<span class="ac-name">${item.name}</span><span class="ac-attr">${item.attribute}</span><span class="ac-stars">${starStr(item.star_rating)}</span>`;
+        }
         div.onclick = () => { $('guessInput').value = item.name; hideSingleSuggestions(); $('guessInput').focus(); };
         list.appendChild(div);
     });
@@ -551,8 +873,8 @@ $('guessInput') && $('guessInput').addEventListener('keydown', function (e) {
             this.value = singleSuggestions[idx].name;
             hideSingleSuggestions();
             e.preventDefault();
-        } else {
-            const m = filterSuggestions(this.value.trim());
+                } else {
+            const m = filterSuggestions(this.value.trim(), singleQuizType);
             if (m.length) { this.value = m[0].name; e.preventDefault(); }
         }
         return;
@@ -668,11 +990,16 @@ setInterval(() => { wsSendText(JSON.stringify({ type: 'ping' })); }, 20000);
 
 async function createRoom() {
     if (!requireLogin()) return;
+    openMultiSetup('create');
+}
+
+// 创建房间（携带类型 / BO 局制 / 难度）
+async function doCreateRoom(type, bo, diff) {
     try {
         const res = await fetch('/api/multi/create', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ player_id: myPlayerId, token: myToken })
+            body: JSON.stringify({ player_id: myPlayerId, token: myToken, quiz_type: type, best_of: bo, difficulty: diff })
         });
         const data = await res.json();
         if (data.status === 'error') { alert(data.message || '创建失败'); return; }
@@ -697,12 +1024,18 @@ function showWaitRoom(code) {
 
 async function randomMatch() {
     if (!requireLogin()) return;
+    openMultiSetup('rank');
+}
+
+// 随机匹配（排位）：BO 固定 3，声骸可带难度
+async function doRandomMatch(type, diff) {
+    diff = diff || 'hard';
     // 先取消可能的排队后重新匹配
     try {
         const res = await fetch('/api/multi/random_match', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ player_id: myPlayerId, token: myToken })
+            body: JSON.stringify({ player_id: myPlayerId, token: myToken, quiz_type: type, difficulty: diff })
         });
         const data = await res.json();
         if (data.status === 'error') { alert(data.message || '匹配失败'); return; }
@@ -734,10 +1067,10 @@ function startWaitFallback(codeOrNull) {
         // 随机匹配排队中（尚无 room_code）：周期重询，检查是否配对
         if (!multiRoomCode) {
             try {
-                const res = await fetch('/api/multi/random_match', {
+                                                                const res = await fetch('/api/multi/random_match', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ player_id: myPlayerId, token: myToken })
+                    body: JSON.stringify({ player_id: myPlayerId, token: myToken, quiz_type: multiQuizType, difficulty: multiSetupState.diff || 'hard' })
                 });
                 const data = await res.json();
                 if (data.status !== 'success') return;
@@ -1000,9 +1333,13 @@ function startTimer(data) {
 
 function renderMultiGame(data) {
     multiGameRef = data;
+    multiQuizType = data.quiz_type || 'resonator';
     const round = data.round;
     const maxRound = data.best_of;
-    $('roundBadge').textContent = `第 ${round} 局`;
+    const diff = data.difficulty || 'hard';
+    const typeName = multiQuizType === 'skeleton' ? '声骸' : '共鸣者';
+    const diffName = multiQuizType === 'skeleton' ? (diff === 'easy' ? '·简单' : '·困难') : '';
+    $('roundBadge').textContent = `第 ${round} 局 · ${typeName}${diffName} · BO${maxRound || 3}`;
 
     // 计时器（毫秒级本地平滑倒计时，不再随轮询跳动）
     startTimer(data);
@@ -1015,14 +1352,18 @@ function renderMultiGame(data) {
     // 对手 ID
     if (data.opponent_id) $('oppIdLabel').textContent = data.opponent_id;
 
+    // 按猜谜类型渲染动态表头
+    renderMultiTheads(multiQuizType);
+
     // 渲染双方表格
     const players = data.players || [];
     const me = players.find(p => p.is_me);
     const opp = players.find(p => !p.is_me);
-    // 对战中用 target_version 提供升/降方向提示（不泄露完整答案）
+    // 对战中用 target_version / target_cost 提供升/降方向提示（不泄露完整答案）
     const targetVersion = data.target_version != null ? data.target_version : null;
-    renderOppTable(me ? me.guesses : [], 'myTbody', 'myEmptyState', true, targetVersion);
-    renderOppTable(opp ? opp.guesses : [], 'oppTbody', 'oppEmptyState', false, targetVersion);
+    const targetCost = data.target_cost != null ? data.target_cost : null;
+    renderOppTable(me ? me.guesses : [], 'myTbody', 'myEmptyState', true, targetVersion, targetCost, multiQuizType);
+    renderOppTable(opp ? opp.guesses : [], 'oppTbody', 'oppEmptyState', false, targetVersion, targetCost, multiQuizType);
 
     // 局结束/游戏结束弹窗
     if (data.round_status === 'finished' || data.room_status === 'finished') {
@@ -1033,29 +1374,60 @@ function renderMultiGame(data) {
     }
 }
 
-function renderOppTable(guesses, tbodyId, emptyId, revealed, targetVersion) {
+function renderMultiTheads(qtype) {
+        let ths;
+    if (qtype === 'skeleton') {
+        ths = ['序号', '名称', '技能属性', 'COST', '异相', '所属套装', '掉落位置'];
+    } else {
+        ths = ['序号', '姓名', '属性', '星级', '武器', '出生地', '实装版本'];
+    }
+    const html = '<tr>' + ths.map(t => `<th>${t}</th>`).join('') + '</tr>';
+    const myT = $('myThead');
+    const oppT = $('oppThead');
+    if (myT) myT.innerHTML = html;
+    if (oppT) oppT.innerHTML = html;
+}
+
+function renderOppTable(guesses, tbodyId, emptyId, revealed, targetVersion, targetCost, qtype) {
     const tbody = $(tbodyId);
     const empty = $(emptyId);
     tbody.innerHTML = '';
     if (!guesses.length) { empty.style.display = 'block'; return; }
     empty.style.display = 'none';
+    // 对手打码时使用 `masked`，自己时显示真实值
     guesses.forEach((rec, idx) => {
         const g = rec.guess, c = rec.compare;
         const tr = document.createElement('tr');
+        const masked = !revealed;
         tr.appendChild(makeCell(String(idx + 1), 'rownum'));
-        tr.appendChild(makeCell(g.name, revealed ? '' : 'masked-cell'));
-        tr.appendChild(makeCell(g.attribute, revealed ? '' : 'masked-cell', null, c.attribute));
-        tr.appendChild(makeCell(revealed ? starStr(g.star_rating) : '***', revealed ? '' : 'masked-cell', null, c.star_rating));
-        tr.appendChild(makeCell(g.weapon, revealed ? '' : 'masked-cell', null, c.weapon));
-        tr.appendChild(makeCell(g.birthplace, revealed ? '' : 'masked-cell', null, c.birthplace));
-        // 版本列：目标可见时显示 ↑/↓ 方向提示
-        let verText = revealed ? formatVersion(g.version) : '***';
-        if (revealed && targetVersion != null) {
-            const gv = parseFloat(g.version), tv = parseFloat(targetVersion);
-            if (gv < tv) verText += ' ↑';
-            else if (gv > tv) verText += ' ↓';
+                tr.appendChild(makeCell(g.name, masked ? 'masked-cell' : ''));
+                if (qtype === 'skeleton') {
+            tr.appendChild(renderAttrCell(c.skill_attribute, masked));
+            // COST 列：带 ↑/↓ 方向提示（不泄露具体数值但可看到等级）
+            let costText = String(g.cost);
+            if (revealed && targetCost != null) {
+                const gc = parseInt(g.cost, 10), tc = parseInt(targetCost, 10);
+                if (gc < tc) costText += ' ↑';
+                else if (gc > tc) costText += ' ↓';
+            }
+            tr.appendChild(makeCell(costText, masked ? 'masked-cell' : '', null, c.cost));
+            tr.appendChild(makeCell(g.is_aberration, masked ? 'masked-cell' : '', null, c.is_aberration));
+            tr.appendChild(renderSetCell(c.set_name, masked));
+            tr.appendChild(renderLocCell(c.drop_location, masked));
+        } else {
+            tr.appendChild(makeCell(g.attribute, masked ? 'masked-cell' : '', null, c.attribute));
+            tr.appendChild(makeCell(revealed ? starStr(g.star_rating) : '***', masked ? 'masked-cell' : '', null, c.star_rating));
+            tr.appendChild(makeCell(g.weapon, masked ? 'masked-cell' : '', null, c.weapon));
+            tr.appendChild(makeCell(g.birthplace, masked ? 'masked-cell' : '', null, c.birthplace));
+            // 版本列：目标可见时显示 ↑/↓ 方向提示
+            let verText = revealed ? formatVersion(g.version) : '***';
+            if (revealed && targetVersion != null) {
+                const gv = parseFloat(g.version), tv = parseFloat(targetVersion);
+                if (gv < tv) verText += ' ↑';
+                else if (gv > tv) verText += ' ↓';
+            }
+            tr.appendChild(makeCell(verText, masked ? 'masked-cell' : '', null, c.version));
         }
-        tr.appendChild(makeCell(verText, revealed ? '' : 'masked-cell', null, c.version));
         tbody.appendChild(tr);
     });
 }
@@ -1088,10 +1460,11 @@ function handleRoundEnd(data) {
         title = iWon ? '🎉 你赢了整场比赛！' : '😢 你输掉了整场比赛';
         icon = iWon ? '🏆' : '💔';
         box.className = 'modal ' + (iWon ? 'win' : 'lose');
-        $('roundAnswer').innerHTML = data.target
+                $('roundAnswer').innerHTML = data.target
             ? `最终答案：<strong>${data.target.name}</strong>`
             : '';
-        msg = `三局两胜最终比分：我 ${wins[myIdx]} : ${wins[1-myIdx]} 对手`;
+        const bo = data.best_of || 3;
+        msg = `BO${bo} 最终比分：我 ${wins[myIdx]} : ${wins[1-myIdx]} 对手 · 胜负各 ${data.score ?? 0} 分`;
         $('roundDetail').textContent = msg;
         $('roundNextBtn').style.display = 'none';
         $('roundDoneBtn').style.display = 'inline-block';
@@ -1173,14 +1546,18 @@ async function multiGuessCharacter() {
 function renderMultiSuggestions() {
     const list = $('multiAutocompleteList');
     const keyword = $('multiGuessInput').value.trim();
-    multiSuggestions = filterSuggestions(keyword);
+    multiSuggestions = filterSuggestions(keyword, multiQuizType);
     multiActive = -1;
     if (!multiSuggestions.length) { hideMultiSuggestions(); return; }
     list.innerHTML = '';
     multiSuggestions.forEach((item, i) => {
         const div = document.createElement('div');
         div.className = 'ac-item' + (i === multiActive ? ' active' : '');
-        div.innerHTML = `<span class="ac-name">${item.name}</span><span class="ac-attr">${item.attribute}</span><span class="ac-stars">${starStr(item.star_rating)}</span>`;
+        if (multiQuizType === 'skeleton') {
+            div.innerHTML = `<span class="ac-name">${item.name}</span><span class="ac-attr">${item.set_name || ''}</span><span class="ac-stars">COST${item.cost}</span>`;
+        } else {
+            div.innerHTML = `<span class="ac-name">${item.name}</span><span class="ac-attr">${item.attribute}</span><span class="ac-stars">${starStr(item.star_rating)}</span>`;
+        }
         div.onclick = () => { $('multiGuessInput').value = item.name; hideMultiSuggestions(); $('multiGuessInput').focus(); };
         list.appendChild(div);
     });
@@ -1195,8 +1572,8 @@ $('multiGuessInput') && $('multiGuessInput').addEventListener('keydown', functio
             this.value = multiSuggestions[idx].name;
             hideMultiSuggestions();
             e.preventDefault();
-        } else {
-            const m = filterSuggestions(this.value.trim());
+                } else {
+            const m = filterSuggestions(this.value.trim(), multiQuizType);
             if (m.length) { this.value = m[0].name; hideMultiSuggestions(); e.preventDefault(); }
         }
         return;

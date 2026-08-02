@@ -28,6 +28,8 @@ from websockets.asyncio.server import serve as ws_serve
 from core import (
     get_connection,
     build_compare,
+    build_compare_by_type,
+    draw_target_by_type,
     all_match,
     apply_score,
     authenticate_player,
@@ -45,12 +47,36 @@ MATCH_QUEUE = []                    # 随机匹配等待队列（存放 {player_
 ROOM_LOCK = threading.Lock()        # 保护上述状态
 FORFEIT_NOTICES = {}                # winner_id -> 强制胜利通知（等待对方前端拉取）
 
-BEST_OF = 3                         # 三局两胜
-ROUND_TIME_LIMIT = 90               # 每局 1分30秒
-MULTI_WIN = 30                      # 多人胜 +30
-MULTI_LOSE = -30                    # 多人负 -30
-MAX_ATTEMPTS = 4                    # 每局（双方）最多 4 次猜测
+BEST_OF = 3                         # 默认三局两胜（排名赛固定 BO3）
+ROUND_TIME_LIMIT = 90               # 每局 1分30秒（共鸣者）
+SKELETON_ROUND_TIME_LIMIT = 150     # 每局 2分30秒（声骸）
+RESONATOR_ATTEMPTS = 4              # 猜共鸣者：每局 4 次机会
+SKELETON_ATTEMPTS = 8               # 猜声骸：每局 8 次机会
 ENTER_GAME_DELAY = 2                # 匹配/加入成功后，双方统一等待 2 秒再进入对局（此时才开始计时）
+
+
+def max_attempts(quiz_type):
+    """根据猜谜类型返回本局最多猜测次数。"""
+    return SKELETON_ATTEMPTS if quiz_type == 'skeleton' else RESONATOR_ATTEMPTS
+
+
+def round_time_limit(quiz_type):
+    """根据猜谜类型返回每局时限（秒）。声骸 2分30秒，共鸣者 1分30秒。"""
+    return SKELETON_ROUND_TIME_LIMIT if quiz_type == 'skeleton' else ROUND_TIME_LIMIT
+
+
+def multi_score(quiz_type, difficulty, best_of):
+    """根据 猜谜类型 + 难度 + 局制 返回整场胜负分数（每方 ±）。
+
+    共鸣者: BO1 ±10 / BO3 ±30 / BO5 ±50
+    声骸·简单: BO1 ±5 / BO3 ±10 / BO5 ±15
+    声骸·困难: BO1 ±30 / BO3 ±50 / BO5 ±70
+    """
+    if quiz_type != 'skeleton':
+        return {1: 10, 3: 30, 5: 50}.get(best_of, 30)
+    if difficulty == 'easy':
+        return {1: 5, 3: 10, 5: 15}.get(best_of, 10)
+    return {1: 30, 3: 50, 5: 70}.get(best_of, 50)
 
 
 def gen_room_code():
@@ -74,12 +100,20 @@ def new_slot(player_id):
     }
 
 
-def new_room(player1):
-    """创建一个新的房间并返回 code 与 room。"""
+def new_room(player1, quiz_type='resonator', best_of=None, difficulty='normal'):
+    """创建一个新的房间并返回 code 与 room。quiz_type: 'resonator'(共鸣者) / 'skeleton'(声骸)。
+
+    best_of: 1/3/5（局制），默认 BEST_OF=3。
+    difficulty: 仅声骸使用 —— 'easy'(简单)/'hard'(困难)，默认 'normal'(困难即全部声骸)。
+    """
+    if best_of not in (1, 3, 5):
+        best_of = BEST_OF
     code = gen_room_code()
     room = {
         'code': code,
-        'best_of': BEST_OF,
+        'quiz_type': quiz_type,
+        'best_of': best_of,
+        'difficulty': difficulty,
         'status': 'waiting',                 # waiting / playing / finished
         'players': [new_slot(player1)],
         'round': 0,
@@ -108,16 +142,9 @@ def add_player(room, player_id):
     room['round_ready_at'] = time.time() + ENTER_GAME_DELAY
 
 
-def draw_target():
-    """随机抽一名角色作为本局目标。"""
-    conn = get_connection()
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute("SELECT * FROM characters ORDER BY RAND() LIMIT 1")
-            row = cursor.fetchone()
-    finally:
-        conn.close()
-    return row
+def draw_target(quiz_type, difficulty='normal'):
+    """根据猜谜类型随机抽一名角色或声骸作为本局目标。difficulty 仅服务骸：easy 只抽 4cost。"""
+    return draw_target_by_type(quiz_type, difficulty)
 
 
 def start_round(room):
@@ -127,18 +154,24 @@ def start_round(room):
     room['round_winner'] = None
     room['round_start'] = time.time()
     room['round_resolved_at'] = None
-    room['target'] = draw_target()
+    room['target'] = draw_target(room.get('quiz_type', 'resonator'), room.get('difficulty', 'normal'))
     for slot in room['players']:
         slot['guesses'] = []
         slot['attempts'] = 0
 
 
+def room_time_limit(room):
+    """根据房间猜谜类型返回每局时限（秒）。"""
+    return round_time_limit(room.get('quiz_type', 'resonator'))
+
+
 def round_time_left(room):
     """当前局剩余秒数。"""
+    limit = room_time_limit(room)
     if room['round_start'] is None:
-        return ROUND_TIME_LIMIT
+        return limit
     elapsed = time.time() - room['round_start']
-    return max(0, int(ROUND_TIME_LIMIT - elapsed))
+    return max(0, int(limit - elapsed))
 
 
 def player_index(room, player_id):
@@ -183,31 +216,43 @@ def resolve_round(room):
 
 def finish_round(room, winner_index):
     """结束当前局。winner_index 为 0/1/None(平局)。
-    仅在某方达到两胜、整场结束时一次性结算整场比分（胜 +30 / 负 -30）。"""
+    仅在某方达到胜场阈值、整场结束时一次性结算整场比分（根据 类型+难度+局制）。"""
     room['round_status'] = 'finished'
     room['round_winner'] = winner_index
     room['round_resolved_at'] = time.time()
     if winner_index is not None:
         room['players'][winner_index]['round_wins'] += 1
 
+    best_of = room.get('best_of', BEST_OF)
+    win_threshold = best_of // 2 + 1
     for idx, slot in enumerate(room['players']):
-        if slot['round_wins'] >= (BEST_OF // 2 + 1):
+        if slot['round_wins'] >= win_threshold:
             room['status'] = 'finished'
             room['overall_winner'] = idx
-            # 整场结算：胜者 +30，负者 -30
-            apply_score(room['players'][idx]['player_id'], MULTI_WIN)
-            apply_score(room['players'][1 - idx]['player_id'], MULTI_LOSE)
+            # 整场结算：胜者 +score，负者 -score（按 类型+难度+局制）
+            score = multi_score(room.get('quiz_type', 'resonator'),
+                                room.get('difficulty', 'normal'), best_of)
+            apply_score(room['players'][idx]['player_id'], score)
+            apply_score(room['players'][1 - idx]['player_id'], -score)
             return
 
 
 def build_room_view(room, viewer_idx):
     """返回给 viewer 的房间视图：自己完整、对手打码但保留背景颜色。"""
+    quiz_type = room.get('quiz_type', 'resonator')
     mine = room['players'][viewer_idx]
     opponent_idx = 1 - viewer_idx
     has_opponent = opponent_idx < len(room['players'])
     opponent = room['players'][opponent_idx] if has_opponent else None
     target = room['target']
     target = target if (room['round_status'] == 'finished' or room['status'] == 'finished') else None
+
+    # 需要打码的字段：对声骸与角色分别处理
+    masked_fields = (
+        ['name', 'skill_attribute', 'cost', 'is_aberration', 'set_name', 'drop_location']
+        if quiz_type == 'skeleton'
+        else ['name', 'attribute', 'star_rating', 'weapon', 'birthplace', 'version']
+    )
 
     def reveal_rows(guesses):
         return [
@@ -216,35 +261,31 @@ def build_room_view(room, viewer_idx):
         ]
 
     def mask_rows(guesses):
-        return [
-            {
-                'revealed': False,
-                'guess': {
-                    'name': '***',
-                    'attribute': '***',
-                    'star_rating': '***',
-                    'weapon': '***',
-                    'birthplace': '***',
-                    'version': '***',
-                },
-                'compare': g['compare'],
-            }
-            for g in guesses
-        ]
+        rows = []
+        for g in guesses:
+            masked = {f: '***' for f in masked_fields}
+            rows.append({'revealed': False, 'guess': masked, 'compare': g['compare']})
+        return rows
 
+    best_of = room.get('best_of', BEST_OF)
+    difficulty = room.get('difficulty', 'normal')
     return {
         'room_code': room['code'],
-        'best_of': room['best_of'],
+        'quiz_type': quiz_type,
+        'best_of': best_of,
+        'difficulty': difficulty,
+        'score': multi_score(quiz_type, difficulty, best_of),
         'room_status': room['status'],
         'round_status': room['round_status'],
         'round': room['round'],
         'round_winner': room['round_winner'],
         'round_wins': [slot['round_wins'] for slot in room['players']],
         'time_left': round_time_left(room),
-        'time_limit': ROUND_TIME_LIMIT,
+        'time_limit': room_time_limit(room),
         'round_start': room['round_start'],
         'target': target,
-        'target_version': room['target']['version'] if room['target'] else None,
+        'target_version': room['target']['version'] if (quiz_type != 'skeleton' and room['target']) else None,
+        'target_cost': room['target']['cost'] if (quiz_type == 'skeleton' and room['target']) else None,
         'overall_winner': room['overall_winner'],
         'players': [
             {
@@ -448,9 +489,22 @@ def start_background_threads():
 # ------------------------------------------------------------------
 @multi_bp.route('/api/multi/create', methods=['POST'])
 def multi_create():
-    """创建房间并返回房间号。"""
+    """创建房间并返回房间号。
+
+    quiz_type: 'resonator'(共鸣者) / 'skeleton'(声骸)
+    best_of:   1 / 3 / 5（创建房间可选择局制）
+    difficulty:'easy'(简单) / 'hard'(困难) —— 仅声骸；困难/其他为全部声骸
+    """
     data = request.get_json() or {}
     pid = (data.get('player_id') or '').strip()
+    quiz_type = (data.get('quiz_type') or 'resonator')
+    if quiz_type not in ('resonator', 'skeleton'):
+        quiz_type = 'resonator'
+    best_of = data.get('best_of', BEST_OF)
+    best_of = best_of if best_of in (1, 3, 5) else BEST_OF
+    difficulty = data.get('difficulty', 'hard')
+    if difficulty not in ('easy', 'hard'):
+        difficulty = 'hard'
     if not pid:
         return jsonify({'status': 'error', 'message': '缺少玩家ID'})
     if not authenticate_player(data):
@@ -467,8 +521,9 @@ def multi_create():
         if any(q.get('player_id') == pid for q in MATCH_QUEUE):
             return jsonify({'status': 'error', 'message': '你正在匹配中'})
         cleanup_stale_rooms()
-        code, _room = new_room(pid)
-    return jsonify({'status': 'success', 'room_code': code})
+        code, _room = new_room(pid, quiz_type, best_of, difficulty)
+    return jsonify({'status': 'success', 'room_code': code,
+                    'quiz_type': quiz_type, 'best_of': best_of, 'difficulty': difficulty})
 
 
 @multi_bp.route('/api/multi/join', methods=['POST'])
@@ -512,9 +567,18 @@ def multi_join():
 
 @multi_bp.route('/api/multi/random_match', methods=['POST'])
 def multi_random_match():
-    """随机匹配。若已有等待者则配对开局；否则进入队列返回 room_code=null。"""
+    """随机匹配（排位）。若已有同类型+同难度的等待者则配对开局；否则进入队列。
+
+    排位局制固定为 BO3；声骸可自选难度（简单/困难），难度不一致不会互相匹配。
+    """
     data = request.get_json() or {}
     pid = (data.get('player_id') or '').strip()
+    quiz_type = (data.get('quiz_type') or 'resonator')
+    if quiz_type not in ('resonator', 'skeleton'):
+        quiz_type = 'resonator'
+    difficulty = data.get('difficulty', 'hard')
+    if difficulty not in ('easy', 'hard'):
+        difficulty = 'hard'
     if not pid:
         return jsonify({'status': 'error', 'message': '缺少玩家ID'})
     if not authenticate_player(data):
@@ -535,13 +599,16 @@ def multi_random_match():
 
         opponent = None
         for q in MATCH_QUEUE:
-            if q.get('player_id') != pid:
+            if (q.get('player_id') != pid
+                    and q.get('quiz_type') == quiz_type
+                    and q.get('difficulty', 'hard') == difficulty):
                 opponent = q
                 break
         if opponent:
             MATCH_QUEUE.remove(opponent)
             opp_id = opponent['player_id']
-            code, room = new_room(opp_id)
+            # 排位固定 BO3
+            code, room = new_room(opp_id, quiz_type, BEST_OF, difficulty)
             add_player(room, pid)
             # 随机匹配配对成功：推送给双方「开局」，使其 2 秒后同时进入
             _paired = True
@@ -553,11 +620,13 @@ def multi_random_match():
             if room:
                 notify_room_players(room, 'game_started')
         return jsonify({'status': 'success', 'room_code': code, 'in_queue': False,
-                        'opponent': opp_id})
+                        'opponent': opp_id, 'quiz_type': quiz_type, 'difficulty': difficulty})
     else:
         with ROOM_LOCK:
-            MATCH_QUEUE.append({'player_id': pid, 'since': time.time()})
-    return jsonify({'status': 'success', 'room_code': None, 'in_queue': True})
+            MATCH_QUEUE.append({'player_id': pid, 'since': time.time(),
+                                'quiz_type': quiz_type, 'difficulty': difficulty})
+    return jsonify({'status': 'success', 'room_code': None, 'in_queue': True,
+                    'quiz_type': quiz_type, 'difficulty': difficulty})
 
 
 @multi_bp.route('/api/multi/cancel_match', methods=['POST'])
@@ -640,21 +709,25 @@ def multi_guess():
             return jsonify({'status': 'error', 'message': '你不在该房间中'})
         slot = room['players'][idx]
 
-        if slot['attempts'] >= MAX_ATTEMPTS:
-            return jsonify({'status': 'error', 'message': f'你本局已用完 {MAX_ATTEMPTS} 次猜测机会'})
-
+        quiz_type = room.get('quiz_type', 'resonator')
+        limit = max_attempts(quiz_type)
+        if slot['attempts'] >= limit:
+            return jsonify({'status': 'error', 'message': f'你本局已用完 {limit} 次猜测机会'})
         conn = get_connection()
         try:
             with conn.cursor() as cursor:
-                cursor.execute("SELECT * FROM characters WHERE name = %s", (guess_name,))
+                if quiz_type == 'skeleton':
+                    cursor.execute("SELECT * FROM sound_skeletons WHERE name = %s", (guess_name,))
+                else:
+                    cursor.execute("SELECT * FROM characters WHERE name = %s", (guess_name,))
                 guess_char = cursor.fetchone()
         finally:
             conn.close()
 
         if not guess_char:
-            return jsonify({'status': 'error', 'message': f'数据库中不存在名为「{guess_name}」的角色'})
+            return jsonify({'status': 'error', 'message': f'数据库中不存在名为「{guess_name}」的目标'})
 
-        compare = build_compare(room['target'], guess_char)
+        compare = build_compare_by_type(room['target'], guess_char, quiz_type)
         slot['guesses'].append({'character': guess_char, 'compare': compare})
         slot['attempts'] += 1
 
@@ -664,7 +737,7 @@ def multi_guess():
         if won:
             finish_round(room, idx)
             _notify = True
-        elif all(p['attempts'] >= MAX_ATTEMPTS for p in room['players']):
+        elif all(p['attempts'] >= limit for p in room['players']):
             w = resolve_round(room)
             finish_round(room, w)
             _notify = True
@@ -783,10 +856,13 @@ def multi_leave_room():
             if idx < 0:
                 return jsonify({'status': 'success'})
             if room['status'] == 'playing' and len(room['players']) >= 2:
-                # 对战中退出：离开者判负，对方判胜
+                # 对战中退出：离开者判负，对方判胜（按房间 类型+难度+局制 结算）
                 loser_idx, winner_idx = idx, 1 - idx
-                apply_score(room['players'][loser_idx]['player_id'], MULTI_LOSE)
-                apply_score(room['players'][winner_idx]['player_id'], MULTI_WIN)
+                score = multi_score(room.get('quiz_type', 'resonator'),
+                                    room.get('difficulty', 'normal'),
+                                    room.get('best_of', BEST_OF))
+                apply_score(room['players'][loser_idx]['player_id'], -score)
+                apply_score(room['players'][winner_idx]['player_id'], score)
                 # 记录强制胜利通知，供对方前端拉取并提示
                 winner_id = room['players'][winner_idx]['player_id']
                 loser_id = room['players'][loser_idx]['player_id']

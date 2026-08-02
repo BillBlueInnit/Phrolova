@@ -288,6 +288,15 @@ h2 {
 .match-gray   { background: #7f8c8d !important; color: #e0e0e0; }
 
 .masked-cell { color: #555; text-shadow: 0 0 6px rgba(0,0,0,0.6); }
+/* 逗号分离字段的整格底色（cell 状态）：绿=数量/内容全对，黄=数量不对，灰=全没猜中 */
+.cell-match     { background: rgba(46, 204, 113, 0.35) !important; }
+.cell-partial   { background: rgba(241, 196, 15, 0.40) !important; }
+.cell-different { background: rgba(127, 140, 141, 0.30) !important; }
+/* 声骸套装 / 掉落位置 / 技能属性 组合单元格 */
+.set-wrap { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; }
+.set-text-chip { display: inline-block; padding: 6px 10px; border-radius: 6px; font-weight: bold; color: #0a0a0a; font-size: 14px; white-space: nowrap; }
+.loc-chip { display: inline-block; padding: 4px 9px; border-radius: 6px; font-size: 13px; margin: 2px; }
+
 
 .empty-state { text-align: center; color: #888; padding: 30px; font-size: 15px; }
 
@@ -340,6 +349,55 @@ h2 {
     margin-top: 10px;
     animation: blink 1s infinite;
 }
+
+/* 猜谜类型选择弹窗按钮 */
+.quiz-type-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 18px;
+}
+.quiz-type-actions .btn {
+    font-size: 18px;
+    padding: 16px 20px;
+}
+
+/* 多人开局配置：局制(bo)/难度 选择行 */
+.ms-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin: 14px 0 6px;
+    flex-wrap: wrap;
+}
+.ms-label { color: #aaa; font-size: 14px; }
+.ms-chip {
+    padding: 8px 18px;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    font-size: 15px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.ms-chip:hover { border-color: #ffd700; color: #ffd700; }
+.ms-chip.active {
+    background: linear-gradient(90deg, #ffd700, #ff8c00);
+    color: #1a1a2e;
+    border-color: transparent;
+}
+.ms-chip.locked { opacity: 0.55; cursor: not-allowed; }
+.ms-note {
+    color: #aaa;
+    font-size: 13px;
+    margin: 12px 0 4px;
+    line-height: 1.6;
+    min-height: 18px;
+}
+.ms-score-preview { color: #ffd700; font-size: 14px; font-weight: bold; margin-top: 6px; }
 
 /* 左下角：返回房间按钮 */
 .room-nav-btn {
@@ -403,6 +461,59 @@ h2 {
 .autocomplete-list .ac-item.active .ac-name { color: #ffd700; }
 
 footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; padding-bottom: 90px; }
+
+/* ============ 数据库预览 ============ */
+.db-count-info {
+    text-align: center;
+    color: #aaa;
+    font-size: 14px;
+    margin-bottom: 15px;
+}
+.db-tabs {
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+}
+.db-tab {
+    padding: 10px 26px;
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.db-tab:hover { border-color: #ffd700; color: #ffd700; }
+.db-tab.active {
+    background: linear-gradient(90deg, #ffd700, #ff8c00);
+    color: #1a1a2e;
+    border-color: transparent;
+}
+.db-page-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+}
+.db-page-info {
+    color: #ffd700;
+    font-size: 15px;
+    font-weight: bold;
+}
+.db-page-controls .btn {
+    padding: 8px 18px;
+    font-size: 14px;
+}
+.db-page-controls .btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
 
 /* ============ 游戏规则页 ============ */
 .rules-notice {

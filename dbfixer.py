@@ -143,6 +143,59 @@ def delete_player(conn):
             print(f"✅ 玩家 '{player_id}' 已成功删除。")
     except pymysql.Error as e:
         print(f"❌ 数据库错误: {e}")
+        
+def add_sound_skeleton(conn):
+    print("\n--- 添加新声骸 ---")
+    
+    name = input("声骸名称: ").strip()
+    if not name:
+        print("❌ 名称不能为空")
+        return
+
+    skill_attribute = input("技能属性 (如: 物理, 治疗, 导电, 热熔, 冷凝, 湮灭, 衍射, 气动, 位移, 防御, 反击, 强化, 协奏等，如果有多种请用中文逗号分隔): ").strip()
+    if not skill_attribute:
+        print("❌ 技能属性不能为空")
+        return
+
+    while True:
+        cost_input = input("COST值 (1/3/4): ").strip()
+        if cost_input.isdigit() and int(cost_input) in (1, 3, 4):
+            cost = int(cost_input)
+            break
+        print("⚠️ COST必须为 1、3 或 4，请重新输入")
+
+    while True:
+        is_aberration = input("是否有异相 (输入 有 或 无): ").strip()
+        if is_aberration in ('有', '无'):
+            break
+        print("⚠️ 请输入 '有' 或 '无'")
+
+    set_name = input("所属套装 (多个套装用中文逗号分隔，如: 啸谷长风，隐世回光): ").strip()
+    if not set_name:
+        print("❌ 所属套装不能为空")
+        return
+
+    drop_location = input("掉落位置 (如: 今州，黑海岸（依旧中文逗号分隔）): ").strip()
+    if not drop_location:
+        print("❌ 掉落位置不能为空")
+        return
+
+    sql = """
+        INSERT INTO sound_skeletons (name, skill_attribute, cost, is_aberration, set_name, drop_location)
+        VALUES (%s, %s, %s, %s, %s, %s)
+    """
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(sql, (name, skill_attribute, cost, is_aberration, set_name, drop_location))
+            conn.commit()
+            print(f"✅ 声骸 '{name}' 添加成功！")
+    except pymysql.IntegrityError as e:
+        if e.args[0] == 1062:   # 唯一键冲突
+            print(f"❌ 错误: 声骸 '{name}' 已存在，请使用不同名称。")
+        else:
+            print(f"❌ 数据库完整性错误: {e}")
+    except pymysql.Error as e:
+        print(f"❌ 数据库错误: {e}")
 
 def main():
     conn = connect_db()
@@ -151,10 +204,11 @@ def main():
     while True:
         print("\n选项:")
         print("  1. 添加角色")
-        print("  2. 转移玩家分数")   # 现在为覆盖模式
+        print("  2. 转移玩家分数")
         print("  3. 删除玩家")
-        print("  4. 退出")           # 退出放在第4项
-        choice = input("请选择 (1/2/3/4): ").strip()
+        print("  4. 添加声骸")          # 新增
+        print("  5. 退出")              # 原 4 改为 5
+        choice = input("请选择 (1/2/3/4/5): ").strip()
 
         if choice == '1':
             add_character(conn)
@@ -163,6 +217,8 @@ def main():
         elif choice == '3':
             delete_player(conn)
         elif choice == '4':
+            add_sound_skeleton(conn)   # 新增调用
+        elif choice == '5':
             print("👋 再见！")
             break
         else:

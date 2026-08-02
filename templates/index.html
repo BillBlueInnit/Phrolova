@@ -25,9 +25,13 @@
                     <span class="menu-icon">⚔️</span>
                     <span class="menu-label">多人模式</span>
                 </button>
-                <button class="menu-btn" onclick="enterLeaderboard()">
+                                <button class="menu-btn" onclick="enterLeaderboard()">
                     <span class="menu-icon">🏆</span>
                     <span class="menu-label">排行榜</span>
+                </button>
+                <button class="menu-btn" onclick="enterDbPreview()">
+                    <span class="menu-icon">🗄️</span>
+                    <span class="menu-label">数据库预览</span>
                 </button>
                 <button class="menu-btn" onclick="enterRules()">
                     <span class="menu-icon">📖</span>
@@ -90,7 +94,6 @@
                 <button class="btn btn-back" onclick="goBackToMenu()">← 主菜单</button>
                 <h2>🎯 单人模式</h2>
             </div>
-            <p class="subtitle">有 <strong>4</strong> 次机会猜出Ta，开始吧！</p>
 
             <div class="top-bar">
                 <span class="attempt-badge" id="attemptBadge">第 1 / 4 次猜测</span>
@@ -106,9 +109,9 @@
                 <div class="item"><span class="color-box color-gray"></span> 完全不一样</div>
             </div>
 
-            <div class="table-wrapper">
+                        <div class="table-wrapper">
                 <table class="data-table" id="singleTable">
-                    <thead>
+                    <thead id="singleThead">
                         <tr>
                             <th>序号</th>
                             <th>姓名</th>
@@ -121,7 +124,7 @@
                     </thead>
                     <tbody id="singleTbody"></tbody>
                 </table>
-                <div class="empty-state" id="singleEmptyState">请输入角色名开始猜测 👆</div>
+                <div class="empty-state" id="singleEmptyState">请输入名称开始猜测 👆</div>
             </div>
 
             <footer>提示：根据每个字段的底色判断与目标数据的接近程度，逐步缩小范围！</footer>
@@ -183,10 +186,10 @@
                 <div class="item"><span class="color-box color-gray"></span> 完全不一样</div>
             </div>
 
-            <h3 class="side-title mine">我的猜测</h3>
+                        <h3 class="side-title mine">我的猜测</h3>
             <div class="table-wrapper">
                 <table class="data-table" id="myTable">
-                    <thead>
+                    <thead id="myThead">
                         <tr>
                             <th>序号</th>
                             <th>姓名</th>
@@ -205,7 +208,7 @@
             <h3 class="side-title opp">对手的猜测 <span class="opp-id" id="oppIdLabel"></span></h3>
             <div class="table-wrapper">
                 <table class="data-table" id="oppTable">
-                    <thead>
+                    <thead id="oppThead">
                         <tr>
                             <th>序号</th>
                             <th>姓名</th>
@@ -251,6 +254,38 @@
             </div>
         </div>
 
+                <!-- ================= 数据库预览 ================= -->
+        <div class="view" id="view-dbpreview" style="display:none">
+            <div class="single-header">
+                <button class="btn btn-back" onclick="goBackToMenu()">← 主菜单</button>
+                <h2>🗄️ 数据库预览</h2>
+            </div>
+
+            <p class="db-count-info" id="dbCountInfo"></p>
+
+            <!-- 分页标签：角色 / 声骸 -->
+            <div class="db-tabs">
+                <button class="db-tab active" id="tabCharacters" onclick="switchDbTab('characters')">🎭 共鸣者</button>
+                <button class="db-tab" id="tabSkeletons" onclick="switchDbTab('skeletons')">👾 声骸</button>
+            </div>
+
+            <div class="db-page-controls">
+                <button class="btn btn-restart" id="dbPrevBtn" onclick="dbPrevPage()">⬅ 上一页</button>
+                <span class="db-page-info" id="dbPageInfo">第 1 / 1 页</span>
+                <button class="btn btn-restart" id="dbNextBtn" onclick="dbNextPage()">下一页 ➡</button>
+            </div>
+
+            <div class="table-wrapper">
+                <table class="data-table" id="dbTable">
+                    <thead id="dbThead"></thead>
+                    <tbody id="dbTbody"></tbody>
+                </table>
+                <div class="empty-state" id="dbEmptyState">暂无数据</div>
+            </div>
+
+            <div style="height:20px"></div>
+        </div>
+
         <!-- ================= 游戏规则 ================= -->
         <div class="view" id="view-rules" style="display:none">
             <div class="single-header">
@@ -267,8 +302,22 @@
             </div>
 
             <div class="rules-section">
+                <h3>🎨 猜谜类型</h3>
+                <p>游戏开始前，系统会询问你要猜 <strong>「共鸣者」</strong>还是 <strong>「声骸」</strong>，再随机为你抽题。</p>
+                <ul class="rules-list">
+                                        <li>猜<b>共鸣者</b>：对比「属性 / 星级 / 武器 / 出生地 / 实装版本」，有 <b>4 次</b>机会。</li>
+                                        <li>猜<b>声骸</b>：对比「技能属性 / COST（±1 内橙）/ 是否有异相 / 所属套装 / 掉落位置」，有 <b>8 次</b>机会。</li>
+                </ul>
+                <p style="font-size:13px;color:#aaa">
+                    💡 <b>逗号分离字段（技能属性 / 所属套装 / 掉落位置）</b>：若一个目标有多个值（如掉落位置=「今州，黑海岸」），
+                    每个猜中的值标为<b>绿色</b>；同时<strong>整格底色</strong>会提示数量是否猜全 ——
+                    描绿底 = 数量/内容全对，<b style="color:#f1c40f">黄底</b> = 数量不对（缺项或多余），灰底 = 一个都没猜中。
+                </p>
+            </div>
+
+            <div class="rules-section">
                 <h3>🎯 单人模式</h3>
-                <p>游戏会从鸣潮所有角色中<strong>随机抽取一个角色</strong>作为目标，你有 <strong>4 次机会</strong>猜出它。</p>
+                <p>游戏会从鸣潮所有角色/声骸中<strong>随机抽取一个目标</strong>。猜共鸣者有 <strong>4 次机会</strong>，猜声骸有 <strong>8 次机会</strong>。</p>
                 <p>输入角色名提交猜测后，系统会按「属性 / 星级 / 武器 / 出生地 / 实装版本」逐项对比，并用<strong>底色</strong>告诉你每一项与目标的接近程度：</p>
                 <div class="legend">
                     <div class="item"><span class="color-box color-green"></span> 绿色 = 完全一样</div>
@@ -318,10 +367,11 @@
                 <p style="font-size:13px;color:#aaa">⬆ 这是「单人模式」一局内连续 3 次猜测的示意</p>
             </div>
 
-            <div class="rules-section">
+                        <div class="rules-section">
                 <h3>⚔️ 多人模式</h3>
-                <p>真人两人对战，<strong>三局两胜</strong>，每局限时 <strong>1 分 30 秒</strong>，每人最多 <strong>4 次猜测</strong>。谁先在本局猜中目标谁赢一局，先拿下两局者胜出整场。</p>
-                <p>胜者 <strong>+30 分</strong>，败者 <strong>-30 分</strong>。</p>
+                <p>真人两人对战，可 <strong>创建房间</strong> 选择「<strong>猜谜类型</strong>」与「<strong>局制 BO1 / BO3 / BO5</strong>」（<strong>随机匹配</strong>固定 BO3）。谁先在本局猜中目标谁赢一局，先拿下对应局数者胜出整场。</p>
+                <p><strong>每局时限</strong>：猜共鸣者 <strong>1 分 30 秒</strong>，猜声骸 <strong>2 分 30 秒</strong>。每局猜测次数：猜共鸣者每人 <strong>4 次</strong>，猜声骸每人 <strong>8 次</strong>。</p>
+                <p><strong>分数（整场胜负 ±）</strong>：共鸣者 BO1 ±10 / BO3 ±30 / BO5 ±50；声骸·简单 BO1 ±5 / BO3 ±10 / BO5 ±15；声骸·困难 BO1 ±30 / BO3 ±50 / BO5 ±70。声骸在创建/匹配时可选择 <strong>难度</strong>（简单=4COST、困难=全部）。</p>
                 <p>如果二人都没有在限定时间内猜中，视为<strong>平局</strong>，二者仍以当前比分继续下一回合。</p>
                 <p>如果中途<strong>意外退出</strong>，请回到该网站，并且点击<strong>多人模式\创建房间</strong>，即可返回当前房间。</p>
                 <p>如果中途<strong>自己点了退出按键</strong>，视为<strong>逃逸</strong>，<strong>立刻判负</strong>。</p>
@@ -424,6 +474,48 @@
             <div class="modal-actions">
                 <button class="btn btn-guess" id="roundNextBtn" onclick="closeRoundModal()">下一步 ▶</button>
                 <button class="btn btn-restart" id="roundDoneBtn" onclick="leaveMulti()">🏁 返回主菜单</button>
+            </div>
+        </div>
+    </div>
+
+                <!-- ================= 猜谜类型选择弹窗（单人/多人开局前） ================= -->
+    <div class="modal-overlay" id="quizTypeModal">
+        <div class="modal">
+            <h2>选择猜谜类型</h2>
+            <p style="color:#ccc;font-size:14px;margin:8px 0;">请选择本局要猜「共鸣者」还是「声骸」</p>
+            <div class="quiz-type-actions">
+                <button class="btn btn-guess" onclick="confirmQuizType('resonator')">🎭 猜共鸣者</button>
+                <button class="btn btn-restart" onclick="confirmQuizType('skeleton')">👾 猜声骸</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= 多人开局配置弹窗（选类型 / BO 局制 / 声骸难度） ================= -->
+    <div class="modal-overlay" id="multiSetupModal">
+        <div class="modal">
+            <h2 id="msTitle">创建房间</h2>
+            <p style="color:#ccc;font-size:14px;margin:8px 0;">请选择本局要猜「共鸣者」还是「声骸」</p>
+            <div class="quiz-type-actions">
+                <button class="btn btn-guess" onclick="msPickType('resonator')">🎭 共鸣者</button>
+                <button class="btn btn-restart" onclick="msPickType('skeleton')">👾 声骸</button>
+            </div>
+            <div id="msConfig" style="display:none;margin-top:14px;">
+                <div class="ms-row">
+                    <span class="ms-label">局制：</span>
+                    <button class="ms-chip" id="msBo1" onclick="msPickBo(1)">BO1</button>
+                    <button class="ms-chip" id="msBo3" onclick="msPickBo(3)">BO3</button>
+                    <button class="ms-chip" id="msBo5" onclick="msPickBo(5)">BO5</button>
+                </div>
+                <div class="ms-row" id="msDiffRow" style="display:none;">
+                    <span class="ms-label">难度：</span>
+                    <button class="ms-chip" id="msDiffEasy" onclick="msPickDiff('easy')">简单</button>
+                    <button class="ms-chip" id="msDiffHard" onclick="msPickDiff('hard')">困难</button>
+                </div>
+                <p id="msNote" class="ms-note"></p>
+                <div class="modal-actions" style="justify-content:flex-end">
+                    <button class="btn btn-restart" onclick="hideModal('multiSetupModal')">取消</button>
+                    <button class="btn btn-guess" id="msConfirmBtn" onclick="msConfirm()">确认开始</button>
+                </div>
             </div>
         </div>
     </div>
