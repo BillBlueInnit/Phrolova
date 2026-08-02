@@ -1,0 +1,9 @@
+Flask==3.0.3
+Flask-SocketIO==5.4.1
+gevent==24.11.1
+gevent-websocket==0.10.1
+PyMySQL==1.1.1
+Pillow==11.3.0
+Werkzeug==3.0.3
+python-dotenv==1.0.1
+pytest==8.3.5
