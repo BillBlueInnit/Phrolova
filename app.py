@@ -28,7 +28,8 @@ def index():
 @app.route('/api/draw')
 def draw():
     qtype = request.args.get('type', 'resonator')
-    row = draw_target_by_type(qtype)
+    difficulty = request.args.get('difficulty', 'normal')
+    row = draw_target_by_type(qtype, difficulty)
     if not row:
         return jsonify({'status': 'error', 'message': '数据库中没有目标数据'})
     return jsonify({'status': 'success', 'type': qtype, 'character': row})

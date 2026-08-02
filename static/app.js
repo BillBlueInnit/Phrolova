@@ -24,9 +24,11 @@ let currentTarget = null;
 let guessHistory = [];
 let gameOver = false;
 let singleQuizType = 'resonator';   // 'resonator' 猜共鸣者 / 'skeleton' 猜声骸
+let singleDifficulty = 'hard';       // 单人猜声骸难度：'easy'(仅4COST) / 'hard'(全部声骸)
 
 // 猜谜类型选择弹窗：确认后的回调
 let pendingQuizTypeCallback = null;
+let singleDiffSelected = 'hard';     // 弹窗内当前选中的声骸难度
 
 // 多人开局配置弹窗：类型 / 局制(bo) / 难度
 let multiSetupState = { mode: 'create', type: 'resonator', bo: 3, diff: 'hard', boLocked: false };
@@ -89,18 +91,56 @@ function showView(id) {
 function showModal(id) { $(id).classList.add('active'); }
 function hideModal(id) { $(id).classList.remove('active'); }
 
-// ==================== 猜谜类型选择（共鸣者 / 声骸） ====================
+// ==================== 单人猜谜类型选择（共鸣者 / 声骸，声骸可选难度） ====================
 function showQuizTypeModal(callback) {
     pendingQuizTypeCallback = callback;
+    singleDiffSelected = 'hard';
+    // 重置弹窗：只显示选类型，隐藏难度区
+    $('singleDiffRow').style.display = 'none';
+    $('singleDiffEasy').classList.remove('active');
+    $('singleDiffHard').classList.add('active');
     showModal('quizTypeModal');
 }
 function hideQuizTypeModal() { hideModal('quizTypeModal'); pendingQuizTypeCallback = null; }
 
-function confirmQuizType(type) {
+// 选定类型：共鸣者直接进入游戏；声骸则展开难度选择
+function pickSingleType(type) {
+    // 先记录已选类型
+    selectedTypeForSingle = type;
+    if (type === 'resonator') {
+        // 共鸣者无需难度，直接开始
+        const cb = pendingQuizTypeCallback;
+        hideQuizTypeModal();
+        if (cb) cb('resonator');
+    } else {
+        // 声骸：显示难度选择行，等待玩家选难度后确认
+        $('singleDiffRow').style.display = 'block';
+        if (!singleDiffSelected) singleDiffSelected = 'hard';
+        $('singleDiffEasy').classList.toggle('active', singleDiffSelected === 'easy');
+        $('singleDiffHard').classList.toggle('active', singleDiffSelected === 'hard');
+    }
+}
+
+// 选择声骸难度
+function pickSingleDifficulty(diff) {
+    singleDiffSelected = diff;
+    $('singleDiffEasy').classList.toggle('active', diff === 'easy');
+    $('singleDiffHard').classList.toggle('active', diff === 'hard');
+}
+
+// 返回重新选类型（只回声骸类型，避免与单人/多人混淆）
+function singleBackToType() {
+    $('singleDiffRow').style.display = 'none';
+}
+
+// 确认开始单人（声骸已选难度）
+function confirmSingleSkeleton() {
     const cb = pendingQuizTypeCallback;
     hideQuizTypeModal();
-    if (cb) cb(type);
+    if (cb) cb('skeleton');
 }
+
+let selectedTypeForSingle = 'skeleton';   // 弹出弹窗时暂存的单人类型
 
 // ==================== 多人开局配置弹窗（选类型 / BO 局制 / 声骸难度） ====================
 function openMultiSetup(mode) {
@@ -434,9 +474,12 @@ function requireLogin() {
 
 function enterSingle() {
     refreshPlayerDisplay();
-    // 先询问猜谜类型，再进入单人模式开始随机抽题
+    // 先询问猜谜类型（若为声骸还需选难度），再进入单人模式开始随机抽题
     showQuizTypeModal((type) => {
         singleQuizType = type;
+        if (type === 'skeleton') {
+            singleDifficulty = singleDiffSelected || 'hard';
+        }
         showView('view-single');
         startGame();
     });
@@ -712,7 +755,10 @@ function renderLocCell(fieldObj, masked) {
 
 async function startGame() {
     try {
-        const res = await fetch('/api/draw?type=' + singleQuizType);
+        const diff = singleQuizType === 'skeleton' ? singleDifficulty : '';
+        let url = '/api/draw?type=' + singleQuizType;
+        if (diff) url += '&difficulty=' + diff;
+        const res = await fetch(url);
         const data = await res.json();
         if (data.status === 'success') {
             currentTarget = data.character;
@@ -722,7 +768,9 @@ async function startGame() {
             $('guessInput').disabled = false;
             $('btnGuess').disabled = false;
             $('btnViewAnswer').disabled = false;
-            $('singleEmptyState').textContent = singleQuizType === 'skeleton' ? '请输入声骸名称开始猜测 👆' : '请输入角色名开始猜测 👆';
+            $('singleEmptyState').textContent = singleQuizType === 'skeleton'
+                ? `请输入声骸名称开始猜测 👆（${singleDifficulty === 'easy' ? '简单·仅4COST' : '困难·全部'}）`
+                : '请输入角色名开始猜测 👆';
             hideSingleSuggestions();
             renderSingleThead();
             renderAttemptBadge();
@@ -751,7 +799,8 @@ function renderSingleThead() {
 
 async function guessCharacter() {
     if (!currentTarget || gameOver) return;
-    const name = $('guessInput').value.trim();
+    // 支持繁体输入：把输入的繁体转成简体后再提交匹配（显示仍为简体）
+    const name = await toSimplified($('guessInput').value.trim());
     if (!name) { alert('请输入角色名！'); return; }
 
         try {
@@ -833,7 +882,8 @@ function currentSuggestionPool(qtype) {
 
 function filterSuggestions(keyword, qtype) {
     if (!keyword) return [];
-    const kw = keyword.toLowerCase();
+    // 支持繁体输入：先把关键词转成简体，再与数据库（简体）姓名匹配
+    const kw = toSimplifiedSync(keyword).toLowerCase();
     return currentSuggestionPool(qtype)
         .filter(n => (n.name || '').toLowerCase().includes(kw))
         .slice(0, 10);
@@ -1519,7 +1569,8 @@ async function nextRound() {
 
 async function multiGuessCharacter() {
     if (!multiRoomCode) return;
-    const name = $('multiGuessInput').value.trim();
+    // 支持繁体输入：把输入的繁体转成简体后再提交匹配（显示仍为简体）
+    const name = await toSimplified($('multiGuessInput').value.trim());
     if (!name) { alert('请输入角色名！'); return; }
     // 若当前局已结束，忽略
     const ref = multiGameRef;

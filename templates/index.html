@@ -315,9 +315,10 @@
                 </p>
             </div>
 
-            <div class="rules-section">
+                        <div class="rules-section">
                 <h3>🎯 单人模式</h3>
                 <p>游戏会从鸣潮所有角色/声骸中<strong>随机抽取一个目标</strong>。猜共鸣者有 <strong>4 次机会</strong>，猜声骸有 <strong>8 次机会</strong>。</p>
+                <p style="font-size:13px;color:#aaa">💡 单人猜<b>声骸</b>时，选完「声骸」后还可选择 <strong>难度</strong>：<strong>简单</strong>（仅 4COST 声骸）或 <strong>困难</strong>（全部声骸）。</p>
                 <p>输入角色名提交猜测后，系统会按「属性 / 星级 / 武器 / 出生地 / 实装版本」逐项对比，并用<strong>底色</strong>告诉你每一项与目标的接近程度：</p>
                 <div class="legend">
                     <div class="item"><span class="color-box color-green"></span> 绿色 = 完全一样</div>
@@ -478,14 +479,27 @@
         </div>
     </div>
 
-                <!-- ================= 猜谜类型选择弹窗（单人/多人开局前） ================= -->
+                                <!-- ================= 猜谜类型选择弹窗（单人开局前，含声骸难度选择） ================= -->
     <div class="modal-overlay" id="quizTypeModal">
         <div class="modal">
             <h2>选择猜谜类型</h2>
             <p style="color:#ccc;font-size:14px;margin:8px 0;">请选择本局要猜「共鸣者」还是「声骸」</p>
             <div class="quiz-type-actions">
-                <button class="btn btn-guess" onclick="confirmQuizType('resonator')">🎭 猜共鸣者</button>
-                <button class="btn btn-restart" onclick="confirmQuizType('skeleton')">👾 猜声骸</button>
+                <button class="btn btn-guess" onclick="pickSingleType('resonator')">🎭 猜共鸣者</button>
+                <button class="btn btn-restart" onclick="pickSingleType('skeleton')">👾 猜声骸</button>
+            </div>
+            <!-- 声骸难度选择（选定声骸后再显示） -->
+            <div id="singleDiffRow" style="display:none;margin-top:14px;">
+                <div class="ms-row">
+                    <span class="ms-label">难度：</span>
+                    <button class="ms-chip" id="singleDiffEasy" onclick="pickSingleDifficulty('easy')">简单</button>
+                    <button class="ms-chip" id="singleDiffHard" onclick="pickSingleDifficulty('hard')">困难</button>
+                </div>
+                <p class="ms-note" id="singleDiffNote">简单 = 仅 4COST 声骸 · 困难 = 全部声骸</p>
+                <div class="modal-actions" style="justify-content:flex-end">
+                    <button class="btn btn-restart" onclick="singleBackToType()">← 返回选类型</button>
+                    <button class="btn btn-guess" onclick="confirmSingleSkeleton()">开始游戏 ▶</button>
+                </div>
             </div>
         </div>
     </div>
@@ -575,6 +589,7 @@
     <!-- ================= 左下角：返回房间按钮 ================= -->
     <button class="room-nav-btn" id="btnRoomNav" style="display:none" onclick="goToMyRoom()">🏠 返回对战</button>
 
+        <script src="{{ url_for('static', filename='t2s.js') }}"></script>
     <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>
