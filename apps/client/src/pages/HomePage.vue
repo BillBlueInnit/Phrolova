@@ -177,6 +177,10 @@ onMounted(async () => {
 <template>
   <section class="page-shell">
     <div id="start-menu" class="home-stage">
+      <div class="home-title-block">
+        <h1 class="home-title">Phrolova</h1>
+        <p class="home-subtitle">鸣潮 · 角色猜谜</p>
+      </div>
       <div class="home-portrait" :key="frolovaKey" ref="frolovaRef">
         <div class="home-portrait-inner">
           <img :src="currentPortrait.src" :alt="currentPortrait.alt" />
@@ -317,9 +321,28 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.home-title-block {
+  position: relative; z-index: 3;
+  text-align: center; padding: 1rem 0 0;
+}
+.home-title {
+  margin: 0;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: clamp(2.5rem, 2rem + 3vw, 4rem);
+  font-weight: 700; letter-spacing: 0.12em;
+  color: var(--gold);
+  text-shadow: 0 0 40px color-mix(in oklab, var(--gold) 30%, transparent);
+}
+.home-subtitle {
+  margin: 0.2rem 0 0;
+  font-size: clamp(0.85rem, 0.7rem + 0.4vw, 1.05rem);
+  color: var(--text-faint); letter-spacing: 0.2em;
+}
+
 #start-menu {
   position: relative;
   display: flex;
+  flex-direction: column;
   flex: 1;
   overflow: hidden;
   border: 1px solid var(--line-soft);
@@ -815,6 +838,9 @@ onMounted(async () => {
 }
 
 @media (max-width: 960px) {
+  .home-title { font-size: 2rem; }
+  .home-subtitle { font-size: 0.75rem; }
+
   #start-menu {
     flex-direction: column;
     justify-content: center;
