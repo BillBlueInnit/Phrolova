@@ -388,7 +388,7 @@ watch(
           </div>
 
           <div class="mr-result-actions">
-            <button class="mr-result-btn mr-result-btn--primary" @click="closeMatchResult(); leaveRoom();">返回大厅</button>
+            <button class="mr-result-btn mr-result-btn--primary" @click="closeMatchResult(); router.push('/multi');">返回大厅</button>
           </div>
         </div>
       </div>

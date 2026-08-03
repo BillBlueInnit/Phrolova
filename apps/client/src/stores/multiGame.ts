@@ -74,13 +74,29 @@ export const useMultiGameStore = defineStore("multiGame", () => {
     currentSocket.on(S2C.GUESS_RESULT, (payload) => {
       infoMessage.value = `已提交猜测，还剩 ${payload.attemptsLeft} 次机会`;
     });
-    currentSocket.on(S2C.ROUND_FINISHED, () => {
+    currentSocket.on(S2C.ROUND_FINISHED, (payload) => {
       infoMessage.value = "本局已结算";
-      if (roomState.value) {
-        roundHistory.value = [...roundHistory.value, {
-          round: roomState.value.round,
-          guesses: JSON.parse(JSON.stringify(roomState.value.players)),
-        }];
+    });
+    currentSocket.on(S2C.ROOM_STATE, (payload: MultiplayerRoomState) => {
+      const prevStatus = roomState.value?.roomStatus;
+      roomState.value = payload;
+      inQueue.value = false;
+      error.value = "";
+      if (
+        payload.roundStatus === "resolved" &&
+        prevStatus !== "finished" &&
+        payload.players[0]?.guesses?.length
+      ) {
+        const existing = roundHistory.value.findIndex(r => r.round === payload.round);
+        const entry = {
+          round: payload.round,
+          guesses: JSON.parse(JSON.stringify(payload.players)),
+        };
+        if (existing >= 0) {
+          roundHistory.value[existing] = entry;
+        } else {
+          roundHistory.value = [...roundHistory.value, entry];
+        }
       }
     });
     currentSocket.on(S2C.MATCH_FINISHED, (payload) => {
@@ -88,6 +104,18 @@ export const useMultiGameStore = defineStore("multiGame", () => {
         payload.scoreDelta >= 0
           ? `整场获胜，积分 +${payload.scoreDelta}`
           : `整场结束，积分 ${payload.scoreDelta}`;
+      if (roomState.value?.players) {
+        const existing = roundHistory.value.findIndex(r => r.round === roomState.value!.round);
+        const entry = {
+          round: roomState.value.round,
+          guesses: JSON.parse(JSON.stringify(roomState.value.players)),
+        };
+        if (existing >= 0) {
+          roundHistory.value[existing] = entry;
+        } else {
+          roundHistory.value = [...roundHistory.value, entry];
+        }
+      }
     });
     currentSocket.on(S2C.OPPONENT_FORFEIT, (payload) => {
       infoMessage.value = payload.message || "对手已退出";
