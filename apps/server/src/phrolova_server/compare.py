@@ -288,7 +288,9 @@ def get_skeleton_names():
     connection = get_connection()
     try:
         with connection.cursor() as cursor:
-            cursor.execute("SELECT name, skill_attribute, cost, set_name FROM sound_skeletons ORDER BY name")
+            cursor.execute(
+                "SELECT name, skill_attribute, cost, is_aberration, set_name, drop_location FROM sound_skeletons ORDER BY name"
+            )
             rows = cursor.fetchall()
     finally:
         connection.close()

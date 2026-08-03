@@ -292,7 +292,7 @@ onBeforeUnmount(() => {
 .pg-card--active {
   border-color: color-mix(in oklab, var(--gold) 60%, transparent);
   background: linear-gradient(180deg, color-mix(in oklab, var(--gold) 10%, var(--surface-panel-strong)), color-mix(in oklab, var(--gold) 4%, var(--surface-panel)));
-  box-shadow: 0 0 48px color-mix(in oklab, var(--gold) 14%, transparent), 0 12px 32px color-mix(in oklab, var(--shadow-plate) 60%, transparent);
+  box-shadow: 0 12px 32px color-mix(in oklab, var(--shadow-plate) 60%, transparent);
 }
 
 .pg-card-border {
@@ -320,7 +320,6 @@ onBeforeUnmount(() => {
 .pg-card--active .pg-card-badge {
   background: color-mix(in oklab, var(--gold) 18%, var(--surface-panel-strong));
   color: var(--gold);
-  box-shadow: 0 0 20px color-mix(in oklab, var(--gold) 18%, transparent);
 }
 
 .pg-card-body { display: grid; gap: 0.4rem; }
@@ -383,12 +382,10 @@ onBeforeUnmount(() => {
   background: linear-gradient(135deg, color-mix(in oklab, var(--gold) 22%, var(--surface-panel-strong)), color-mix(in oklab, var(--gold) 12%, var(--surface-panel)));
   color: var(--gold); font-size: 1.05rem; font-weight: 700; letter-spacing: 0.06em;
   cursor: pointer; transition: all 0.3s;
-  box-shadow: 0 4px 24px color-mix(in oklab, var(--gold) 12%, transparent);
 }
 .pg-start:hover {
   background: linear-gradient(135deg, color-mix(in oklab, var(--gold) 32%, var(--surface-panel-strong)), color-mix(in oklab, var(--gold) 18%, var(--surface-panel)));
   transform: translateY(-3px);
-  box-shadow: 0 8px 32px color-mix(in oklab, var(--gold) 22%, transparent);
 }
 .pg-start:disabled { opacity: 0.5; cursor: wait; transform: none; }
 

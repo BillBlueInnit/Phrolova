@@ -221,7 +221,6 @@ onMounted(loadLeaderboard);
   width: 3.6rem; height: 3.6rem;
   border-color: var(--gold);
   background: color-mix(in oklab, var(--gold) 14%, var(--shell-bg-deep));
-  box-shadow: 0 0 24px color-mix(in oklab, var(--gold) 20%, transparent);
 }
 .lb-podium-item--2 .lb-podium-avatar { border-color: #b0b8c0; }
 .lb-podium-item--3 .lb-podium-avatar { border-color: #c4946c; }

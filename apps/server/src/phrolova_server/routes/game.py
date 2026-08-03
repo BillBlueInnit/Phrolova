@@ -31,7 +31,9 @@ def names():
     connection = get_connection()
     try:
         with connection.cursor() as cursor:
-            cursor.execute("SELECT name, attribute, star_rating FROM characters ORDER BY name")
+            cursor.execute(
+                "SELECT name, attribute, star_rating, weapon, birthplace, version FROM characters ORDER BY name"
+            )
             rows = cursor.fetchall()
     finally:
         connection.close()
