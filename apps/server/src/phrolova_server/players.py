@@ -10,11 +10,16 @@ from .db import get_connection
 _secret_prepared = False
 _password_prepared = False
 _stats_prepared = False
+_single_score_prepared = False
 _prepare_lock = Lock()
 
 
 def generate_token() -> str:
     return secrets.token_hex(16)
+
+
+def single_score_column(quiz_type: str) -> str:
+    return "single_resonator_score" if quiz_type == "resonator" else "single_skeleton_score"
 
 
 def public_player(player: dict | None):
@@ -25,6 +30,8 @@ def public_player(player: dict | None):
         "score": int(player.get("score", 0)),
         "wins": int(player.get("wins", 0)),
         "matches": int(player.get("matches", 0)),
+        "single_resonator_score": int(player.get("single_resonator_score", 0)),
+        "single_skeleton_score": int(player.get("single_skeleton_score", 0)),
     }
 
 
@@ -92,6 +99,30 @@ def ensure_stats_columns():
             connection.close()
 
 
+def ensure_single_score_columns():
+    global _single_score_prepared
+    if _single_score_prepared:
+        return
+    with _prepare_lock:
+        if _single_score_prepared:
+            return
+        connection = get_connection()
+        try:
+            with connection.cursor() as cursor:
+                for ddl in (
+                    "ALTER TABLE players ADD COLUMN single_resonator_score INT NOT NULL DEFAULT 0",
+                    "ALTER TABLE players ADD COLUMN single_skeleton_score INT NOT NULL DEFAULT 0",
+                ):
+                    try:
+                        cursor.execute(ddl)
+                    except Exception:
+                        connection.rollback()
+                connection.commit()
+            _single_score_prepared = True
+        finally:
+            connection.close()
+
+
 def get_player(player_id: str):
     connection = get_connection()
     try:
@@ -150,6 +181,25 @@ def apply_score(player_id: str, delta: int):
         connection.commit()
     finally:
         connection.close()
+
+
+def apply_single_score(player_id: str, quiz_type: str, attempts: int):
+    base = 100 if quiz_type == "resonator" else 150
+    limit = 4 if quiz_type == "resonator" else 8
+    bonus = max(0, limit - attempts) * 20
+    delta = base + bonus
+    column = single_score_column(quiz_type)
+    connection = get_connection()
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"UPDATE players SET {column} = {column} + %s WHERE player_id = %s",
+                (delta, player_id),
+            )
+        connection.commit()
+    finally:
+        connection.close()
+    return delta
 
 
 def record_match(winner_id: str, loser_id: str):

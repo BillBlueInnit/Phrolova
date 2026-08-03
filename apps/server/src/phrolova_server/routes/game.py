@@ -3,12 +3,14 @@ from __future__ import annotations
 from flask import Blueprint, jsonify, request
 
 from ..compare import (
+    all_match,
     build_compare_by_type,
     draw_target_by_type,
     get_skeleton_names,
     lookup_guess_by_name,
 )
 from ..db import get_connection
+from ..players import apply_single_score, authenticate_player, ensure_single_score_columns
 
 game_bp = Blueprint("game", __name__)
 
@@ -51,10 +53,12 @@ def draw():
 
 @game_bp.route("/api/guess", methods=["POST"])
 def guess():
+    ensure_single_score_columns()
     data = _json_body()
     target = data.get("target")
     guess_name = (data.get("guess") or "").strip()
     quiz_type = data.get("type", "resonator")
+    attempts = int(data.get("attempts", 1))
     if not target:
         return jsonify({"status": "error", "message": "缺少目标数据，请先抽取随机目标"}), 400
     if not guess_name:
@@ -63,12 +67,17 @@ def guess():
     if not guess_row:
         return jsonify({"status": "error", "message": f"数据库中不存在名为「{guess_name}」的目标"}), 404
     compare_result = build_compare_by_type(target, guess_row, quiz_type)
+    score = None
+    if all_match(compare_result):
+        player = authenticate_player(data)
+        if player:
+            score = apply_single_score(player["player_id"], quiz_type, attempts)
     return jsonify(
         {
             "status": "success",
             "type": quiz_type,
-            "target": target,
             "guess": guess_row,
             "compare": compare_result,
+            "score": score,
         }
     )
