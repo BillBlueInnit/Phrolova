@@ -23,7 +23,7 @@ class MultiplayerManager:
     skeleton_round_time = 150
     enter_game_delay = 2
     next_round_delay = 5
-    room_ttl_after_finish = 300
+    room_ttl_after_finish = 5
 
     def __init__(self, socketio: SocketIO):
         self.socketio = socketio
@@ -482,6 +482,8 @@ class MultiplayerManager:
                 room["status"] = "finished"
                 room["overall_winner"] = index
                 room["finished_at"] = time.time()
+                for slot in room["players"]:
+                    self.player_to_room.pop(slot["player_id"], None)
                 score = self.multi_score(room["quiz_type"], room["difficulty"], best_of)
                 winner_id = room["players"][index]["player_id"]
                 loser_id = room["players"][1 - index]["player_id"]
@@ -530,6 +532,8 @@ class MultiplayerManager:
         room["round_resolved_at"] = time.time()
         room["finished_at"] = time.time()
         room["forfeit_by"] = room["players"][loser_index]["player_id"]
+        for slot in room["players"]:
+            self.player_to_room.pop(slot["player_id"], None)
         room["players"][winner_index]["round_wins"] = max(
             room["players"][winner_index]["round_wins"],
             room["best_of"] // 2 + 1,
@@ -680,6 +684,8 @@ class MultiplayerManager:
                         self._start_round(room)
                         self._emit_room_state(room)
                     if room["status"] in ("countdown", "playing") and room["round_status"] == "active":
+                        self._emit_room_state(room)
+                    if room["status"] == "finished":
                         self._emit_room_state(room)
                 self._cleanup_stale_rooms()
             self.socketio.sleep(1)
