@@ -251,6 +251,10 @@ onMounted(async () => {
           <Icon icon="ph:github-logo-duotone" /> GitHub
         </a>
         <span class="home-social-divider">·</span>
+        <a href="https://phrolova.usotsuki-kaze.com/" target="_blank" rel="noopener" class="home-social-link">
+          <Icon icon="ph:link-duotone" /> 友联
+        </a>
+        <span class="home-social-divider">·</span>
         <a target="_blank"
           href="https://qm.qq.com/cgi-bin/qm/qr?k=hYVfe1ReAYkgLM71ZkQMKABUu8641H-B&jump_from=webapi&authKey=WP+actLjZvH3Q6/JHDiDjU1xj7HpjXNxPSoCB9skVZnH1w0I6jzVf2lvnCCP7I/B">
           <Icon icon="ph:chat-circle-dots-duotone" /> QQ群 457323277
