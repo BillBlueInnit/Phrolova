@@ -3,7 +3,7 @@ import { computed } from "vue";
 
 import LoreBadge from "@/components/shared/LoreBadge.vue";
 import type { CellStatus, CompareStatus, GuessHistoryRow, QuizType, ResonatorCompare, SkeletonCompare } from "@/types/game";
-import { formatGuessValue, getCharacterAvatar, getColumns, getStatusClass, getWeaponIcon, renderGroupItem } from "@/utils/game";
+import { formatGuessValue, getCharacterAvatar, getColumns, getSkeletonAvatar, getStatusClass, getWeaponIcon, renderGroupItem } from "@/utils/game";
 import { resolveBadgeCategory } from "@/utils/presentation";
 
 const props = defineProps<{
@@ -66,7 +66,7 @@ function formatCellValue(row: GuessHistoryRow, key: string) {
       <thead>
         <tr>
           <th class="guess-table-head">#</th>
-          <th v-if="quizType === 'resonator'" class="guess-table-head">头像</th>
+          <th class="guess-table-head">头像</th>
           <th v-for="column in columns" :key="column.key" class="guess-table-head">
             {{ column.label }}
           </th>
@@ -75,10 +75,10 @@ function formatCellValue(row: GuessHistoryRow, key: string) {
       <tbody v-if="rows.length">
         <tr v-for="(row, index) in rows" :key="`${index}-${row.guess.name}`">
           <td class="guess-table-index">{{ index + 1 }}</td>
-          <td v-if="quizType === 'resonator'" class="guess-table-cell guess-table-avatar-cell">
+          <td class="guess-table-cell guess-table-avatar-cell">
             <img
               v-if="row.revealed"
-              :src="getCharacterAvatar(String(row.guess.name))"
+              :src="quizType === 'resonator' ? getCharacterAvatar(String(row.guess.name)) : getSkeletonAvatar(String(row.guess.name))"
               class="gt-avatar"
               alt=""
             />
@@ -90,7 +90,15 @@ function formatCellValue(row: GuessHistoryRow, key: string) {
             :class="getCellClass(row, column.key)"
           >
             <template v-if="column.key === 'name'">
-              <span class="guess-table-name">{{ row.revealed ? row.guess.name : "***" }}</span>
+              <div class="gt-name-cell">
+                <img
+                  v-if="row.revealed && quizType === 'skeleton'"
+                  :src="getSkeletonAvatar(String(row.guess.name))"
+                  class="gt-name-avatar"
+                  alt=""
+                />
+                <span class="guess-table-name">{{ row.revealed ? row.guess.name : "***" }}</span>
+              </div>
             </template>
 
             <template v-else-if="isGroupField(row, column.key)">
@@ -165,6 +173,13 @@ function formatCellValue(row: GuessHistoryRow, key: string) {
   font-size: 0.85rem; font-weight: 600; color: var(--text-sub);
 }
 
+.gt-name-cell {
+  display: flex; align-items: center; gap: 0.4rem; justify-content: center;
+}
+.gt-name-avatar {
+  width: 32px; height: 32px; border-radius: 6px; object-fit: cover;
+  border: 1px solid var(--line-soft); flex-shrink: 0;
+}
 .guess-table-name {
   font-weight: 700; font-size: 0.95rem; text-align: center;
 }

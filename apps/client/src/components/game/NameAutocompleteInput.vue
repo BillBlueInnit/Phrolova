@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, shallowRef, useTemplateRef } from "vue";
-import { getCharacterAvatar } from "@/utils/game";
+import { getCharacterAvatar, getSkeletonAvatar } from "@/utils/game";
 import type { QuizType } from "@/types/game";
 
 const props = defineProps<{
@@ -84,8 +84,8 @@ function handleKeydown(event: KeyboardEvent) {
         @click="selectSuggestion(item.name)"
       >
         <img
-          v-if="quizType === 'resonator'"
-          :src="getCharacterAvatar(item.name)"
+          v-if="quizType"
+          :src="quizType === 'resonator' ? getCharacterAvatar(item.name) : getSkeletonAvatar(item.name)"
           class="ac-avatar"
           alt=""
         />

@@ -256,7 +256,8 @@ watch(
               v-model="guessName"
               :disabled="!multiGameStore.canGuess"
               :names="names"
-              :placeholder="multiGameStore.roomState.quizType === 'skeleton' ? '输入声骸名称' : '输入角色昵称'"
+              :quiz-type="multiGameStore.roomState?.quizType"
+              :placeholder="multiGameStore.roomState?.quizType === 'skeleton' ? '输入声骸名称' : '输入角色昵称'"
               @submit="submitGuess"
             />
             <button class="mr-btn mr-btn-submit" :disabled="!multiGameStore.canGuess" @click="submitGuess">

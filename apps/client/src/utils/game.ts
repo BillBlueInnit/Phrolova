@@ -94,6 +94,10 @@ export function getCharacterAvatar(name: string): string {
   return `/media/characters/角色 ${base} 头像.png`;
 }
 
+export function getSkeletonAvatar(name: string): string {
+  return `/media/echo/声骸 ${name} 头像.png`;
+}
+
 export function toHistoryRow(
   guess: ResonatorRow | SkeletonRow,
   compare: ResonatorCompare | SkeletonCompare,
