@@ -165,7 +165,8 @@ def ensure_player(player_id: str):
     player = get_player(player_id)
     if not player:
         return create_player(player_id)
-    player["secret"] = set_player_secret(player_id)
+    if not player.get("secret"):
+        player["secret"] = set_player_secret(player_id)
     return player
 
 
