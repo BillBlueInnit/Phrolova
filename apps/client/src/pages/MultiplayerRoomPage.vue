@@ -630,7 +630,6 @@ watch(
   border: 1px solid var(--line-soft);
   border-radius: 10px;
   background: linear-gradient(180deg, var(--surface-panel-strong), var(--surface-panel));
-  box-shadow: 6px 6px 0 var(--shadow-plate);
 }
 
 .mr-dock-copy {
@@ -734,41 +733,81 @@ watch(
 
 @media (max-width: 720px) {
   .mr-shell {
-    padding: 0.4rem 0.5rem 0.5rem;
-    gap: 0.45rem;
+    padding: 0;
+    gap: 0;
+    grid-template-rows: minmax(0, 1fr) auto;
   }
 
   .mr-glass-header {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    border-top: none;
     padding: 0.5rem 0.7rem;
   }
 
-  .mr-glass-chip {
+  .mr-summary-row,
+  .status-stack {
     display: none;
   }
 
   .mr-stage {
-    padding: 0.7rem 0.65rem 0.6rem;
+    border: none;
+    border-radius: 0;
+    padding: 0.6rem 0.7rem;
+    grid-template-rows: auto auto minmax(0, 1fr);
   }
+
+  .mr-stage-head {
+    gap: 0.4rem;
+  }
+
+  .mr-stage-kicker { font-size: 0.62rem; }
+  .mr-stage-title, .mr-empty-title { font-size: 1rem; }
+  .mr-stage-sub, .mr-empty-sub { font-size: 0.76rem; line-height: 1.5; }
+
+  .mr-empty-glyph {
+    width: 2.6rem; height: 2.6rem; font-size: 1rem;
+  }
+
+  .mr-boards {
+    gap: 0.5rem;
+  }
+
+  .mr-board-head {
+    padding: 0.4rem 0.6rem;
+  }
+
+  .mr-board-title { font-size: 0.8rem; }
+  .mr-board-meta { font-size: 0.7rem; }
 
   .mr-dock {
-    padding: 0.6rem 0.7rem 0.7rem;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    padding: 0.6rem 0.7rem 0.8rem;
   }
 
+  .mr-dock-copy { display: none; }
+
   .mr-input-row {
-    flex-direction: column;
+    flex-direction: row;
+    width: 100%;
+  }
+
+  .mr-input-row > :first-child { flex: 1; }
+
+  .mr-btn-submit {
+    padding: 0.55rem 1rem;
+    font-size: 0.88rem;
   }
 }
 
 @media (max-width: 480px) {
-  .mr-glass-title {
-    font-size: 0.78rem;
-  }
-
-  .mr-glass-back,
-  .mr-glass-btn {
-    width: 2rem;
-    height: 2rem;
-    font-size: 1rem;
-  }
+  .mr-stage { padding: 0.5rem 0.55rem; }
+  .mr-dock { padding: 0.5rem 0.55rem 0.65rem; }
+  .mr-input-row { gap: 0.4rem; }
+  .mr-btn-submit { padding: 0.55rem 0.8rem; }
 }
 </style>

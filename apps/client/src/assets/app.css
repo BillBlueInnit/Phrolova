@@ -218,6 +218,7 @@ img {
   max-width: none;
   margin: 0;
   padding: 0;
+  height: 100dvh;
   overflow: hidden;
 }
 
@@ -803,5 +804,37 @@ img {
 
   .score-ribbon-card-center {
     min-width: 0;
+  }
+
+  /* ── 移动端去掉所有不规则矩形 ── */
+  .feature-panel,
+  .codex-panel,
+  .battle-board-card,
+  .empty-panel,
+  .sg-stage,
+  .mr-stage {
+    clip-path: none;
+    border-radius: 8px;
+  }
+
+  .primary-action-button,
+  .primary-action-button-link,
+  .ghost-action-button,
+  .segmented-switch-item {
+    clip-path: none;
+    border-radius: 8px;
+  }
+
+  .home-spotlight,
+  .battle-stage,
+  .field-input {
+    clip-path: none;
+    border-radius: 8px;
+  }
+
+  .feature-panel::after,
+  .codex-panel::after,
+  .battle-board-card::after {
+    display: none;
   }
 }

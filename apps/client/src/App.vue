@@ -18,7 +18,7 @@ const introVisible = shallowRef(false);
 const isHomeRoute = computed(() => route.name === "home");
 const isGameRoute = computed(() => {
   const name = route.name;
-  return name === "single" || name === "multi-lobby" || name === "multi-room";
+  return name === "single" || name === "single-play" || name === "multi-lobby" || name === "multi-room";
 });
 
 let introTimer: number | null = null;
