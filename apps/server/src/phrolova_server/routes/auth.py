@@ -42,7 +42,6 @@ def player_init():
     if not player_id:
         return jsonify({"status": "error", "message": "缺少玩家ID"}), 400
     player = ensure_player(player_id)
-    kick_player_sockets(player_id)
     return jsonify({"status": "success", "player": public_player(player), "token": player["secret"]})
 
 
