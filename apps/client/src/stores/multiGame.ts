@@ -203,6 +203,7 @@ export const useMultiGameStore = defineStore("multiGame", () => {
     }
     roomState.value = null;
     inQueue.value = false;
+    roundHistory.value = [];
   }
 
   function disconnect() {
