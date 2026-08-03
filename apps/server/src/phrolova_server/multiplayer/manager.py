@@ -9,7 +9,7 @@ from copy import deepcopy
 from typing import Any
 
 from flask import request
-from flask_socketio import SocketIO, join_room as socket_join_room
+from flask_socketio import SocketIO, emit, join_room as socket_join_room
 
 from ..compare import all_match, build_compare_by_type, draw_target_by_type, lookup_guess_by_name
 from ..players import apply_score, authenticate_player, ensure_stats_columns, record_match

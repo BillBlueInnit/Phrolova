@@ -43,10 +43,10 @@ export const useSingleGameStore = defineStore("singleGame", () => {
   const resultMessage = shallowRef("");
   const earnedScore = shallowRef(0);
 
-  const attemptsLimit = computed(() => (quizType.value === "skeleton" ? 8 : 4));
+  const attemptsLimit = ref(quizType.value === "skeleton" ? 8 : 4);
   const attemptsUsed = computed(() => guessHistory.value.length);
   const attemptsLeft = computed(() => Math.max(0, attemptsLimit.value - attemptsUsed.value));
-  const canSubmit = computed(() => Boolean(target.value) && !gameOver.value && attemptsLeft.value > 0);
+  const canSubmit = computed(() => !gameOver.value && attemptsLeft.value > 0);
 
   function setConfig(nextQuizType: QuizType, nextDifficulty: Difficulty) {
     quizType.value = nextQuizType;
@@ -63,7 +63,13 @@ export const useSingleGameStore = defineStore("singleGame", () => {
     resultMessage.value = "";
     guessHistory.value = [];
     try {
-      const data = await api.drawTarget(quizType.value, difficulty.value);
+      const authStore = useAuthStore();
+      const data = await api.drawTarget(
+        quizType.value,
+        difficulty.value,
+        authStore.playerId || undefined,
+        authStore.token || undefined,
+      );
       target.value = (data.character ?? null) as ResonatorRow | SkeletonRow | null;
     } catch (reason) {
       error.value = reason instanceof Error ? reason.message : "开局失败";
@@ -74,9 +80,6 @@ export const useSingleGameStore = defineStore("singleGame", () => {
   }
 
   async function submitGuess(guessName: string) {
-    if (!target.value) {
-      throw new Error("请先开始游戏");
-    }
     if (!guessName.trim()) {
       throw new Error("请输入角色或声骸名称");
     }
@@ -85,19 +88,12 @@ export const useSingleGameStore = defineStore("singleGame", () => {
     earnedScore.value = 0;
     try {
       const authStore = useAuthStore();
-      const attempts = guessHistory.value.length + 1;
-      const data = await api.submitGuess(
-        target.value,
-        guessName,
-        quizType.value,
-        attempts,
-        authStore.playerId || undefined,
-        authStore.token || undefined,
-      );
+      const data = await api.submitGuess(guessName, authStore.playerId, authStore.token);
       if (!data.guess || !data.compare) {
         throw new Error("返回结果不完整");
       }
       guessHistory.value = [...guessHistory.value, toHistoryRow(data.guess, data.compare)];
+      if (data.limit) attemptsLimit.value = data.limit;
       const win = isWinningCompare(data.compare);
       if (win) {
         gameOver.value = true;
@@ -107,7 +103,7 @@ export const useSingleGameStore = defineStore("singleGame", () => {
           earnedScore.value = data.score;
           await authStore.refreshPlayer().catch(() => undefined);
         }
-      } else if (guessHistory.value.length >= attemptsLimit.value) {
+      } else if (data.attempts && data.limit && data.attempts >= data.limit) {
         gameOver.value = true;
         answerVisible.value = true;
         resultMessage.value = "机会已用尽，可以重新开始。";

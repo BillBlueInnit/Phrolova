@@ -9,7 +9,6 @@ import NameAutocompleteInput from "@/components/game/NameAutocompleteInput.vue";
 import StatusBanner from "@/components/shared/StatusBanner.vue";
 import { useDictionaryStore } from "@/stores/dictionary";
 import { useSingleGameStore } from "@/stores/singleGame";
-import { getCharacterAvatar } from "@/utils/game";
 
 const THEME_KEY = "phrolova_theme";
 
@@ -73,16 +72,6 @@ const attemptSummary = computed(
 );
 
 const showWinModal = shallowRef(false);
-const showHints = shallowRef(false);
-
-function toggleHints() {
-  showHints.value = !showHints.value;
-}
-
-function fillHint(name: string) {
-  guessName.value = name;
-  showHints.value = false;
-}
 
 watch(
   () => singleGameStore.resultMessage,
@@ -138,9 +127,6 @@ onMounted(async () => {
         </div>
 
         <div class="sg-glass-actions">
-          <button class="sg-glass-btn" :class="{ 'sg-glass-btn--active': showHints }" @click="toggleHints" title="提示">
-            <Icon icon="ph:lightbulb-duotone" aria-hidden="true" />
-          </button>
           <button class="sg-glass-btn" @click="singleGameStore.revealAnswer()" title="查看答案">
             <Icon icon="ph:eye-duotone" aria-hidden="true" />
           </button>
@@ -198,34 +184,6 @@ onMounted(async () => {
           />
         </div>
       </section>
-
-      <!-- ── 提示面板 ── -->
-      <div v-if="showHints" class="sg-hints">
-        <div class="sg-hints-head">
-          <span class="sg-hints-label">
-            <Icon icon="ph:lightbulb-duotone" aria-hidden="true" />
-            {{ singleGameStore.quizType === "skeleton" ? "声骸列表" : "角色列表" }}
-          </span>
-          <span class="sg-hints-count">共 {{ currentNames.length }} 个</span>
-        </div>
-        <div class="sg-hints-grid">
-          <button
-            v-for="item in currentNames"
-            :key="item.name"
-            class="sg-hint-chip"
-            type="button"
-            @click="fillHint(item.name)"
-          >
-            <img
-              v-if="singleGameStore.quizType === 'resonator'"
-              :src="getCharacterAvatar(item.name)"
-              class="sg-hint-avatar"
-              alt=""
-            />
-            {{ item.name }}
-          </button>
-        </div>
-      </div>
 
       <!-- ── 底部：猜测输入区 ── -->
       <footer class="sg-dock">
@@ -352,8 +310,8 @@ onMounted(async () => {
 .sg-stage-title, .sg-empty-title { margin: 0; font-size: clamp(1.18rem, 1rem + 0.6vw, 1.7rem); font-weight: 900; letter-spacing: 0.04em; }
 .sg-stage-sub, .sg-empty-sub, .sg-dock-meta { margin: 0; color: var(--text-sub); font-size: 0.84rem; line-height: 1.6; }
 
-.sg-stage-body { min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
-.sg-stage-body--empty { align-items: center; justify-content: center; }
+.sg-stage-body { min-height: 0; display: flex; flex-direction: column; overflow: auto; }
+.sg-stage-body--empty { align-items: center; justify-content: center; overflow: hidden; }
 .sg-empty-state { max-width: 600px; display: grid; justify-items: center; gap: 0.7rem; text-align: center; }
 .sg-empty-glyph {
   display: grid; place-items: center; width: 3.2rem; height: 3.2rem;
@@ -456,51 +414,6 @@ onMounted(async () => {
   .sg-dock { padding: 0.5rem 0.55rem 0.65rem; }
   .sg-input-row { gap: 0.4rem; }
   .sg-btn-submit { padding: 0.55rem 0.8rem; }
-}
-
-.sg-glass-btn--active { color: var(--gold); border-color: var(--gold); }
-
-/* ── Hints Panel ── */
-.sg-hints {
-  display: flex; flex-direction: column; gap: 0.5rem;
-  max-height: 180px; overflow: hidden;
-  padding: 0.65rem 0.8rem;
-  border: 1px solid var(--line-soft); border-radius: 8px;
-  background: linear-gradient(180deg, var(--surface-panel-strong), var(--surface-panel));
-}
-
-.sg-hints-head {
-  display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
-}
-
-.sg-hints-label {
-  display: inline-flex; align-items: center; gap: 0.3rem;
-  color: var(--text-sub); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em;
-}
-
-.sg-hints-count { color: var(--text-faint); font-size: 0.7rem; }
-
-.sg-hints-grid {
-  flex: 1; overflow-y: auto;
-  display: flex; flex-wrap: wrap; gap: 0.35rem; align-content: flex-start;
-}
-
-.sg-hint-avatar {
-  width: 20px; height: 20px; border-radius: 3px; object-fit: cover;
-  border: 1px solid var(--line-soft); flex-shrink: 0; vertical-align: middle;
-}
-.sg-hint-chip {
-  display: inline-flex; align-items: center; gap: 0.3rem;
-  padding: 0.3rem 0.6rem;
-  border: 1px solid var(--line-soft); border-radius: 5px;
-  background: color-mix(in oklab, var(--gold) 4%, var(--surface-card));
-  color: var(--text-sub); font-size: 0.78rem; cursor: pointer;
-  transition: border-color 0.15s, background 0.15s, color 0.15s;
-}
-.sg-hint-chip:hover {
-  border-color: color-mix(in oklab, var(--gold) 35%, transparent);
-  background: color-mix(in oklab, var(--gold) 12%, var(--surface-card));
-  color: var(--text-main);
 }
 
 /* ── Win Modal ── */

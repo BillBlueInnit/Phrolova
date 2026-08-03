@@ -36,7 +36,7 @@ const toneLabel = computed(() => {
   padding: 0.9rem 1rem;
   border: 1px solid var(--line-soft);
   background: linear-gradient(180deg, var(--surface-panel-strong), var(--surface-panel));
-  clip-path: polygon(0 12px, 12px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 12px) 100%, 0 100%);
+  border-radius: 8px;
 }
 
 .status-banner-mark {
@@ -47,6 +47,7 @@ const toneLabel = computed(() => {
   min-height: 28px;
   padding: 0.12rem 0.5rem;
   border: 1px solid currentColor;
+  border-radius: 6px;
   font-size: 0.74rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;

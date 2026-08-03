@@ -109,10 +109,11 @@ export interface SingleDrawResponse extends ApiStatusResponse {
 
 export interface SingleGuessResponse extends ApiStatusResponse {
   type?: QuizType;
-  target?: ResonatorRow | SkeletonRow;
   guess?: ResonatorRow | SkeletonRow;
   compare?: ResonatorCompare | SkeletonCompare;
   score?: number | null;
+  attempts?: number;
+  limit?: number;
 }
 
 export interface LeaderboardRow {

@@ -43,7 +43,7 @@ const badgeStyle = computed(() => ({
   background:
     linear-gradient(180deg, color-mix(in oklab, var(--badge-accent) 8%, var(--surface-panel)), color-mix(in oklab, var(--badge-accent) 3%, var(--surface-panel)));
   color: var(--text-main);
-  clip-path: polygon(0 8px, 8px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 10px) 100%, 0 100%);
+  border-radius: 8px;
 }
 
 .lore-badge-compact {
@@ -57,6 +57,7 @@ const badgeStyle = computed(() => ({
   justify-content: center;
   width: 1.55rem;
   height: 1.55rem;
+  border-radius: 6px;
   border: 1px solid color-mix(in oklab, var(--badge-accent) 60%, transparent);
   background: color-mix(in oklab, var(--badge-accent) 22%, var(--surface-card));
   color: color-mix(in oklab, var(--badge-accent) 70%, white);

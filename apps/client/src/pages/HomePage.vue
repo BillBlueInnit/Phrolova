@@ -12,6 +12,17 @@ const route = useRoute();
 const authStore = useAuthStore();
 const multiGameStore = useMultiGameStore();
 
+const PORTRAIT_POOL = [
+  { src: "/media/frolova.png", alt: "弗洛洛" },
+  { src: "/media/jinhsi.png", alt: "今汐" },
+  { src: "/media/phoebe.png", alt: "菲比" },
+];
+
+function randomPortrait() {
+  return PORTRAIT_POOL[Math.floor(Math.random() * PORTRAIT_POOL.length)];
+}
+
+const currentPortrait = ref(randomPortrait());
 const frolovaKey = ref(0);
 const frolovaRef = shallowRef<HTMLElement | null>(null);
 const menuRef = shallowRef<HTMLElement | null>(null);
@@ -65,6 +76,7 @@ function setupGsap() {
 }
 
 async function resetFrolova() {
+  currentPortrait.value = randomPortrait();
   frolovaKey.value = 0;
   await nextTick();
   frolovaKey.value = Date.now();
@@ -167,7 +179,7 @@ onMounted(async () => {
     <div id="start-menu" class="home-stage">
       <div class="home-portrait" :key="frolovaKey" ref="frolovaRef">
         <div class="home-portrait-inner">
-          <img src="/media/frolova.png" alt="弗洛洛" />
+          <img :src="currentPortrait.src" :alt="currentPortrait.alt" />
         </div>
       </div>
 

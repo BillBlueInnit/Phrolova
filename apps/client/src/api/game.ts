@@ -2,11 +2,9 @@ import type {
   Difficulty,
   QuizType,
   ResonatorNameEntry,
-  ResonatorRow,
   SingleDrawResponse,
   SingleGuessResponse,
   SkeletonNameEntry,
-  SkeletonRow,
 } from "@/types/game";
 import { apiPath, requestJson } from "./http";
 
@@ -22,28 +20,29 @@ export function fetchSkeletonNames() {
   return requestJson<{ status: string; names: SkeletonNameEntry[] }>(apiPath("/skeleton_names"));
 }
 
-export function drawTarget(quizType: QuizType, difficulty: Difficulty) {
-  const url = `${apiPath("/draw")}?type=${quizType}&difficulty=${difficulty}`;
-  return requestJson<SingleDrawResponse>(url);
+export function drawTarget(quizType: QuizType, difficulty: Difficulty, playerId?: string, token?: string) {
+  return requestJson<SingleDrawResponse>(apiPath("/draw"), {
+    method: "POST",
+    body: JSON.stringify({
+      type: quizType,
+      difficulty,
+      player_id: playerId || "",
+      token: token || "",
+    }),
+  });
 }
 
 export function submitGuess(
-  target: ResonatorRow | SkeletonRow,
   guessName: string,
-  quizType: QuizType,
-  attempts: number,
-  playerId?: string,
-  token?: string,
+  playerId: string,
+  token: string,
 ) {
   return requestJson<SingleGuessResponse>(apiPath("/guess"), {
     method: "POST",
     body: JSON.stringify({
-      target,
       guess: guessName,
-      type: quizType,
-      attempts,
-      player_id: playerId || "",
-      token: token || "",
+      player_id: playerId,
+      token,
     }),
   });
 }

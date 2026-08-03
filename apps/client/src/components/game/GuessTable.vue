@@ -65,7 +65,8 @@ function formatCellValue(row: GuessHistoryRow, key: string) {
     <table class="guess-table">
       <thead>
         <tr>
-          <th class="guess-table-head">序号</th>
+          <th class="guess-table-head">#</th>
+          <th v-if="quizType === 'resonator'" class="guess-table-head">头像</th>
           <th v-for="column in columns" :key="column.key" class="guess-table-head">
             {{ column.label }}
           </th>
@@ -74,6 +75,14 @@ function formatCellValue(row: GuessHistoryRow, key: string) {
       <tbody v-if="rows.length">
         <tr v-for="(row, index) in rows" :key="`${index}-${row.guess.name}`">
           <td class="guess-table-index">{{ index + 1 }}</td>
+          <td v-if="quizType === 'resonator'" class="guess-table-cell guess-table-avatar-cell">
+            <img
+              v-if="row.revealed"
+              :src="getCharacterAvatar(String(row.guess.name))"
+              class="gt-avatar"
+              alt=""
+            />
+          </td>
           <td
             v-for="column in columns"
             :key="column.key"
@@ -81,15 +90,7 @@ function formatCellValue(row: GuessHistoryRow, key: string) {
             :class="getCellClass(row, column.key)"
           >
             <template v-if="column.key === 'name'">
-              <div class="gt-name-cell">
-                <img
-                  v-if="row.revealed"
-                  :src="getCharacterAvatar(String(row.guess.name))"
-                  class="gt-avatar"
-                  alt=""
-                />
-                <span class="guess-table-name">{{ row.revealed ? row.guess.name : "***" }}</span>
-              </div>
+              <span class="guess-table-name">{{ row.revealed ? row.guess.name : "***" }}</span>
             </template>
 
             <template v-else-if="isGroupField(row, column.key)">
@@ -106,14 +107,21 @@ function formatCellValue(row: GuessHistoryRow, key: string) {
               </div>
             </template>
 
-            <template v-else-if="shouldRenderBadge(column.key)">
-              <div class="gt-badge-row">
+            <template v-else-if="column.key === 'weapon'">
+              <div class="gt-weapon-cell">
                 <img
-                  v-if="column.key === 'weapon' && row.revealed"
+                  v-if="row.revealed"
                   :src="getWeaponIcon(String(row.guess.weapon))"
                   class="gt-weapon-icon"
                   alt=""
                 />
+                <span v-if="row.revealed" class="gt-weapon-text">{{ row.guess.weapon }}</span>
+                <span v-else class="guess-table-masked">***</span>
+              </div>
+            </template>
+
+            <template v-else-if="shouldRenderBadge(column.key)">
+              <div class="gt-badge-row">
                 <LoreBadge :label="String(formatCellValue(row, column.key))" :category="resolveBadgeCategory(column.key, String(row.guess[column.key as keyof typeof row.guess]))" compact />
               </div>
             </template>
@@ -136,22 +144,29 @@ function formatCellValue(row: GuessHistoryRow, key: string) {
 </template>
 
 <style scoped>
-.gt-name-cell {
-  display: flex; align-items: center; gap: 0.45rem;
-}
 .gt-avatar {
-  width: 28px; height: 28px; border-radius: 4px; object-fit: cover;
-  border: 1px solid var(--line-soft); flex-shrink: 0;
+  width: 60px; height: 60px; border-radius: 10px; object-fit: cover;
+  flex-shrink: 0;
+}
+.guess-table-avatar-cell {
+  width: 76px; text-align: center;
 }
 .gt-badge-row {
-  display: flex; align-items: center; gap: 0.35rem;
+  display: flex; align-items: center; gap: 0.4rem;
+}
+.gt-weapon-cell {
+  display: flex; align-items: center; gap: 0.45rem; justify-content: center;
 }
 .gt-weapon-icon {
-  width: 24px; height: 24px; object-fit: contain; flex-shrink: 0;
-  filter: drop-shadow(0 0 2px rgba(0,0,0,0.4));
+  width: 32px; height: 32px; object-fit: contain; flex-shrink: 0;
+  filter: drop-shadow(0 0 3px rgba(0,0,0,0.5));
 }
+.gt-weapon-text {
+  font-size: 0.85rem; font-weight: 600; color: var(--text-sub);
+}
+
 .guess-table-name {
-  font-weight: 600;
+  font-weight: 700; font-size: 0.95rem; text-align: center;
 }
 
 .guess-table-masked {
@@ -162,7 +177,7 @@ function formatCellValue(row: GuessHistoryRow, key: string) {
 .guess-table-value {
   display: inline-flex;
   align-items: center;
-  min-height: 32px;
+  min-height: 40px;
 }
 
 .guess-table-stars {
@@ -174,5 +189,13 @@ function formatCellValue(row: GuessHistoryRow, key: string) {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
+}
+
+@media (max-width: 720px) {
+  .gt-avatar { width: 46px; height: 46px; }
+  .gt-weapon-icon { width: 24px; height: 24px; }
+  .gt-weapon-text { font-size: 0.72rem; }
+  .guess-table-name { font-size: 0.82rem; }
+  .guess-table-avatar-cell { width: 62px; }
 }
 </style>

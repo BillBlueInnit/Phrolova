@@ -105,9 +105,9 @@ function handleKeydown(event: KeyboardEvent) {
   min-height: 52px;
   padding: 0.95rem 1rem;
   border: 1px solid var(--line-strong);
+  border-radius: 8px;
   background: linear-gradient(180deg, var(--surface-panel-strong), var(--surface-panel));
   color: var(--text-main);
-  clip-path: polygon(0 12px, 14px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%);
 }
 
 .autocomplete-panel {

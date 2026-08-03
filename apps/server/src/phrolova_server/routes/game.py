@@ -14,6 +14,8 @@ from ..players import apply_single_score, authenticate_player, ensure_single_sco
 
 game_bp = Blueprint("game", __name__)
 
+_player_targets: dict[str, dict] = {}
+
 
 def _json_body():
     return request.get_json(silent=True) or {}
@@ -41,13 +43,23 @@ def skeleton_names():
     return jsonify({"status": "success", "names": get_skeleton_names()})
 
 
-@game_bp.route("/api/draw", methods=["GET"])
+@game_bp.route("/api/draw", methods=["POST"])
 def draw():
-    quiz_type = request.args.get("type", "resonator")
-    difficulty = request.args.get("difficulty", "normal")
+    data = _json_body()
+    quiz_type = (data.get("type") or "resonator").strip()
+    difficulty = (data.get("difficulty") or "normal").strip()
+    player_id = (data.get("player_id") or "").strip()
+    token = (data.get("token") or "").strip()
+
+    player = authenticate_player({"player_id": player_id, "token": token}) if player_id else None
+
     row = draw_target_by_type(quiz_type, difficulty)
     if not row:
         return jsonify({"status": "error", "message": "数据库中没有目标数据"}), 404
+
+    if player:
+        _player_targets[player_id] = {"target": row, "quiz_type": quiz_type, "attempts": 0}
+
     return jsonify({"status": "success", "type": quiz_type, "character": row})
 
 
@@ -55,23 +67,40 @@ def draw():
 def guess():
     ensure_single_score_columns()
     data = _json_body()
-    target = data.get("target")
     guess_name = (data.get("guess") or "").strip()
-    quiz_type = data.get("type", "resonator")
-    attempts = int(data.get("attempts", 1))
-    if not target:
-        return jsonify({"status": "error", "message": "缺少目标数据，请先抽取随机目标"}), 400
+    player_id = (data.get("player_id") or "").strip()
+    token = (data.get("token") or "").strip()
+
     if not guess_name:
         return jsonify({"status": "error", "message": "请输入名称"}), 400
+
+    player = authenticate_player({"player_id": player_id, "token": token})
+    if not player:
+        return jsonify({"status": "error", "message": "请先登录"}), 401
+
+    session = _player_targets.get(player_id)
+    if not session or not session.get("target"):
+        return jsonify({"status": "error", "message": "请先抽取目标再开始猜测"}), 400
+
+    target = session["target"]
+    quiz_type = session["quiz_type"]
+    session["attempts"] += 1
+    attempts = session["attempts"]
+
     guess_row = lookup_guess_by_name(quiz_type, guess_name)
     if not guess_row:
         return jsonify({"status": "error", "message": f"数据库中不存在名为「{guess_name}」的目标"}), 404
+
     compare_result = build_compare_by_type(target, guess_row, quiz_type)
     score = None
     if all_match(compare_result):
-        player = authenticate_player(data)
-        if player:
-            score = apply_single_score(player["player_id"], quiz_type, attempts)
+        score = apply_single_score(player_id, quiz_type, attempts)
+        del _player_targets[player_id]
+
+    limit = 4 if quiz_type == "resonator" else 8
+    if attempts >= limit and not score:
+        del _player_targets[player_id]
+
     return jsonify(
         {
             "status": "success",
@@ -79,5 +108,7 @@ def guess():
             "guess": guess_row,
             "compare": compare_result,
             "score": score,
+            "attempts": attempts,
+            "limit": limit,
         }
     )
