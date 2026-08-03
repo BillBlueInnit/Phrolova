@@ -16,6 +16,7 @@ export const useMultiGameStore = defineStore("multiGame", () => {
   const inQueue = shallowRef(false);
   const roomState = ref<MultiplayerRoomState | null>(null);
   const kicked = shallowRef(false);
+  const roundHistory = shallowRef<Array<{ round: number; guesses: typeof roomState.value }>>([]);
 
   const me = computed(() => roomState.value?.players.find((player) => player.isMe) ?? null);
   const opponent = computed(() => roomState.value?.players.find((player) => !player.isMe) ?? null);
@@ -75,6 +76,12 @@ export const useMultiGameStore = defineStore("multiGame", () => {
     });
     currentSocket.on(S2C.ROUND_FINISHED, () => {
       infoMessage.value = "本局已结算";
+      if (roomState.value) {
+        roundHistory.value = [...roundHistory.value, {
+          round: roomState.value.round,
+          guesses: JSON.parse(JSON.stringify(roomState.value.players)),
+        }];
+      }
     });
     currentSocket.on(S2C.MATCH_FINISHED, (payload) => {
       infoMessage.value =
@@ -177,6 +184,7 @@ export const useMultiGameStore = defineStore("multiGame", () => {
     inQueue.value = false;
     roomState.value = null;
     kicked.value = false;
+    roundHistory.value = [];
   }
 
   return {
@@ -189,6 +197,7 @@ export const useMultiGameStore = defineStore("multiGame", () => {
     opponent,
     canGuess,
     kicked,
+    roundHistory,
     ensureConnected,
     resumeRoom,
     createRoom,

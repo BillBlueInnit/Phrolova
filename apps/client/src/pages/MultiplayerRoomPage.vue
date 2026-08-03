@@ -329,27 +329,61 @@ watch(
           </div>
 
           <div class="mr-result-body">
-            <div class="mr-result-board">
-              <h4 class="mr-result-board-title">我的猜测记录</h4>
-              <GuessTable
-                v-if="multiGameStore.roomState"
-                :quiz-type="multiGameStore.roomState.quizType"
-                :rows="multiGameStore.me?.guesses ?? []"
-                empty-label="无记录"
-                :target-version="multiGameStore.roomState.targetVersion"
-                :target-cost="multiGameStore.roomState.targetCost"
-              />
+            <div v-if="multiGameStore.roundHistory.length" class="mr-result-rounds">
+              <div v-for="entry in multiGameStore.roundHistory" :key="entry.round" class="mr-result-round">
+                <h4 class="mr-result-round-label">第 {{ entry.round }} 局</h4>
+                <div class="mr-result-round-boards">
+                  <div class="mr-result-board">
+                    <h5 class="mr-result-board-title">我的猜测</h5>
+                    <GuessTable
+                      v-if="multiGameStore.roomState"
+                      :quiz-type="multiGameStore.roomState.quizType"
+                      :rows="(entry.guesses[0]?.guesses as any) ?? []"
+                      empty-label="-"
+                      :target-version="multiGameStore.roomState.targetVersion"
+                      :target-cost="multiGameStore.roomState.targetCost"
+                    />
+                  </div>
+                  <div class="mr-result-board">
+                    <h5 class="mr-result-board-title">对手猜测</h5>
+                    <GuessTable
+                      v-if="multiGameStore.roomState"
+                      :quiz-type="multiGameStore.roomState.quizType"
+                      :rows="(entry.guesses[1]?.guesses as any) ?? []"
+                      empty-label="-"
+                      :target-version="multiGameStore.roomState.targetVersion"
+                      :target-cost="multiGameStore.roomState.targetCost"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
-            <div class="mr-result-board">
-              <h4 class="mr-result-board-title">对手猜测记录</h4>
-              <GuessTable
-                v-if="multiGameStore.roomState"
-                :quiz-type="multiGameStore.roomState.quizType"
-                :rows="multiGameStore.opponent?.guesses ?? []"
-                empty-label="无记录"
-                :target-version="multiGameStore.roomState.targetVersion"
-                :target-cost="multiGameStore.roomState.targetCost"
-              />
+            <div v-if="(multiGameStore.me?.guesses.length || multiGameStore.opponent?.guesses.length)" class="mr-result-board">
+              <h4 class="mr-result-board-title">第 {{ multiGameStore.roomState?.round }} 局 · 最终回合</h4>
+              <div class="mr-result-round-boards">
+                <div class="mr-result-board">
+                  <h5 class="mr-result-board-title">我的猜测</h5>
+                  <GuessTable
+                    v-if="multiGameStore.roomState"
+                    :quiz-type="multiGameStore.roomState.quizType"
+                    :rows="multiGameStore.me?.guesses ?? []"
+                    empty-label="-"
+                    :target-version="multiGameStore.roomState.targetVersion"
+                    :target-cost="multiGameStore.roomState.targetCost"
+                  />
+                </div>
+                <div class="mr-result-board">
+                  <h5 class="mr-result-board-title">对手猜测</h5>
+                  <GuessTable
+                    v-if="multiGameStore.roomState"
+                    :quiz-type="multiGameStore.roomState.quizType"
+                    :rows="multiGameStore.opponent?.guesses ?? []"
+                    empty-label="-"
+                    :target-version="multiGameStore.roomState.targetVersion"
+                    :target-cost="multiGameStore.roomState.targetCost"
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
@@ -916,15 +950,23 @@ watch(
   margin: 0; color: var(--gold); font-size: 1.15rem; font-weight: 700;
 }
 .mr-result-body {
-  flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem;
-  padding: 1rem 1.2rem;
+  flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.8rem;
+  padding: 0.8rem 1rem;
+}
+.mr-result-rounds { display: flex; flex-direction: column; gap: 0.8rem; }
+.mr-result-round { display: flex; flex-direction: column; gap: 0.35rem; }
+.mr-result-round-label {
+  margin: 0; font-size: 0.8rem; font-weight: 700; color: var(--gold); letter-spacing: 0.06em;
+}
+.mr-result-round-boards {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;
 }
 .mr-result-board { display: flex; flex-direction: column; min-height: 0; }
 .mr-result-board-title {
-  margin: 0 0 0.4rem; font-size: 0.82rem; font-weight: 700; color: var(--text-sub); letter-spacing: 0.06em;
+  margin: 0 0 0.3rem; font-size: 0.72rem; font-weight: 700; color: var(--text-sub); letter-spacing: 0.04em;
 }
 .mr-result-board :deep(.guess-table-shell) {
-  max-height: 220px; overflow: auto;
+  max-height: 200px; overflow: auto;
 }
 .mr-result-actions {
   display: flex; justify-content: center; gap: 0.6rem;

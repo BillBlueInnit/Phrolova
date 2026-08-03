@@ -599,7 +599,10 @@ class MultiplayerManager:
                     "roundWins": opponent["round_wins"] if opponent else 0,
                     "attemptsUsed": opponent["attempts"] if opponent else 0,
                     "attemptsLimit": self.max_attempts(room["quiz_type"]),
-                    "guesses": mask_rows(opponent["guesses"]) if opponent else [],
+                    "guesses": (
+                        reveal_rows(opponent["guesses"]) if room["status"] == "finished"
+                        else mask_rows(opponent["guesses"]) if opponent else []
+                    ),
                     "isMe": False,
                 },
             ],
