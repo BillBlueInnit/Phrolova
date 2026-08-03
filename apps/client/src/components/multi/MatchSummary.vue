@@ -45,26 +45,29 @@ const roundLabel = computed(() => {
 <style scoped>
 .summary-band {
   display: grid;
-  gap: 0.8rem;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.35rem;
 }
 
 .summary-band-card {
-  padding: 0.95rem 1rem;
+  padding: 0.4rem 0.55rem;
   border: 1px solid var(--line-soft);
+  border-radius: 6px;
   background: linear-gradient(180deg, var(--surface-panel-strong), var(--surface-panel));
-  box-shadow: 10px 10px 0 var(--shadow-plate);
 }
 
 .summary-band-label {
   display: block;
   color: var(--text-faint);
-  font-size: 0.78rem;
-  letter-spacing: 0.12em;
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .summary-band-value {
   display: block;
-  margin-top: 0.45rem;
-  font-size: 1rem;
+  margin-top: 0.15rem;
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 </style>

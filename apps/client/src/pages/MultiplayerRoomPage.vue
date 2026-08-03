@@ -375,8 +375,8 @@ watch(
   height: 100dvh;
   display: grid;
   grid-template-rows: auto auto auto minmax(0, 1fr) auto;
-  gap: 0.6rem;
-  padding: 0.5rem 1rem 0.6rem;
+  gap: 0.35rem;
+  padding: 0.35rem 0.8rem 0.4rem;
   overflow: hidden;
 }
 
@@ -385,14 +385,13 @@ watch(
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.8rem;
-  padding: 0.6rem 0.85rem;
+  gap: 0.5rem;
+  padding: 0.35rem 0.6rem;
   border: 1px solid var(--line-soft);
-  border-radius: 10px;
+  border-radius: 8px;
   background: color-mix(in oklab, var(--surface-panel-strong) 72%, transparent);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  box-shadow: 0 4px 24px color-mix(in oklab, var(--shadow-plate) 40%, transparent);
 }
 
 .mr-glass-left {
@@ -406,13 +405,13 @@ watch(
 .mr-glass-back {
   display: grid;
   place-items: center;
-  width: 2.2rem;
-  height: 2.2rem;
+  width: 1.8rem;
+  height: 1.8rem;
   border: 1px solid var(--line-strong);
-  border-radius: 8px;
+  border-radius: 6px;
   background: color-mix(in oklab, var(--surface-panel) 60%, transparent);
   color: var(--text-sub);
-  font-size: 1.1rem;
+  font-size: 0.95rem;
   cursor: pointer;
   flex-shrink: 0;
   transition: color 0.2s, border-color 0.2s;
@@ -516,20 +515,19 @@ watch(
 }
 
 .mr-score-panel {
-  padding: 0.75rem 0.9rem;
+  padding: 0.45rem 0.65rem;
   border: 1px solid var(--line-soft);
-  border-radius: 10px;
+  border-radius: 8px;
   background:
     radial-gradient(circle at 50% 0, color-mix(in oklab, var(--gold) 6%, transparent), transparent 18%),
     linear-gradient(180deg, var(--surface-panel-strong), var(--surface-panel));
-  box-shadow: 6px 6px 0 var(--shadow-plate);
 }
 
 .mr-score-kicker {
-  margin: 0 0 0.35rem;
+  margin: 0 0 0.15rem;
   color: var(--text-faint);
-  font-size: 0.66rem;
-  letter-spacing: 0.22em;
+  font-size: 0.58rem;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
 }
 
@@ -587,11 +585,11 @@ watch(
 .mr-stage {
   min-height: 0;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
-  gap: 0.6rem;
-  padding: 0.9rem 0.9rem 0.8rem;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0.35rem;
+  padding: 0.5rem 0.6rem;
   border: 1px solid var(--line-soft);
-  border-radius: 10px;
+  border-radius: 8px;
   background:
     radial-gradient(circle at 50% 18%, color-mix(in oklab, var(--gold) 8%, transparent), transparent 22%),
     linear-gradient(180deg, var(--surface-panel-strong), var(--surface-panel));
@@ -722,11 +720,11 @@ watch(
 .mr-dock {
   display: flex;
   align-items: center;
-  gap: 0.8rem;
+  gap: 0.5rem;
   flex-wrap: wrap;
-  padding: 0.75rem 0.9rem 0.85rem;
+  padding: 0.45rem 0.6rem;
   border: 1px solid var(--line-soft);
-  border-radius: 10px;
+  border-radius: 8px;
   background: linear-gradient(180deg, var(--surface-panel-strong), var(--surface-panel));
 }
 
@@ -833,80 +831,57 @@ watch(
   .mr-shell {
     padding: 0;
     gap: 0;
-    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr) auto;
   }
-
   .mr-glass-header {
-    border-radius: 0;
-    border-left: none;
-    border-right: none;
-    border-top: none;
-    padding: 0.5rem 0.7rem;
+    border-radius: 0; border-left: none; border-right: none; border-top: none;
+    padding: 0.35rem 0.5rem;
   }
-
+  .mr-glass-kicker { font-size: 0.56rem; }
+  .mr-glass-title { font-size: 0.74rem; }
+  .mr-glass-chip { font-size: 0.6rem; max-width: 10rem; padding: 0.2rem 0.4rem; }
+  .mr-glass-back { width: 1.6rem; height: 1.6rem; font-size: 0.85rem; }
+  .mr-glass-btn { width: 1.6rem; height: 1.6rem; font-size: 0.9rem; }
   .mr-summary-row,
-  .status-stack {
-    display: none;
-  }
+  .status-stack { display: none; }
 
   .mr-stage {
-    border: none;
-    border-radius: 0;
-    padding: 0.6rem 0.7rem;
-    grid-template-rows: auto auto minmax(0, 1fr);
+    border: none; border-radius: 0;
+    padding: 0.35rem 0.4rem;
   }
-
-  .mr-stage-head {
-    gap: 0.4rem;
-  }
-
-  .mr-stage-kicker { font-size: 0.62rem; }
-  .mr-stage-title, .mr-empty-title { font-size: 1rem; }
-  .mr-stage-sub, .mr-empty-sub { font-size: 0.76rem; line-height: 1.5; }
-
-  .mr-empty-glyph {
-    width: 2.6rem; height: 2.6rem; font-size: 1rem;
-  }
+  .mr-stage-head { gap: 0.3rem; }
+  .mr-stage-kicker { font-size: 0.56rem; }
+  .mr-stage-title, .mr-empty-title { font-size: 0.88rem; }
+  .mr-stage-sub, .mr-empty-sub { font-size: 0.7rem; }
 
   .mr-boards {
-    gap: 0.5rem;
+    gap: 0.35rem;
   }
-
-  .mr-board-head {
-    padding: 0.4rem 0.6rem;
-  }
-
-  .mr-board-title { font-size: 0.8rem; }
-  .mr-board-meta { font-size: 0.7rem; }
+  .mr-board-head { padding: 0.3rem 0.45rem; }
+  .mr-board-title { font-size: 0.72rem; }
+  .mr-board-meta { font-size: 0.64rem; }
 
   .mr-dock {
-    border-radius: 0;
-    border-left: none;
-    border-right: none;
-    border-bottom: none;
-    padding: 0.6rem 0.7rem 0.8rem;
+    border-radius: 0; border-left: none; border-right: none; border-bottom: none;
+    padding: 0.4rem 0.5rem;
   }
-
   .mr-dock-copy { display: none; }
-
-  .mr-input-row {
-    flex-direction: row;
-    width: 100%;
-  }
-
+  .mr-input-row { width: 100%; }
   .mr-input-row > :first-child { flex: 1; }
+  .mr-btn { padding: 0.4rem 0.7rem; font-size: 0.78rem; }
+  .mr-btn-submit { padding: 0.45rem 0.8rem; font-size: 0.8rem; }
 
-  .mr-btn-submit {
-    padding: 0.55rem 1rem;
-    font-size: 0.88rem;
-  }
+  .mr-result-modal { max-width: 96vw; max-height: 85vh; }
+  .mr-result-header { padding: 1rem 1rem 0.8rem; }
+  .mr-result-body { padding: 0.5rem; }
+  .mr-result-board :deep(.guess-table-shell) { max-height: 140px; }
 }
 
 @media (max-width: 480px) {
-  .mr-stage { padding: 0.5rem 0.55rem; }
-  .mr-dock { padding: 0.5rem 0.55rem 0.65rem; }
-  .mr-input-row { gap: 0.4rem; }
-  .mr-btn-submit { padding: 0.55rem 0.8rem; }
+  .mr-stage { padding: 0.25rem; }
+  .mr-dock { padding: 0.35rem 0.4rem; }
+  .mr-input-row { gap: 0.3rem; }
+  .mr-btn-submit { padding: 0.4rem 0.6rem; }
 }
 
 /* ── Match Result Modal ── */
