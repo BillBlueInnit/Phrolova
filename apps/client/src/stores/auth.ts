@@ -18,6 +18,8 @@ export const useAuthStore = defineStore("auth", () => {
     score: 0,
     wins: 0,
     matches: 0,
+    single_resonator_score: 0,
+    single_skeleton_score: 0,
   });
 
   const isAuthenticated = computed(() => loggedIn.value && Boolean(playerId.value) && Boolean(token.value));
@@ -28,6 +30,8 @@ export const useAuthStore = defineStore("auth", () => {
     stats.score = player.score;
     stats.wins = player.wins;
     stats.matches = player.matches;
+    stats.single_resonator_score = player.single_resonator_score;
+    stats.single_skeleton_score = player.single_skeleton_score;
   }
 
   function persist() {
@@ -43,6 +47,8 @@ export const useAuthStore = defineStore("auth", () => {
     stats.score = 0;
     stats.wins = 0;
     stats.matches = 0;
+    stats.single_resonator_score = 0;
+    stats.single_skeleton_score = 0;
     localStorage.removeItem(PLAYER_ID_KEY);
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(AUTH_KEY);

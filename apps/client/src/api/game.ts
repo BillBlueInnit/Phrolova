@@ -31,9 +31,19 @@ export function submitGuess(
   target: ResonatorRow | SkeletonRow,
   guessName: string,
   quizType: QuizType,
+  attempts: number,
+  playerId?: string,
+  token?: string,
 ) {
   return requestJson<SingleGuessResponse>(apiPath("/guess"), {
     method: "POST",
-    body: JSON.stringify({ target, guess: guessName, type: quizType }),
+    body: JSON.stringify({
+      target,
+      guess: guessName,
+      type: quizType,
+      attempts,
+      player_id: playerId || "",
+      token: token || "",
+    }),
   });
 }

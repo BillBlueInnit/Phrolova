@@ -12,6 +12,7 @@ import type {
 } from "@/types/game";
 import * as api from "@/api";
 import { toHistoryRow } from "@/utils/game";
+import { useAuthStore } from "./auth";
 
 function isWinningCompare(compare: ResonatorCompare | SkeletonCompare) {
   if ("skill_attribute" in compare) {
@@ -27,8 +28,12 @@ function isWinningCompare(compare: ResonatorCompare | SkeletonCompare) {
 }
 
 export const useSingleGameStore = defineStore("singleGame", () => {
-  const quizType = shallowRef<QuizType>("resonator");
-  const difficulty = shallowRef<Difficulty>("hard");
+  const quizType = shallowRef<QuizType>(
+    (localStorage.getItem("sg_quiz_type") as QuizType) || "resonator",
+  );
+  const difficulty = shallowRef<Difficulty>(
+    (localStorage.getItem("sg_difficulty") as Difficulty) || "hard",
+  );
   const target = ref<ResonatorRow | SkeletonRow | null>(null);
   const guessHistory = ref<GuessHistoryRow[]>([]);
   const loading = shallowRef(false);
@@ -36,6 +41,7 @@ export const useSingleGameStore = defineStore("singleGame", () => {
   const gameOver = shallowRef(false);
   const answerVisible = shallowRef(false);
   const resultMessage = shallowRef("");
+  const earnedScore = shallowRef(0);
 
   const attemptsLimit = computed(() => (quizType.value === "skeleton" ? 8 : 4));
   const attemptsUsed = computed(() => guessHistory.value.length);
@@ -45,6 +51,8 @@ export const useSingleGameStore = defineStore("singleGame", () => {
   function setConfig(nextQuizType: QuizType, nextDifficulty: Difficulty) {
     quizType.value = nextQuizType;
     difficulty.value = nextDifficulty;
+    localStorage.setItem("sg_quiz_type", nextQuizType);
+    localStorage.setItem("sg_difficulty", nextDifficulty);
   }
 
   async function startGame() {
@@ -74,8 +82,18 @@ export const useSingleGameStore = defineStore("singleGame", () => {
     }
     loading.value = true;
     error.value = "";
+    earnedScore.value = 0;
     try {
-      const data = await api.submitGuess(target.value, guessName, quizType.value);
+      const authStore = useAuthStore();
+      const attempts = guessHistory.value.length + 1;
+      const data = await api.submitGuess(
+        target.value,
+        guessName,
+        quizType.value,
+        attempts,
+        authStore.playerId || undefined,
+        authStore.token || undefined,
+      );
       if (!data.guess || !data.compare) {
         throw new Error("返回结果不完整");
       }
@@ -85,6 +103,10 @@ export const useSingleGameStore = defineStore("singleGame", () => {
         gameOver.value = true;
         answerVisible.value = true;
         resultMessage.value = "回答正确，本局已完成。";
+        if (data.score) {
+          earnedScore.value = data.score;
+          await authStore.refreshPlayer().catch(() => undefined);
+        }
       } else if (guessHistory.value.length >= attemptsLimit.value) {
         gameOver.value = true;
         answerVisible.value = true;
@@ -119,6 +141,7 @@ export const useSingleGameStore = defineStore("singleGame", () => {
     attemptsUsed,
     attemptsLeft,
     canSubmit,
+    earnedScore,
     setConfig,
     startGame,
     submitGuess,

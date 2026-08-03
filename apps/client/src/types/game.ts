@@ -91,6 +91,8 @@ export interface AuthResponse extends ApiStatusResponse {
     score: number;
     wins: number;
     matches: number;
+    single_resonator_score: number;
+    single_skeleton_score: number;
   };
   token?: string;
 }
@@ -110,11 +112,15 @@ export interface SingleGuessResponse extends ApiStatusResponse {
   target?: ResonatorRow | SkeletonRow;
   guess?: ResonatorRow | SkeletonRow;
   compare?: ResonatorCompare | SkeletonCompare;
+  score?: number | null;
 }
 
 export interface LeaderboardRow {
   player_id: string;
   score: number;
+  sort_score?: number;
+  single_resonator_score?: number;
+  single_skeleton_score?: number;
   wins: number;
   matches: number;
   win_rate: number;
