@@ -16,6 +16,8 @@ def create_app():
     settings = get_settings()
     app = Flask(__name__)
     app.config["SECRET_KEY"] = settings.secret_key
+    app.config["JSON_AS_ASCII"] = False
+    app.json.ensure_ascii = False
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(game_bp)
