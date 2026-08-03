@@ -76,18 +76,14 @@ export const useMultiGameStore = defineStore("multiGame", () => {
     currentSocket.on(S2C.ROUND_FINISHED, () => {
       infoMessage.value = "本局已结算";
     });
-    currentSocket.on(S2C.MATCH_FINISHED, async (payload) => {
-      const authStore = useAuthStore();
+    currentSocket.on(S2C.MATCH_FINISHED, (payload) => {
       infoMessage.value =
         payload.scoreDelta >= 0
           ? `整场获胜，积分 +${payload.scoreDelta}`
           : `整场结束，积分 ${payload.scoreDelta}`;
-      await authStore.refreshPlayer().catch(() => undefined);
     });
-    currentSocket.on(S2C.OPPONENT_FORFEIT, async (payload) => {
-      const authStore = useAuthStore();
+    currentSocket.on(S2C.OPPONENT_FORFEIT, (payload) => {
       infoMessage.value = payload.message || "对手已退出";
-      await authStore.refreshPlayer().catch(() => undefined);
     });
     currentSocket.on(S2C.KICKED, () => {
       if (kicked.value) return;
