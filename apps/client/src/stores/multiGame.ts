@@ -170,10 +170,10 @@ export const useMultiGameStore = defineStore("multiGame", () => {
     currentSocket.emit(C2S.JOIN_ROOM, { roomCode });
   }
 
-  async function joinQueue(quizType: QuizType, difficulty: Difficulty) {
+  async function joinQueue(quizType: QuizType, difficulty: Difficulty, bestOf: number) {
     const currentSocket = await ensureConnected();
     inQueue.value = true;
-    currentSocket.emit(C2S.QUEUE_JOIN, { quizType, difficulty });
+    currentSocket.emit(C2S.QUEUE_JOIN, { quizType, difficulty, bestOf });
   }
 
   async function cancelQueue() {

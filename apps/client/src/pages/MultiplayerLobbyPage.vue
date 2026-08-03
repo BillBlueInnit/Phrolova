@@ -60,7 +60,7 @@ async function joinRoom() {
 
 async function randomMatch() {
   try {
-    await multiGameStore.joinQueue(config.quizType, config.difficulty);
+    await multiGameStore.joinQueue(config.quizType, config.difficulty, config.bestOf);
   } catch (reason) {
     multiGameStore.error = reason instanceof Error ? reason.message : "进入匹配队列失败";
   }

@@ -151,6 +151,7 @@ class MultiplayerManager:
                 return
             quiz_type = payload.get("quizType", "resonator")
             difficulty = payload.get("difficulty", "hard")
+            best_of = payload.get("bestOf", self.best_of_default)
             with self.lock:
                 self._purge_finished_rooms_for(player_id)
                 if self._get_player_room(player_id):
@@ -169,6 +170,7 @@ class MultiplayerManager:
                         if item["player_id"] != player_id
                         and item["quiz_type"] == quiz_type
                         and item["difficulty"] == difficulty
+                        and item["best_of"] == best_of
                     ),
                     None,
                 )
@@ -178,12 +180,13 @@ class MultiplayerManager:
                             "player_id": player_id,
                             "quiz_type": quiz_type,
                             "difficulty": difficulty,
+                            "best_of": best_of,
                         }
                     )
                     self._emit_to_player(player_id, "multi:matching", {"message": "已进入匹配队列"})
                     return
                 opponent = self.match_queue.pop(match_index)
-                room = self._new_room(opponent["player_id"], quiz_type, self.best_of_default, difficulty)
+                room = self._new_room(opponent["player_id"], quiz_type, best_of, difficulty)
                 room["players"].append(self._new_slot(player_id))
                 room["status"] = "countdown"
                 room["countdown_end_at"] = time.time() + self.enter_game_delay
