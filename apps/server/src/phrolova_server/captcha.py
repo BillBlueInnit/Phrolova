@@ -54,7 +54,7 @@ def _make_captcha_image(text: str):
     width, height = 132, 46
     image = Image.new("RGB", (width, height), (22, 27, 47))
     draw = ImageDraw.Draw(image)
-    font = _load_font(28)
+    font = _load_font(36)
     for _ in range(150):
         x = random.randint(0, width - 1)
         y = random.randint(0, height - 1)

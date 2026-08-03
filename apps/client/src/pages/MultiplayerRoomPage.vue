@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { useRouter } from "vue-router";
 import gsap from "gsap";
 
@@ -75,6 +75,39 @@ const myWins = computed(() => multiGameStore.me?.roundWins ?? 0);
 const opponentWins = computed(() => multiGameStore.opponent?.roundWins ?? 0);
 const targetBestOf = computed(() => multiGameStore.roomState?.bestOf ?? 1);
 const winsNeeded = computed(() => Math.ceil(targetBestOf.value / 2));
+
+const showMatchResult = ref(false);
+const matchResultSeen = ref(false);
+
+watch(
+  () => multiGameStore.roomState?.roomStatus,
+  (status) => {
+    if (status === "finished" && !matchResultSeen.value) {
+      showMatchResult.value = true;
+      matchResultSeen.value = true;
+    }
+    if (status !== "finished") {
+      matchResultSeen.value = false;
+    }
+  },
+);
+
+const matchResultText = computed(() => {
+  const state = multiGameStore.roomState;
+  if (!state) return "";
+  const iWon = state.overallWinner !== null && state.players[state.overallWinner]?.isMe;
+  return iWon ? "胜利" : "失败";
+});
+
+const matchScoreText = computed(() => {
+  const state = multiGameStore.roomState;
+  if (!state || !state.scoreDelta) return "";
+  return state.scoreDelta > 0 ? `+${state.scoreDelta} 分` : `${state.scoreDelta} 分`;
+});
+
+function closeMatchResult() {
+  showMatchResult.value = false;
+}
 
 async function submitGuess() {
   if (!guessName.value.trim()) return;
@@ -277,6 +310,53 @@ watch(
       <p class="mr-empty-sub">刷新后会自动尝试恢复房间，也可以返回大厅重新创建或加入一场对局。</p>
       <RouterLink class="mr-btn mr-link-btn" to="/multi">返回大厅</RouterLink>
     </div>
+
+    <Teleport to="body">
+      <div v-if="showMatchResult" class="mr-result-overlay">
+        <div class="mr-result-modal">
+          <div class="mr-result-header">
+            <Icon
+              :icon="matchResultText === '胜利' ? 'ph:crown-fill' : 'ph:hand-waving-duotone'"
+              class="mr-result-icon"
+              :class="{ 'mr-result-icon--win': matchResultText === '胜利' }"
+            />
+            <h2 class="mr-result-title" :class="{ 'mr-result-title--win': matchResultText === '胜利' }">
+              {{ matchResultText }}
+            </h2>
+            <p v-if="matchScoreText" class="mr-result-score">{{ matchScoreText }}</p>
+          </div>
+
+          <div class="mr-result-body">
+            <div class="mr-result-board">
+              <h4 class="mr-result-board-title">我的猜测记录</h4>
+              <GuessTable
+                v-if="multiGameStore.roomState"
+                :quiz-type="multiGameStore.roomState.quizType"
+                :rows="multiGameStore.me?.guesses ?? []"
+                empty-label="无记录"
+                :target-version="multiGameStore.roomState.targetVersion"
+                :target-cost="multiGameStore.roomState.targetCost"
+              />
+            </div>
+            <div class="mr-result-board">
+              <h4 class="mr-result-board-title">对手猜测记录</h4>
+              <GuessTable
+                v-if="multiGameStore.roomState"
+                :quiz-type="multiGameStore.roomState.quizType"
+                :rows="multiGameStore.opponent?.guesses ?? []"
+                empty-label="无记录"
+                :target-version="multiGameStore.roomState.targetVersion"
+                :target-cost="multiGameStore.roomState.targetCost"
+              />
+            </div>
+          </div>
+
+          <div class="mr-result-actions">
+            <button class="mr-result-btn mr-result-btn--primary" @click="closeMatchResult(); leaveRoom();">返回大厅</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -825,5 +905,74 @@ watch(
   .mr-dock { padding: 0.5rem 0.55rem 0.65rem; }
   .mr-input-row { gap: 0.4rem; }
   .mr-btn-submit { padding: 0.55rem 0.8rem; }
+}
+
+/* ── Match Result Modal ── */
+.mr-result-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(6px);
+  animation: mrFadeIn 0.25s ease;
+}
+.mr-result-modal {
+  display: flex; flex-direction: column;
+  width: 100%; max-width: 680px; max-height: 90vh;
+  border: 1px solid var(--line-soft); border-radius: 14px;
+  background: var(--surface-panel-strong);
+  overflow: hidden;
+  animation: mrSlideUp 0.3s ease;
+}
+.mr-result-header {
+  display: grid; justify-items: center; gap: 0.4rem;
+  padding: 2rem 1.5rem 1.2rem;
+  background: radial-gradient(ellipse 100% 140% at 50% 0%, color-mix(in oklab, var(--gold) 12%, transparent), transparent);
+}
+.mr-result-icon {
+  font-size: 2.6rem; color: var(--text-sub);
+}
+.mr-result-icon--win { color: var(--gold); }
+.mr-result-title {
+  margin: 0; font-size: 1.6rem; font-weight: 900; letter-spacing: 0.06em;
+}
+.mr-result-title--win { color: var(--gold); }
+.mr-result-score {
+  margin: 0; color: var(--gold); font-size: 1.15rem; font-weight: 700;
+}
+.mr-result-body {
+  flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem;
+  padding: 1rem 1.2rem;
+}
+.mr-result-board { display: flex; flex-direction: column; min-height: 0; }
+.mr-result-board-title {
+  margin: 0 0 0.4rem; font-size: 0.82rem; font-weight: 700; color: var(--text-sub); letter-spacing: 0.06em;
+}
+.mr-result-board :deep(.guess-table-shell) {
+  max-height: 220px; overflow: auto;
+}
+.mr-result-actions {
+  display: flex; justify-content: center; gap: 0.6rem;
+  padding: 1rem 1.2rem 1.2rem; border-top: 1px solid var(--line-soft);
+}
+.mr-result-btn {
+  padding: 0.65rem 1.8rem;
+  border: 1px solid var(--line-strong); border-radius: 8px;
+  background: var(--surface-panel); color: var(--text-sub);
+  font-size: 0.9rem; font-weight: 600; cursor: pointer;
+}
+.mr-result-btn:hover { border-color: var(--gold); color: var(--text-main); }
+.mr-result-btn--primary {
+  border-color: color-mix(in oklab, var(--gold) 40%, transparent);
+  background: color-mix(in oklab, var(--gold) 16%, var(--surface-panel-strong));
+  color: var(--gold);
+}
+.mr-result-btn--primary:hover { background: color-mix(in oklab, var(--gold) 26%, var(--surface-panel-strong)); }
+
+@keyframes mrFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes mrSlideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+@media (max-width: 720px) {
+  .mr-result-modal { max-width: 96vw; max-height: 85vh; }
+  .mr-result-body { padding: 0.7rem; }
+  .mr-result-board :deep(.guess-table-shell) { max-height: 160px; }
 }
 </style>

@@ -90,6 +90,7 @@ export const useMultiGameStore = defineStore("multiGame", () => {
       await authStore.refreshPlayer().catch(() => undefined);
     });
     currentSocket.on(S2C.KICKED, () => {
+      if (kicked.value) return;
       const authStore = useAuthStore();
       disconnect();
       authStore.logout();

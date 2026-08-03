@@ -88,7 +88,14 @@ export const useSingleGameStore = defineStore("singleGame", () => {
     earnedScore.value = 0;
     try {
       const authStore = useAuthStore();
-      const data = await api.submitGuess(guessName, authStore.playerId, authStore.token);
+      const isAuth = authStore.isAuthenticated;
+      const data = await api.submitGuess(
+        guessName,
+        authStore.playerId,
+        authStore.token,
+        isAuth ? undefined : (target.value ?? undefined),
+        isAuth ? undefined : quizType.value,
+      );
       if (!data.guess || !data.compare) {
         throw new Error("返回结果不完整");
       }
