@@ -329,8 +329,8 @@ watch(
           </div>
 
           <div class="mr-result-body">
-            <div v-if="multiGameStore.roundHistory.length" class="mr-result-rounds">
-              <div v-for="entry in multiGameStore.roundHistory" :key="entry.round" class="mr-result-round">
+            <div v-if="multiGameStore.roomState?.roundHistory?.length" class="mr-result-rounds">
+              <div v-for="entry in multiGameStore.roomState.roundHistory" :key="entry.round" class="mr-result-round">
                 <h4 class="mr-result-round-label">第 {{ entry.round }} 局</h4>
                 <div class="mr-result-round-boards">
                   <div class="mr-result-board">
@@ -338,10 +338,10 @@ watch(
                     <GuessTable
                       v-if="multiGameStore.roomState"
                       :quiz-type="multiGameStore.roomState.quizType"
-                      :rows="(entry.guesses[0]?.guesses as any) ?? []"
+                      :rows="(entry.players[0]?.guesses as any) ?? []"
                       empty-label="-"
-                      :target-version="multiGameStore.roomState.targetVersion"
-                      :target-cost="multiGameStore.roomState.targetCost"
+                      :target-version="entry.target ? ('version' in entry.target ? Number((entry.target as any).version) : null) : multiGameStore.roomState.targetVersion"
+                      :target-cost="entry.target ? ('cost' in entry.target ? Number((entry.target as any).cost) : null) : multiGameStore.roomState.targetCost"
                     />
                   </div>
                   <div class="mr-result-board">
@@ -349,39 +349,12 @@ watch(
                     <GuessTable
                       v-if="multiGameStore.roomState"
                       :quiz-type="multiGameStore.roomState.quizType"
-                      :rows="(entry.guesses[1]?.guesses as any) ?? []"
+                      :rows="(entry.players[1]?.guesses as any) ?? []"
                       empty-label="-"
-                      :target-version="multiGameStore.roomState.targetVersion"
-                      :target-cost="multiGameStore.roomState.targetCost"
+                      :target-version="entry.target ? ('version' in entry.target ? Number((entry.target as any).version) : null) : multiGameStore.roomState.targetVersion"
+                      :target-cost="entry.target ? ('cost' in entry.target ? Number((entry.target as any).cost) : null) : multiGameStore.roomState.targetCost"
                     />
                   </div>
-                </div>
-              </div>
-            </div>
-            <div v-if="(multiGameStore.me?.guesses.length || multiGameStore.opponent?.guesses.length)" class="mr-result-board">
-              <h4 class="mr-result-board-title">第 {{ multiGameStore.roomState?.round }} 局 · 最终回合</h4>
-              <div class="mr-result-round-boards">
-                <div class="mr-result-board">
-                  <h5 class="mr-result-board-title">我的猜测</h5>
-                  <GuessTable
-                    v-if="multiGameStore.roomState"
-                    :quiz-type="multiGameStore.roomState.quizType"
-                    :rows="multiGameStore.me?.guesses ?? []"
-                    empty-label="-"
-                    :target-version="multiGameStore.roomState.targetVersion"
-                    :target-cost="multiGameStore.roomState.targetCost"
-                  />
-                </div>
-                <div class="mr-result-board">
-                  <h5 class="mr-result-board-title">对手猜测</h5>
-                  <GuessTable
-                    v-if="multiGameStore.roomState"
-                    :quiz-type="multiGameStore.roomState.quizType"
-                    :rows="multiGameStore.opponent?.guesses ?? []"
-                    empty-label="-"
-                    :target-version="multiGameStore.roomState.targetVersion"
-                    :target-cost="multiGameStore.roomState.targetCost"
-                  />
                 </div>
               </div>
             </div>

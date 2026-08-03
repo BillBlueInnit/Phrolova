@@ -367,6 +367,7 @@ class MultiplayerManager:
             "updated_at": time.time(),
             "finished_at": None,
             "forfeit_by": None,
+            "round_history": [],
         }
         self.rooms[code] = room
         return room
@@ -460,6 +461,17 @@ class MultiplayerManager:
         room["round_winner"] = winner_index
         room["round_resolved_at"] = time.time()
         room["updated_at"] = time.time()
+        round_guesses = []
+        for slot in room["players"]:
+            round_guesses.append({
+                "player_id": slot["player_id"],
+                "guesses": [{"revealed": True, "guess": item["character"], "compare": item["compare"]} for item in slot["guesses"]],
+            })
+        room.setdefault("round_history", []).append({
+            "round": room["round"],
+            "target": room["target"],
+            "players": round_guesses,
+        })
         if winner_index is not None:
             room["players"][winner_index]["round_wins"] += 1
 
@@ -554,9 +566,9 @@ class MultiplayerManager:
         opponent = room["players"][opponent_index] if opponent_index < len(room["players"]) else None
         quiz_type = room["quiz_type"]
         masked_fields = (
-            ["name", "skill_attribute", "cost", "is_aberration", "set_name", "drop_location"]
+            ["name", "skill_attribute", "set_name", "drop_location"]
             if quiz_type == "skeleton"
-            else ["name", "attribute", "star_rating", "weapon", "birthplace", "version"]
+            else ["name", "attribute", "weapon", "birthplace"]
         )
 
         def reveal_rows(guesses):
@@ -565,7 +577,9 @@ class MultiplayerManager:
         def mask_rows(guesses):
             rows = []
             for item in guesses:
-                masked = {field: "***" for field in masked_fields}
+                masked = dict(item["character"])
+                for field in masked_fields:
+                    masked[field] = "***"
                 rows.append({"revealed": False, "guess": masked, "compare": item["compare"]})
             return rows
 
@@ -610,6 +624,7 @@ class MultiplayerManager:
                 },
             ],
             "opponentId": opponent["player_id"] if opponent else "",
+            "roundHistory": room.get("round_history", []),
         }
         return room_state
 

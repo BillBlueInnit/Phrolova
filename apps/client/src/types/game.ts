@@ -170,4 +170,12 @@ export interface MultiplayerRoomState {
   forfeitBy: string | null;
   players: RoomPlayerView[];
   opponentId: string;
+  roundHistory?: Array<{
+    round: number;
+    target: ResonatorRow | SkeletonRow | null;
+    players: Array<{
+      player_id: string;
+      guesses: GuessHistoryRow[];
+    }>;
+  }>;
 }
