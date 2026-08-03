@@ -1,0 +1,774 @@
+<script setup lang="ts">
+import { computed, onMounted, ref, shallowRef, watch } from "vue";
+import { useRouter } from "vue-router";
+
+import FeedbackLegend from "@/components/game/FeedbackLegend.vue";
+import GuessTable from "@/components/game/GuessTable.vue";
+import NameAutocompleteInput from "@/components/game/NameAutocompleteInput.vue";
+import MatchSummary from "@/components/multi/MatchSummary.vue";
+import StatusBanner from "@/components/shared/StatusBanner.vue";
+import { useAuthStore } from "@/stores/auth";
+import { useDictionaryStore } from "@/stores/dictionary";
+import { useMultiGameStore } from "@/stores/multiGame";
+
+const THEME_KEY = "phrolova_theme";
+
+const authStore = useAuthStore();
+const dictionaryStore = useDictionaryStore();
+const multiGameStore = useMultiGameStore();
+const router = useRouter();
+const guessName = shallowRef("");
+
+const currentTheme = ref<"phrolova-light" | "phrolova-night">(
+  (localStorage.getItem(THEME_KEY) as "phrolova-light" | "phrolova-night") || "phrolova-light",
+);
+
+function toggleTheme() {
+  const next = currentTheme.value === "phrolova-light" ? "phrolova-night" : "phrolova-light";
+  currentTheme.value = next;
+  document.documentElement.setAttribute("data-theme", next);
+  localStorage.setItem(THEME_KEY, next);
+}
+
+const names = computed(() =>
+  multiGameStore.roomState?.quizType === "skeleton" ? dictionaryStore.skeletonNames : dictionaryStore.resonatorNames,
+);
+
+const battleTitle = computed(() => {
+  if (!multiGameStore.roomState) return "实时对战";
+  if (multiGameStore.roomState.quizType === "skeleton") {
+    return `声骸对战 / ${multiGameStore.roomState.difficulty === "easy" ? "简单" : "困难"}`;
+  }
+  return "共鸣者对战 / 标准";
+});
+
+const stagePromptTitle = computed(() => {
+  if (multiGameStore.roomState?.quizType === "skeleton") return "在下方输入声骸名称开始实时猜测";
+  return "在下方输入角色昵称开始实时猜测";
+});
+
+const stagePromptSubtitle = computed(() => "对手名称保持遮罩，颜色反馈与回合状态由服务端同步推进。");
+
+const hasBattleHistory = computed(() =>
+  Boolean((multiGameStore.me?.guesses.length ?? 0) || (multiGameStore.opponent?.guesses.length ?? 0)),
+);
+
+const roomHintText = computed(() => {
+  const roomState = multiGameStore.roomState;
+  if (!roomState) return "";
+  const timer = roomState.timeLeft ?? roomState.countdownLeft ?? 0;
+  return `房间 ${roomState.roomCode} · 第 ${roomState.round} 局 / BO${roomState.bestOf} · 剩余 ${timer} 秒`;
+});
+
+const answerText = computed(() => multiGameStore.roomState?.target?.name ?? "");
+
+const dockHintText = computed(() => {
+  if (!multiGameStore.roomState) return "";
+  if (multiGameStore.canGuess) return "当前轮到你提交猜测";
+  return multiGameStore.roomState.roomStatus === "countdown" ? "对局即将开始" : "等待系统推进或对手行动";
+});
+
+const myWins = computed(() => multiGameStore.me?.roundWins ?? 0);
+const opponentWins = computed(() => multiGameStore.opponent?.roundWins ?? 0);
+const targetBestOf = computed(() => multiGameStore.roomState?.bestOf ?? 1);
+const winsNeeded = computed(() => Math.ceil(targetBestOf.value / 2));
+
+async function submitGuess() {
+  if (!guessName.value.trim()) return;
+  try {
+    await multiGameStore.submitGuess(guessName.value.trim());
+    guessName.value = "";
+  } catch {
+    return;
+  }
+}
+
+async function leaveRoom() {
+  await multiGameStore.leaveRoom().catch(() => undefined);
+  router.push("/multi");
+}
+
+onMounted(async () => {
+  if (!authStore.isAuthenticated) {
+    router.push("/auth");
+    return;
+  }
+  await multiGameStore.resumeRoom().catch(() => undefined);
+  if (multiGameStore.roomState) {
+    await dictionaryStore.ensureLoaded(multiGameStore.roomState.quizType);
+  }
+});
+
+watch(
+  () => multiGameStore.roomState?.quizType,
+  async (quizType) => {
+    if (!quizType) return;
+    await dictionaryStore.ensureLoaded(quizType);
+  },
+);
+</script>
+
+<template>
+  <div class="mr-screen">
+    <template v-if="multiGameStore.roomState">
+      <div class="mr-shell">
+        <!-- ── 毛玻璃 Header ── -->
+        <header class="mr-glass-header">
+          <div class="mr-glass-left">
+            <button class="mr-glass-back" @click="router.push('/multi')" aria-label="返回大厅">
+              <Icon icon="ph:arrow-left-duotone" aria-hidden="true" />
+            </button>
+            <div class="mr-glass-info">
+              <span class="mr-glass-kicker">多人 · 房间对局</span>
+              <span class="mr-glass-title">{{ battleTitle }}</span>
+            </div>
+          </div>
+
+          <div class="mr-glass-actions">
+            <span class="mr-glass-chip">{{ roomHintText }}</span>
+            <button class="mr-glass-btn mr-glass-btn--danger" @click="leaveRoom" title="退出房间">
+              <Icon icon="ph:sign-out-duotone" aria-hidden="true" />
+            </button>
+            <button class="mr-glass-btn mr-glass-theme" @click="toggleTheme" :title="currentTheme === 'phrolova-light' ? '暗色模式' : '亮色模式'">
+              <Icon :icon="currentTheme === 'phrolova-light' ? 'ph:moon-duotone' : 'ph:sun-duotone'" aria-hidden="true" />
+            </button>
+          </div>
+        </header>
+
+        <!-- ── 对局摘要 ── -->
+        <MatchSummary :room-state="multiGameStore.roomState" />
+
+        <!-- ── 分数 + 状态行 ── -->
+        <div class="mr-summary-row">
+          <div class="mr-score-panel">
+            <p class="mr-score-kicker">SCORE</p>
+            <div class="mr-score-ribbon">
+              <div class="mr-score-side">
+                <span class="mr-score-label">我方</span>
+                <strong class="mr-score-value" :class="{ 'mr-score-value--lead': myWins >= winsNeeded }">{{ myWins }}</strong>
+              </div>
+
+              <div class="mr-score-center">
+                <span class="mr-score-vs">VS</span>
+                <span class="mr-score-target">先 {{ winsNeeded }} 胜</span>
+              </div>
+
+              <div class="mr-score-side">
+                <span class="mr-score-label">对手</span>
+                <strong class="mr-score-value" :class="{ 'mr-score-value--lead': opponentWins >= winsNeeded }">{{ opponentWins }}</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="status-stack">
+            <StatusBanner v-if="multiGameStore.error" :message="multiGameStore.error" tone="error" />
+            <StatusBanner v-else-if="multiGameStore.infoMessage" :message="multiGameStore.infoMessage" />
+            <StatusBanner v-if="answerText" :message="`本局答案：${answerText}`" tone="success" />
+          </div>
+        </div>
+
+        <!-- ── 中部：游戏面板 ── -->
+        <section class="mr-stage" :class="{ 'mr-stage--empty': !hasBattleHistory }">
+          <div class="mr-stage-head">
+            <div class="mr-stage-copy">
+              <p class="mr-stage-kicker">ARENA</p>
+              <h2 class="mr-stage-title">{{ hasBattleHistory ? "双方猜测进度" : stagePromptTitle }}</h2>
+              <p class="mr-stage-sub">{{ hasBattleHistory ? stagePromptSubtitle : roomHintText }}</p>
+            </div>
+
+            <FeedbackLegend v-if="hasBattleHistory" />
+          </div>
+
+          <div v-if="!hasBattleHistory" class="mr-empty-state">
+            <div class="mr-empty-glyph">
+              <Icon icon="ph:target-duotone" aria-hidden="true" />
+            </div>
+            <h2 class="mr-empty-title">{{ stagePromptTitle }}</h2>
+            <p class="mr-empty-sub">{{ stagePromptSubtitle }}</p>
+          </div>
+
+          <div v-if="hasBattleHistory" class="mr-boards">
+            <div class="mr-board-panel">
+              <div class="mr-board-head">
+                <h3 class="mr-board-title">
+                  <Icon icon="ph:user-duotone" class="mr-board-head-icon" aria-hidden="true" />
+                  我的猜测
+                </h3>
+                <span class="mr-board-meta">{{ multiGameStore.me?.attemptsUsed ?? 0 }} / {{ multiGameStore.me?.attemptsLimit ?? 0 }}</span>
+              </div>
+
+              <GuessTable
+                :quiz-type="multiGameStore.roomState.quizType"
+                :rows="multiGameStore.me?.guesses ?? []"
+                empty-label="等待我方提交第一条猜测"
+                :target-version="multiGameStore.roomState.targetVersion"
+                :target-cost="multiGameStore.roomState.targetCost"
+              />
+            </div>
+
+            <div class="mr-board-panel">
+              <div class="mr-board-head">
+                <h3 class="mr-board-title">
+                  <Icon icon="ph:user-circle-duotone" class="mr-board-head-icon" aria-hidden="true" />
+                  对手猜测
+                </h3>
+                <span class="mr-board-meta">{{ multiGameStore.roomState.opponentId || "等待加入" }}</span>
+              </div>
+
+              <GuessTable
+                :quiz-type="multiGameStore.roomState.quizType"
+                :rows="multiGameStore.opponent?.guesses ?? []"
+                empty-label="等待对手提交第一条猜测"
+                :target-version="multiGameStore.roomState.targetVersion"
+                :target-cost="multiGameStore.roomState.targetCost"
+              />
+            </div>
+          </div>
+        </section>
+
+        <!-- ── 底部：猜测输入区 ── -->
+        <footer class="mr-dock">
+          <div class="mr-dock-copy">
+            <span class="mr-dock-label">
+              <Icon icon="ph:keyboard-duotone" class="mr-dock-label-icon" aria-hidden="true" />
+              提交猜测
+            </span>
+            <span class="mr-dock-meta">{{ dockHintText }}</span>
+          </div>
+
+          <div class="mr-input-row">
+            <NameAutocompleteInput
+              v-model="guessName"
+              :disabled="!multiGameStore.canGuess"
+              :names="names"
+              :placeholder="multiGameStore.roomState.quizType === 'skeleton' ? '输入声骸名称' : '输入角色昵称'"
+              @submit="submitGuess"
+            />
+            <button class="mr-btn mr-btn-submit" :disabled="!multiGameStore.canGuess" @click="submitGuess">
+              <Icon icon="ph:paper-plane-right-duotone" class="mr-btn-icon" aria-hidden="true" /> 提交
+            </button>
+          </div>
+        </footer>
+      </div>
+    </template>
+
+    <div v-else class="mr-empty-shell">
+      <div class="mr-empty-glyph">
+        <Icon icon="ph:warning-circle-duotone" aria-hidden="true" />
+      </div>
+      <p class="mr-empty-kicker">NOTICE</p>
+      <h2 class="mr-empty-title">当前没有活跃房间</h2>
+      <p class="mr-empty-sub">刷新后会自动尝试恢复房间，也可以返回大厅重新创建或加入一场对局。</p>
+      <RouterLink class="mr-btn mr-link-btn" to="/multi">返回大厅</RouterLink>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.mr-screen {
+  width: 100vw;
+  height: 100dvh;
+  margin-left: calc(50% - 50vw);
+  max-width: 100vw;
+  overflow: hidden;
+}
+
+.mr-shell {
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  gap: 0.6rem;
+  padding: 0.5rem 1rem 0.6rem;
+  overflow: hidden;
+}
+
+/* ── 毛玻璃 Header ── */
+.mr-glass-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--surface-panel-strong) 72%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 4px 24px color-mix(in oklab, var(--shadow-plate) 40%, transparent);
+}
+
+.mr-glass-left {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.mr-glass-back {
+  display: grid;
+  place-items: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--surface-panel) 60%, transparent);
+  color: var(--text-sub);
+  font-size: 1.1rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.mr-glass-back:hover {
+  color: var(--gold);
+  border-color: var(--gold);
+}
+
+.mr-glass-info {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.mr-glass-kicker {
+  color: var(--text-faint);
+  font-size: 0.65rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mr-glass-title {
+  color: var(--text-main);
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mr-glass-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.mr-glass-chip {
+  padding: 0.28rem 0.6rem;
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  background: color-mix(in oklab, var(--gold) 4%, var(--surface-card));
+  color: var(--text-sub);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 18rem;
+}
+
+.mr-glass-btn {
+  display: grid;
+  place-items: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--surface-panel) 60%, transparent);
+  color: var(--text-sub);
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.mr-glass-btn:hover {
+  color: var(--gold);
+  border-color: var(--gold);
+}
+
+.mr-glass-btn--danger:hover {
+  color: var(--color-error);
+  border-color: var(--color-error);
+}
+
+.mr-glass-theme {
+  color: var(--gold-soft);
+}
+
+.mr-glass-theme:hover {
+  color: var(--gold);
+}
+
+.mr-btn-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+/* ── 分数面板 ── */
+.mr-summary-row {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+  gap: 0.6rem;
+  align-items: start;
+}
+
+.mr-score-panel {
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 50% 0, color-mix(in oklab, var(--gold) 6%, transparent), transparent 18%),
+    linear-gradient(180deg, var(--surface-panel-strong), var(--surface-panel));
+  box-shadow: 6px 6px 0 var(--shadow-plate);
+}
+
+.mr-score-kicker {
+  margin: 0 0 0.35rem;
+  color: var(--text-faint);
+  font-size: 0.66rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.mr-score-ribbon {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.mr-score-side {
+  display: grid;
+  justify-items: center;
+  gap: 0.3rem;
+}
+
+.mr-score-label {
+  color: var(--text-faint);
+  font-size: 0.66rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.mr-score-center {
+  display: grid;
+  justify-items: center;
+  gap: 0.15rem;
+}
+
+.mr-score-vs {
+  color: var(--text-faint);
+  font-size: 0.88rem;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+}
+
+.mr-score-target {
+  color: var(--text-faint);
+  font-size: 0.6rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.mr-score-value {
+  font-size: 1.5rem;
+  font-weight: 900;
+  transition: color 0.4s ease;
+}
+
+.mr-score-value--lead {
+  color: var(--gold);
+}
+
+/* ── 中部面板 ── */
+.mr-stage {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 0.6rem;
+  padding: 0.9rem 0.9rem 0.8rem;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 50% 18%, color-mix(in oklab, var(--gold) 8%, transparent), transparent 22%),
+    linear-gradient(180deg, var(--surface-panel-strong), var(--surface-panel));
+  overflow: hidden;
+}
+
+.mr-stage--empty {
+  grid-template-rows: auto 1fr;
+}
+
+.mr-stage-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.mr-stage-copy {
+  display: grid;
+  gap: 0.22rem;
+}
+
+.mr-stage-kicker {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: 0.68rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.mr-stage-title,
+.mr-empty-title {
+  margin: 0;
+  font-size: clamp(1.18rem, 1rem + 0.6vw, 1.7rem);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.mr-stage-sub,
+.mr-dock-meta {
+  margin: 0;
+  color: var(--text-sub);
+  font-size: 0.84rem;
+  line-height: 1.6;
+}
+
+.mr-empty-state {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 0.6rem;
+  text-align: center;
+}
+
+.mr-empty-glyph {
+  display: grid;
+  place-items: center;
+  width: 3.2rem;
+  height: 3.2rem;
+  border: 1px solid color-mix(in oklab, var(--line-strong) 90%, transparent);
+  border-radius: 999px;
+  color: var(--text-faint);
+  font-size: 1.2rem;
+}
+
+.mr-empty-sub {
+  margin: 0;
+  color: var(--text-sub);
+  font-size: 0.84rem;
+  line-height: 1.6;
+}
+
+.mr-boards {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+  overflow: hidden;
+}
+
+.mr-board-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: var(--surface-panel);
+  overflow: hidden;
+}
+
+.mr-board-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.85rem;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.mr-board-title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.mr-board-head-icon {
+  font-size: 1rem;
+  color: var(--gold-soft);
+}
+
+.mr-board-meta {
+  color: var(--text-faint);
+  font-size: 0.74rem;
+}
+
+.mr-board-panel :deep(.guess-table-shell) {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* ── 底部猜测区 ── */
+.mr-dock {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 0.9rem 0.85rem;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  background: linear-gradient(180deg, var(--surface-panel-strong), var(--surface-panel));
+  box-shadow: 6px 6px 0 var(--shadow-plate);
+}
+
+.mr-dock-copy {
+  display: grid;
+  gap: 0.18rem;
+  min-width: min(100%, 14rem);
+}
+
+.mr-dock-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--text-faint);
+  font-size: 0.68rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.mr-dock-label-icon {
+  font-size: 0.95rem;
+  color: var(--gold-soft);
+}
+
+.mr-input-row {
+  flex: 1;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.mr-input-row > :first-child {
+  flex: 1;
+}
+
+/* ── 空状态页 ── */
+.mr-empty-shell {
+  max-width: 480px;
+  margin: 4rem auto 0;
+  display: grid;
+  justify-items: center;
+  gap: 0.7rem;
+  text-align: center;
+}
+
+.mr-empty-shell .mr-empty-glyph {
+  font-size: 2.2rem;
+}
+
+.mr-empty-kicker {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: 0.7rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+
+/* ── 按钮 ── */
+.mr-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid color-mix(in oklab, var(--gold) 40%, transparent);
+  border-radius: 6px;
+  background: color-mix(in oklab, var(--gold) 16%, var(--surface-panel-strong));
+  color: var(--gold);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.mr-btn:hover {
+  background: color-mix(in oklab, var(--gold) 24%, var(--surface-panel-strong));
+}
+
+.mr-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mr-btn-submit {
+  padding-inline: 1.1rem;
+}
+
+.mr-link-btn {
+  display: inline-flex;
+  text-decoration: none;
+}
+
+/* ── 响应式 ── */
+@media (max-width: 1040px) {
+  .mr-summary-row {
+    grid-template-columns: 1fr;
+  }
+
+  .mr-boards {
+    grid-template-rows: repeat(2, minmax(200px, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .mr-shell {
+    padding: 0.4rem 0.5rem 0.5rem;
+    gap: 0.45rem;
+  }
+
+  .mr-glass-header {
+    padding: 0.5rem 0.7rem;
+  }
+
+  .mr-glass-chip {
+    display: none;
+  }
+
+  .mr-stage {
+    padding: 0.7rem 0.65rem 0.6rem;
+  }
+
+  .mr-dock {
+    padding: 0.6rem 0.7rem 0.7rem;
+  }
+
+  .mr-input-row {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 480px) {
+  .mr-glass-title {
+    font-size: 0.78rem;
+  }
+
+  .mr-glass-back,
+  .mr-glass-btn {
+    width: 2rem;
+    height: 2rem;
+    font-size: 1rem;
+  }
+}
+</style>
