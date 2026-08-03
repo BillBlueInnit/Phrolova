@@ -679,5 +679,7 @@ class MultiplayerManager:
                     ):
                         self._start_round(room)
                         self._emit_room_state(room)
+                    if room["status"] in ("countdown", "playing") and room["round_status"] == "active":
+                        self._emit_room_state(room)
                 self._cleanup_stale_rooms()
             self.socketio.sleep(1)
