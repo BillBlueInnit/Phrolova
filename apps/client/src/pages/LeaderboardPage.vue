@@ -100,6 +100,7 @@ onMounted(loadLeaderboard);
               </div>
               <span class="lb-podium-name">{{ row.player_id }}</span>
               <span class="lb-podium-score">{{ row.sort_score ?? row.score }}</span>
+              <span class="lb-podium-rate">{{ row.win_rate ?? 100 }}%</span>
             </div>
           </div>
 
@@ -112,6 +113,7 @@ onMounted(loadLeaderboard);
               <span class="lb-row-rank">{{ index + 4 }}</span>
               <span class="lb-row-name">{{ row.player_id }}</span>
               <span class="lb-row-score">{{ row.sort_score ?? row.score }}</span>
+              <span class="lb-row-rate">{{ row.win_rate ?? 100 }}%</span>
             </div>
           </div>
         </template>
@@ -244,6 +246,7 @@ onMounted(loadLeaderboard);
   font-weight: 900; color: var(--gold); font-size: 0.95rem;
 }
 .lb-podium-item--1 .lb-podium-score { font-size: 1.15rem; }
+.lb-podium-rate { font-size: 0.75rem; color: var(--text-sub); font-weight: 600; }
 
 /* ── Rows (4-40) ── */
 .lb-rows { }
@@ -262,6 +265,7 @@ onMounted(loadLeaderboard);
 }
 .lb-row-name { flex: 1; font-weight: 600; font-size: 0.95rem; letter-spacing: 0.04em; }
 .lb-row-score { font-weight: 900; color: var(--gold); font-size: 0.95rem; min-width: 4rem; text-align: right; }
+.lb-row-rate { color: var(--text-sub); font-weight: 600; font-size: 0.85rem; min-width: 3.5rem; text-align: right; }
 
 /* ── mobile ── */
 @media (max-width: 640px) {
