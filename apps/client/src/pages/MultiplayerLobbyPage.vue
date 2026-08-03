@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRouter } from "vue-router";
+import gsap from "gsap";
 
 import StatusBanner from "@/components/shared/StatusBanner.vue";
 import { useAuthStore } from "@/stores/auth";
@@ -19,6 +20,8 @@ const config = reactive({
   bestOf: 3,
   roomCode: "",
 });
+
+let ctx: gsap.Context | null = null;
 
 const currentTheme = ref<"phrolova-light" | "phrolova-night">(
   (localStorage.getItem(THEME_KEY) as "phrolova-light" | "phrolova-night") || "phrolova-light",
@@ -68,9 +71,20 @@ watch(() => multiGameStore.roomState?.roomCode, (roomCode) => {
 });
 
 onMounted(async () => {
+  nextTick(() => {
+    ctx = gsap.context(() => {
+      gsap.from(".ml-glass-header", { opacity: 0, y: -20, duration: 0.45, ease: "power2.out" });
+      gsap.from(".ml-card", { opacity: 0, y: 30, duration: 0.55, ease: "power3.out", stagger: 0.1, delay: 0.1 });
+      gsap.from(".ml-foot", { opacity: 0, y: 16, duration: 0.4, ease: "power2.out", delay: 0.35 });
+    });
+  });
   if (authStore.isAuthenticated) {
     await multiGameStore.resumeRoom().catch(() => undefined);
   }
+});
+
+onBeforeUnmount(() => {
+  ctx?.revert();
 });
 </script>
 
@@ -97,7 +111,7 @@ onMounted(async () => {
       </header>
 
       <!-- ── 配置行 ── -->
-      <div class="ml-config">
+      <div v-if="!multiGameStore.inQueue" class="ml-config">
         <div class="ml-tabs">
           <button class="ml-tab" :class="{ 'ml-tab--active': config.quizType === 'resonator' }" @click="config.quizType = 'resonator'">
             <Icon icon="ph:user-duotone" class="ml-tab-icon" aria-hidden="true" /> 共鸣者
@@ -123,11 +137,32 @@ onMounted(async () => {
       <div class="status-stack">
         <StatusBanner v-if="!authStore.isAuthenticated" message="多人模式需要先登录账号" tone="error" />
         <StatusBanner v-else-if="multiGameStore.error" :message="multiGameStore.error" tone="error" />
-        <StatusBanner v-else-if="multiGameStore.infoMessage" :message="multiGameStore.infoMessage" />
+      </div>
+
+      <!-- ── 匹配大厅 ── -->
+      <div v-if="authStore.isAuthenticated && multiGameStore.inQueue" class="ml-match" key="match">
+        <div class="ml-match-orb" aria-hidden="true"></div>
+
+        <div class="ml-match-spinner">
+          <div v-for="i in 3" :key="i" class="ml-match-ring" :style="{ animationDelay: `${(i - 1) * 0.25}s` }"></div>
+          <div class="ml-match-core">
+            <Icon icon="ph:shuffle-duotone" aria-hidden="true" />
+          </div>
+        </div>
+
+        <div class="ml-match-info">
+          <h2 class="ml-match-title">正在匹配</h2>
+          <p class="ml-match-desc">Searching for opponent...</p>
+          <span class="ml-match-chip">{{ queueSummary }}</span>
+        </div>
+
+        <button class="ml-btn" style="margin-top:0.5rem" @click="multiGameStore.cancelQueue()">
+          <Icon icon="ph:x-circle-duotone" class="ml-btn-icon" aria-hidden="true" /> 取消匹配
+        </button>
       </div>
 
       <!-- ── 中部：操作面板 ── -->
-      <div v-if="authStore.isAuthenticated" class="ml-grid">
+      <div v-else-if="authStore.isAuthenticated" class="ml-grid">
         <article class="ml-card">
           <div class="ml-card-icon"><Icon icon="ph:plus-circle-duotone" aria-hidden="true" /></div>
           <div class="ml-card-copy">
@@ -190,7 +225,7 @@ onMounted(async () => {
       </div>
 
       <!-- ── 底部状态栏 ── -->
-      <footer class="ml-foot">
+      <footer v-if="!multiGameStore.inQueue" class="ml-foot">
         <span class="ml-foot-status">
           <span class="ml-foot-dot" :class="{ 'ml-foot-dot--on': authStore.isAuthenticated }"></span>
           {{ authStore.isAuthenticated ? `已登录 · ${authStore.playerId}` : "未登录" }}
@@ -298,6 +333,67 @@ onMounted(async () => {
 .ml-card-kicker { margin: 0; color: var(--text-faint); font-size: 0.68rem; letter-spacing: 0.22em; text-transform: uppercase; }
 .ml-card-title { margin: 0.12rem 0 0; font-size: 1.15rem; font-weight: 900; letter-spacing: 0.05em; }
 .ml-card-desc { margin: 0.25rem 0 0; color: var(--text-sub); font-size: 0.82rem; line-height: 1.55; }
+
+/* ── 匹配大厅 ── */
+.ml-match {
+  display: grid; justify-items: center; align-content: center; gap: 1.2rem;
+  min-height: 0; position: relative; overflow: hidden;
+}
+
+.ml-match-orb {
+  position: absolute; top: 50%; left: 50%; translate: -50% -50%;
+  width: min(40vw, 300px); height: min(40vw, 300px); border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in oklab, var(--gold) 14%, transparent) 0%, transparent 70%);
+  pointer-events: none; z-index: 0;
+  animation: mlMatchPulse 2s ease-in-out infinite;
+}
+
+@keyframes mlMatchPulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.6; }
+  50% { transform: translate(-50%, -50%) scale(1.25); opacity: 1; }
+}
+
+.ml-match-spinner {
+  position: relative; z-index: 1;
+  width: 120px; height: 120px;
+  display: grid; place-items: center;
+}
+
+.ml-match-ring {
+  position: absolute; inset: 0; border-radius: 50%;
+  border: 1.5px solid color-mix(in oklab, var(--gold) 20%, transparent);
+  animation: mlRingExpand 1.2s ease-out infinite;
+}
+
+@keyframes mlRingExpand {
+  0% { transform: scale(0.5); opacity: 0.8; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+
+.ml-match-core {
+  position: relative; z-index: 1;
+  display: grid; place-items: center;
+  width: 2.4rem; height: 2.4rem; border-radius: 50%;
+  background: color-mix(in oklab, var(--gold) 16%, var(--surface-panel-strong));
+  color: var(--gold); font-size: 1.3rem;
+  box-shadow: 0 0 20px color-mix(in oklab, var(--gold) 20%, transparent);
+}
+
+.ml-match-info {
+  position: relative; z-index: 1;
+  display: grid; justify-items: center; gap: 0.3rem; text-align: center;
+}
+
+.ml-match-title { margin: 0; font-size: 1.4rem; font-weight: 900; letter-spacing: 0.06em; }
+.ml-match-desc { margin: 0; color: var(--text-sub); font-size: 0.9rem; }
+
+.ml-match-chip {
+  display: inline-block; margin-top: 0.3rem;
+  padding: 0.3rem 0.8rem;
+  border: 1px solid var(--line-soft); border-radius: 6px;
+  background: color-mix(in oklab, var(--gold) 4%, var(--surface-card));
+  color: var(--text-sub); font-size: 0.8rem; font-weight: 600;
+}
 
 /* ── 空状态 ── */
 .ml-empty {

@@ -4,16 +4,15 @@ RUN corepack enable
 
 WORKDIR /app
 
-COPY package.json pnpm-workspace.yaml ./
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY apps/client/package.json apps/client/package.json
 
-RUN pnpm install --filter client... --no-frozen-lockfile
+RUN pnpm install --frozen-lockfile
 
 COPY apps/client ./apps/client
 
-RUN pnpm --filter client build
-
 WORKDIR /app/apps/client
+RUN pnpm exec vite build
 
 EXPOSE 4173
 

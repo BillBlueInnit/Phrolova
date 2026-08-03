@@ -1,11 +1,10 @@
 import type {
   CellStatus,
   CompareAttrItem,
+  CompareStatus,
   CompareLocationItem,
   CompareSetItem,
-  CompareStatus,
   GuessHistoryRow,
-  MultiplayerRoomState,
   QuizType,
   ResonatorCompare,
   ResonatorRow,
@@ -13,7 +12,7 @@ import type {
   SkeletonRow,
 } from "@/types/game";
 
-export const resonatorColumns = [
+const resonatorColumns = [
   { key: "name", label: "姓名" },
   { key: "attribute", label: "属性" },
   { key: "star_rating", label: "星级" },
@@ -22,7 +21,7 @@ export const resonatorColumns = [
   { key: "version", label: "实装版本" },
 ] as const;
 
-export const skeletonColumns = [
+const skeletonColumns = [
   { key: "name", label: "名称" },
   { key: "skill_attribute", label: "技能属性" },
   { key: "cost", label: "COST" },
@@ -71,24 +70,10 @@ export function formatGuessValue(
   return String(value);
 }
 
-export function isSkeletonCompare(compare: ResonatorCompare | SkeletonCompare): compare is SkeletonCompare {
-  return "skill_attribute" in compare;
-}
-
 export function renderGroupItem(item: CompareAttrItem | CompareSetItem | CompareLocationItem | Record<string, unknown>) {
   if ("attr" in item) return item.attr;
   if ("set" in item) return item.set;
   return String(item.loc ?? "");
-}
-
-export function getMultiplayerPlayers(state: MultiplayerRoomState | null) {
-  if (!state) {
-    return { me: null, opponent: null };
-  }
-  return {
-    me: state.players.find((player) => player.isMe) ?? null,
-    opponent: state.players.find((player) => !player.isMe) ?? null,
-  };
 }
 
 export function toHistoryRow(

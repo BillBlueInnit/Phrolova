@@ -1,8 +1,3 @@
-export const FLOROVA_ART = {
-  cover: "/media/florova-cover.jpg",
-  portrait: "/media/florova-portrait.png",
-} as const;
-
 export type BadgeCategory =
   | "attribute"
   | "birthplace"
@@ -72,13 +67,6 @@ function fallbackMeta(label: string): BadgeMeta {
     accent: "#8f8d84",
     mark: label.trim().slice(0, 1) || "·",
   };
-}
-
-export function splitGameTags(value: string) {
-  return value
-    .split(/[，,]/)
-    .map((entry) => entry.trim())
-    .filter(Boolean);
 }
 
 export function getBadgeMeta(label: string, category: BadgeCategory = "plain"): BadgeMeta {

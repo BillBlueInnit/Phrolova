@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, shallowRef, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { useRouter } from "vue-router";
+import gsap from "gsap";
 
 import FeedbackLegend from "@/components/game/FeedbackLegend.vue";
 import GuessTable from "@/components/game/GuessTable.vue";
@@ -12,6 +13,8 @@ import { useDictionaryStore } from "@/stores/dictionary";
 import { useMultiGameStore } from "@/stores/multiGame";
 
 const THEME_KEY = "phrolova_theme";
+
+let ctx: gsap.Context | null = null;
 
 const authStore = useAuthStore();
 const dictionaryStore = useDictionaryStore();
@@ -89,6 +92,14 @@ async function leaveRoom() {
 }
 
 onMounted(async () => {
+  nextTick(() => {
+    ctx = gsap.context(() => {
+      gsap.from(".mr-glass-header", { opacity: 0, y: -20, duration: 0.45, ease: "power2.out" });
+      gsap.from(".mr-summary-row", { opacity: 0, y: 16, duration: 0.4, ease: "power2.out", delay: 0.08 });
+      gsap.from(".mr-stage", { opacity: 0, y: 20, duration: 0.5, ease: "power2.out", delay: 0.14 });
+      gsap.from(".mr-dock", { opacity: 0, y: 12, duration: 0.4, ease: "power2.out", delay: 0.2 });
+    });
+  });
   if (!authStore.isAuthenticated) {
     router.push("/auth");
     return;
@@ -97,6 +108,10 @@ onMounted(async () => {
   if (multiGameStore.roomState) {
     await dictionaryStore.ensureLoaded(multiGameStore.roomState.quizType);
   }
+});
+
+onBeforeUnmount(() => {
+  ctx?.revert();
 });
 
 watch(
