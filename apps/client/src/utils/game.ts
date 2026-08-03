@@ -1,0 +1,103 @@
+import type {
+  CellStatus,
+  CompareAttrItem,
+  CompareLocationItem,
+  CompareSetItem,
+  CompareStatus,
+  GuessHistoryRow,
+  MultiplayerRoomState,
+  QuizType,
+  ResonatorCompare,
+  ResonatorRow,
+  SkeletonCompare,
+  SkeletonRow,
+} from "@/types/game";
+
+export const resonatorColumns = [
+  { key: "name", label: "姓名" },
+  { key: "attribute", label: "属性" },
+  { key: "star_rating", label: "星级" },
+  { key: "weapon", label: "武器" },
+  { key: "birthplace", label: "出生地" },
+  { key: "version", label: "实装版本" },
+] as const;
+
+export const skeletonColumns = [
+  { key: "name", label: "名称" },
+  { key: "skill_attribute", label: "技能属性" },
+  { key: "cost", label: "COST" },
+  { key: "is_aberration", label: "异相" },
+  { key: "set_name", label: "所属套装" },
+  { key: "drop_location", label: "掉落位置" },
+] as const;
+
+export function getColumns(quizType: QuizType) {
+  return quizType === "skeleton" ? skeletonColumns : resonatorColumns;
+}
+
+export function getStatusClass(status: CompareStatus | CellStatus) {
+  if (status === "match") return "feedback-cell feedback-cell-match";
+  if (status === "near") return "feedback-cell feedback-cell-near";
+  if (status === "partial") return "feedback-cell feedback-cell-partial";
+  return "feedback-cell feedback-cell-different";
+}
+
+export function formatGuessValue(
+  row: ResonatorRow | SkeletonRow | Record<string, string>,
+  key: string,
+  options?: { targetVersion?: number | null; targetCost?: number | null },
+) {
+  const value = row[key];
+  if (value === undefined || value === null) return "—";
+  if (key === "star_rating") {
+    return "★".repeat(Number(value));
+  }
+  if (key === "version") {
+    const numeric = Number(value).toFixed(1);
+    if (options?.targetVersion === null || options?.targetVersion === undefined) {
+      return numeric;
+    }
+    if (Number(value) < options.targetVersion) return `${numeric} ↑`;
+    if (Number(value) > options.targetVersion) return `${numeric} ↓`;
+    return numeric;
+  }
+  if (key === "cost") {
+    if (options?.targetCost === null || options?.targetCost === undefined) {
+      return String(value);
+    }
+    if (Number(value) < options.targetCost) return `${value} ↑`;
+    if (Number(value) > options.targetCost) return `${value} ↓`;
+  }
+  return String(value);
+}
+
+export function isSkeletonCompare(compare: ResonatorCompare | SkeletonCompare): compare is SkeletonCompare {
+  return "skill_attribute" in compare;
+}
+
+export function renderGroupItem(item: CompareAttrItem | CompareSetItem | CompareLocationItem | Record<string, unknown>) {
+  if ("attr" in item) return item.attr;
+  if ("set" in item) return item.set;
+  return String(item.loc ?? "");
+}
+
+export function getMultiplayerPlayers(state: MultiplayerRoomState | null) {
+  if (!state) {
+    return { me: null, opponent: null };
+  }
+  return {
+    me: state.players.find((player) => player.isMe) ?? null,
+    opponent: state.players.find((player) => !player.isMe) ?? null,
+  };
+}
+
+export function toHistoryRow(
+  guess: ResonatorRow | SkeletonRow,
+  compare: ResonatorCompare | SkeletonCompare,
+): GuessHistoryRow {
+  return {
+    revealed: true,
+    guess,
+    compare,
+  };
+}
