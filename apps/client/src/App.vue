@@ -63,6 +63,18 @@ onMounted(async () => {
     <main class="app-main" :class="{ 'app-main-home': isHomeRoute, 'app-main-game': isGameRoute }">
       <RouterView />
     </main>
+
+    <Teleport to="body">
+      <div v-if="multiGameStore.kicked" class="kicked-overlay">
+        <div class="kicked-modal">
+          <Icon icon="ph:warning-duotone" class="kicked-icon" />
+          <h2 class="kicked-title">账号在别处登录</h2>
+          <p class="kicked-desc">你的账号已在其他设备登录，当前会话已被强制退出。</p>
+          <button class="kicked-btn" @click="multiGameStore.kicked = false">确定</button>
+        </div>
+      </div>
+    </Teleport>
+
     <button class="theme-toggle" type="button" @click="toggleTheme"
       :aria-label="theme === 'phrolova-light' ? '切换到暗色模式' : '切换到亮色模式'">
       <Icon :icon="theme === 'phrolova-light' ? 'ph:moon-duotone' : 'ph:sun-duotone'" />
@@ -94,4 +106,34 @@ onMounted(async () => {
   border-color: var(--gold);
   transform: scale(1.1);
 }
+
+.kicked-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(8px);
+}
+.kicked-modal {
+  display: grid; justify-items: center; gap: 0.8rem;
+  width: 100%; max-width: 360px; padding: 2rem 1.8rem;
+  border: 1px solid color-mix(in oklab, var(--color-error) 40%, transparent);
+  border-radius: 12px;
+  background: var(--surface-panel-strong);
+  text-align: center;
+}
+.kicked-icon {
+  font-size: 2.8rem; color: var(--color-error);
+}
+.kicked-title {
+  margin: 0; font-size: 1.2rem; font-weight: 900; color: var(--text-main);
+}
+.kicked-desc {
+  margin: 0; color: var(--text-sub); font-size: 0.88rem; line-height: 1.6;
+}
+.kicked-btn {
+  margin-top: 0.5rem; padding: 0.6rem 2rem;
+  border: 1px solid var(--line-strong); border-radius: 8px;
+  background: var(--surface-panel);
+  color: var(--text-main); font-size: 0.9rem; font-weight: 600; cursor: pointer;
+}
+.kicked-btn:hover { border-color: var(--gold); color: var(--gold); }
 </style>

@@ -28,6 +28,7 @@ export const S2C = {
   ROUND_FINISHED: "multi:round_finished",
   MATCH_FINISHED: "multi:match_finished",
   OPPONENT_FORFEIT: "multi:opponent_forfeit",
+  KICKED: "multi:kicked",
 } as const;
 
 // ── Client → Server payload types ──

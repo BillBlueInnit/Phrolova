@@ -15,6 +15,7 @@ export const useMultiGameStore = defineStore("multiGame", () => {
   const infoMessage = shallowRef("");
   const inQueue = shallowRef(false);
   const roomState = ref<MultiplayerRoomState | null>(null);
+  const kicked = shallowRef(false);
 
   const me = computed(() => roomState.value?.players.find((player) => player.isMe) ?? null);
   const opponent = computed(() => roomState.value?.players.find((player) => !player.isMe) ?? null);
@@ -88,9 +89,11 @@ export const useMultiGameStore = defineStore("multiGame", () => {
       infoMessage.value = payload.message || "对手已退出";
       await authStore.refreshPlayer().catch(() => undefined);
     });
-    currentSocket.on("multi:kicked", (payload) => {
-      error.value = payload.message || "账号在别处登录";
+    currentSocket.on(S2C.KICKED, () => {
+      const authStore = useAuthStore();
       disconnect();
+      authStore.logout();
+      kicked.value = true;
     });
   }
 
@@ -178,6 +181,7 @@ export const useMultiGameStore = defineStore("multiGame", () => {
     connectionState.value = "idle";
     inQueue.value = false;
     roomState.value = null;
+    kicked.value = false;
   }
 
   return {
@@ -189,6 +193,7 @@ export const useMultiGameStore = defineStore("multiGame", () => {
     me,
     opponent,
     canGuess,
+    kicked,
     ensureConnected,
     resumeRoom,
     createRoom,

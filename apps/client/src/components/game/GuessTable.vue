@@ -76,27 +76,14 @@ function formatCellValue(row: GuessHistoryRow, key: string) {
         <tr v-for="(row, index) in rows" :key="`${index}-${row.guess.name}`">
           <td class="guess-table-index">{{ index + 1 }}</td>
           <td class="guess-table-cell guess-table-avatar-cell">
-            <img
-              v-if="row.revealed"
+            <img v-if="row.revealed"
               :src="quizType === 'resonator' ? getCharacterAvatar(String(row.guess.name)) : getSkeletonAvatar(String(row.guess.name))"
-              class="gt-avatar"
-              alt=""
-            />
+              class="gt-avatar" alt="" />
           </td>
-          <td
-            v-for="column in columns"
-            :key="column.key"
-            class="guess-table-cell"
-            :class="getCellClass(row, column.key)"
-          >
+          <td v-for="column in columns" :key="column.key" class="guess-table-cell"
+            :class="getCellClass(row, column.key)">
             <template v-if="column.key === 'name'">
               <div class="gt-name-cell">
-                <img
-                  v-if="row.revealed && quizType === 'skeleton'"
-                  :src="getSkeletonAvatar(String(row.guess.name))"
-                  class="gt-name-avatar"
-                  alt=""
-                />
                 <span class="guess-table-name">{{ row.revealed ? row.guess.name : "***" }}</span>
               </div>
             </template>
@@ -104,25 +91,15 @@ function formatCellValue(row: GuessHistoryRow, key: string) {
             <template v-else-if="isGroupField(row, column.key)">
               <span v-if="!row.revealed" class="guess-table-masked">***</span>
               <div v-else class="compare-token-list">
-                <LoreBadge
-                  v-for="item in getGroupItems(row, column.key)"
-                  :key="renderGroupItem(item)"
+                <LoreBadge v-for="item in getGroupItems(row, column.key)" :key="renderGroupItem(item)"
                   :category="resolveBadgeCategory(column.key, renderGroupItem(item))"
-                  :class="getStatusClass(getItemStatus(item))"
-                  :label="renderGroupItem(item)"
-                  compact
-                />
+                  :class="getStatusClass(getItemStatus(item))" :label="renderGroupItem(item)" compact />
               </div>
             </template>
 
             <template v-else-if="column.key === 'weapon'">
               <div class="gt-weapon-cell">
-                <img
-                  v-if="row.revealed"
-                  :src="getWeaponIcon(String(row.guess.weapon))"
-                  class="gt-weapon-icon"
-                  alt=""
-                />
+                <img v-if="row.revealed" :src="getWeaponIcon(String(row.guess.weapon))" class="gt-weapon-icon" alt="" />
                 <span v-if="row.revealed" class="gt-weapon-text">{{ row.guess.weapon }}</span>
                 <span v-else class="guess-table-masked">***</span>
               </div>
@@ -130,15 +107,14 @@ function formatCellValue(row: GuessHistoryRow, key: string) {
 
             <template v-else-if="shouldRenderBadge(column.key)">
               <div class="gt-badge-row">
-                <LoreBadge :label="String(formatCellValue(row, column.key))" :category="resolveBadgeCategory(column.key, String(row.guess[column.key as keyof typeof row.guess]))" compact />
+                <LoreBadge :label="String(formatCellValue(row, column.key))"
+                  :category="resolveBadgeCategory(column.key, String(row.guess[column.key as keyof typeof row.guess]))"
+                  compact />
               </div>
             </template>
 
             <template v-else>
-              <span
-                class="guess-table-value"
-                :class="{ 'guess-table-stars': column.key === 'star_rating' }"
-              >
+              <span class="guess-table-value" :class="{ 'guess-table-stars': column.key === 'star_rating' }">
                 {{ formatCellValue(row, column.key) }}
               </span>
             </template>
@@ -153,35 +129,65 @@ function formatCellValue(row: GuessHistoryRow, key: string) {
 
 <style scoped>
 .gt-avatar {
-  width: 60px; height: 60px; border-radius: 10px; object-fit: cover;
+  width: 60px;
+  height: 60px;
+  border-radius: 10px;
+  object-fit: cover;
   flex-shrink: 0;
 }
+
 .guess-table-avatar-cell {
-  width: 76px; text-align: center;
+  width: 76px;
+  text-align: center;
 }
+
 .gt-badge-row {
-  display: flex; align-items: center; gap: 0.4rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
 }
+
 .gt-weapon-cell {
-  display: flex; align-items: center; gap: 0.45rem; justify-content: center;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  justify-content: center;
 }
+
 .gt-weapon-icon {
-  width: 32px; height: 32px; object-fit: contain; flex-shrink: 0;
-  filter: drop-shadow(0 0 3px rgba(0,0,0,0.5));
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.5));
 }
+
 .gt-weapon-text {
-  font-size: 0.85rem; font-weight: 600; color: var(--text-sub);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-sub);
 }
 
 .gt-name-cell {
-  display: flex; align-items: center; gap: 0.4rem; justify-content: center;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  justify-content: center;
 }
+
 .gt-name-avatar {
-  width: 32px; height: 32px; border-radius: 6px; object-fit: cover;
-  border: 1px solid var(--line-soft); flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  object-fit: cover;
+  border: 1px solid var(--line-soft);
+  flex-shrink: 0;
 }
+
 .guess-table-name {
-  font-weight: 700; font-size: 0.95rem; text-align: center;
+  font-weight: 700;
+  font-size: 0.95rem;
+  text-align: center;
 }
 
 .guess-table-masked {
@@ -207,10 +213,26 @@ function formatCellValue(row: GuessHistoryRow, key: string) {
 }
 
 @media (max-width: 720px) {
-  .gt-avatar { width: 46px; height: 46px; }
-  .gt-weapon-icon { width: 24px; height: 24px; }
-  .gt-weapon-text { font-size: 0.72rem; }
-  .guess-table-name { font-size: 0.82rem; }
-  .guess-table-avatar-cell { width: 62px; }
+  .gt-avatar {
+    width: 46px;
+    height: 46px;
+  }
+
+  .gt-weapon-icon {
+    width: 24px;
+    height: 24px;
+  }
+
+  .gt-weapon-text {
+    font-size: 0.72rem;
+  }
+
+  .guess-table-name {
+    font-size: 0.82rem;
+  }
+
+  .guess-table-avatar-cell {
+    width: 62px;
+  }
 }
 </style>
