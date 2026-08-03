@@ -7,12 +7,10 @@ import type {
   QuizType,
   ResonatorCompare,
   ResonatorRow,
-  SingleDrawResponse,
-  SingleGuessResponse,
   SkeletonCompare,
   SkeletonRow,
 } from "@/types/game";
-import { apiPath, requestJson } from "@/utils/http";
+import * as api from "@/api";
 import { toHistoryRow } from "@/utils/game";
 
 function isWinningCompare(compare: ResonatorCompare | SkeletonCompare) {
@@ -57,8 +55,7 @@ export const useSingleGameStore = defineStore("singleGame", () => {
     resultMessage.value = "";
     guessHistory.value = [];
     try {
-      const url = `${apiPath("/draw")}?type=${quizType.value}&difficulty=${difficulty.value}`;
-      const data = await requestJson<SingleDrawResponse>(url);
+      const data = await api.drawTarget(quizType.value, difficulty.value);
       target.value = (data.character ?? null) as ResonatorRow | SkeletonRow | null;
     } catch (reason) {
       error.value = reason instanceof Error ? reason.message : "开局失败";
@@ -78,14 +75,7 @@ export const useSingleGameStore = defineStore("singleGame", () => {
     loading.value = true;
     error.value = "";
     try {
-      const data = await requestJson<SingleGuessResponse>(apiPath("/guess"), {
-        method: "POST",
-        body: JSON.stringify({
-          target: target.value,
-          guess: guessName,
-          type: quizType.value,
-        }),
-      });
+      const data = await api.submitGuess(target.value, guessName, quizType.value);
       if (!data.guess || !data.compare) {
         throw new Error("返回结果不完整");
       }

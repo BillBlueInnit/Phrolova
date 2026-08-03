@@ -2,18 +2,11 @@ import { computed, reactive, shallowRef } from "vue";
 import { defineStore } from "pinia";
 
 import type { AuthResponse } from "@/types/game";
-import { apiPath, requestJson } from "@/utils/http";
+import * as api from "@/api";
 
 const PLAYER_ID_KEY = "phrolova_player_id";
 const TOKEN_KEY = "phrolova_player_token";
 const AUTH_KEY = "phrolova_logged_in";
-
-interface AuthPayload {
-  username: string;
-  password: string;
-  captchaId: string;
-  captchaText: string;
-}
 
 export const useAuthStore = defineStore("auth", () => {
   const playerId = shallowRef("");
@@ -56,13 +49,8 @@ export const useAuthStore = defineStore("auth", () => {
   }
 
   async function refreshPlayer() {
-    if (!loggedIn.value || !playerId.value) {
-      return;
-    }
-    const data = await requestJson<AuthResponse>(apiPath("/player/init"), {
-      method: "POST",
-      body: JSON.stringify({ player_id: playerId.value }),
-    });
+    if (!loggedIn.value || !playerId.value) return;
+    const data = await api.initPlayer(playerId.value);
     applyPlayer(data.player);
     if (data.token) {
       token.value = data.token;
@@ -87,19 +75,11 @@ export const useAuthStore = defineStore("auth", () => {
     }
   }
 
-  async function login(payload: AuthPayload) {
+  async function login(payload: api.LoginPayload) {
     loading.value = true;
     error.value = "";
     try {
-      const data = await requestJson<AuthResponse>(apiPath("/auth/login"), {
-        method: "POST",
-        body: JSON.stringify({
-          username: payload.username,
-          password: payload.password,
-          captcha_id: payload.captchaId,
-          captcha_text: payload.captchaText,
-        }),
-      });
+      const data = await api.login(payload);
       loggedIn.value = true;
       applyPlayer(data.player);
       token.value = data.token || "";
@@ -113,19 +93,11 @@ export const useAuthStore = defineStore("auth", () => {
     }
   }
 
-  async function register(payload: AuthPayload) {
+  async function register(payload: api.RegisterPayload) {
     loading.value = true;
     error.value = "";
     try {
-      const data = await requestJson<AuthResponse>(apiPath("/auth/register"), {
-        method: "POST",
-        body: JSON.stringify({
-          username: payload.username,
-          password: payload.password,
-          captcha_id: payload.captchaId,
-          captcha_text: payload.captchaText,
-        }),
-      });
+      const data = await api.register(payload);
       loggedIn.value = true;
       applyPlayer(data.player);
       token.value = data.token || "";
@@ -146,13 +118,10 @@ export const useAuthStore = defineStore("auth", () => {
     loading.value = true;
     error.value = "";
     try {
-      const data = await requestJson<AuthResponse>(apiPath("/player/update_id"), {
-        method: "POST",
-        body: JSON.stringify({
-          old_id: playerId.value,
-          new_id: newId,
-          token: token.value,
-        }),
+      const data = await api.updatePlayerId({
+        oldId: playerId.value,
+        newId,
+        token: token.value,
       });
       applyPlayer(data.player);
       token.value = data.token || token.value;

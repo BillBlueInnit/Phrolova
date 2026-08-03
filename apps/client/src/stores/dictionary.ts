@@ -2,7 +2,7 @@ import { reactive, ref, shallowRef } from "vue";
 import { defineStore } from "pinia";
 
 import type { QuizType, ResonatorNameEntry, SkeletonNameEntry } from "@/types/game";
-import { apiPath, requestJson } from "@/utils/http";
+import * as api from "@/api";
 
 export const useDictionaryStore = defineStore("dictionary", () => {
   const resonatorNames = ref<ResonatorNameEntry[]>([]);
@@ -18,7 +18,7 @@ export const useDictionaryStore = defineStore("dictionary", () => {
     if (loaded.resonator) return;
     loading.value = true;
     try {
-      const data = await requestJson<{ names: ResonatorNameEntry[] }>(apiPath("/names"));
+      const data = await api.fetchResonatorNames();
       resonatorNames.value = data.names;
       loaded.resonator = true;
     } catch (reason) {
@@ -33,7 +33,7 @@ export const useDictionaryStore = defineStore("dictionary", () => {
     if (loaded.skeleton) return;
     loading.value = true;
     try {
-      const data = await requestJson<{ names: SkeletonNameEntry[] }>(apiPath("/skeleton_names"));
+      const data = await api.fetchSkeletonNames();
       skeletonNames.value = data.names;
       loaded.skeleton = true;
     } catch (reason) {

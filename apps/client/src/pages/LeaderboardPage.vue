@@ -1,24 +1,19 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, shallowRef } from "vue";
+import { onMounted, ref, shallowRef } from "vue";
 import { useRouter } from "vue-router";
 
 import { useAuthStore } from "@/stores/auth";
-import type { LeaderboardResponse } from "@/types/game";
-import { apiPath, requestJson } from "@/utils/http";
+import * as api from "@/api";
 
 const authStore = useAuthStore();
 const router = useRouter();
 const loading = shallowRef(false);
 const leaderboard = ref<LeaderboardResponse["leaderboard"]>([]);
 
-const queryPath = computed(() =>
-  authStore.playerId ? `${apiPath("/leaderboard")}?player_id=${encodeURIComponent(authStore.playerId)}` : apiPath("/leaderboard"),
-);
-
 async function loadLeaderboard() {
   loading.value = true;
   try {
-    const data = await requestJson<LeaderboardResponse>(queryPath.value);
+    const data = await api.fetchLeaderboard(authStore.playerId || undefined);
     leaderboard.value = data.leaderboard;
   } catch {
     // silent
