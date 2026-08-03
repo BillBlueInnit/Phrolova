@@ -103,7 +103,7 @@ function handleKeydown(event: KeyboardEvent) {
 
 .autocomplete-panel {
   position: absolute;
-  inset: calc(100% + 0.45rem) 0 auto;
+  inset: auto 0 calc(100% + 0.45rem);
   z-index: 20;
   display: grid;
   gap: 0.35rem;

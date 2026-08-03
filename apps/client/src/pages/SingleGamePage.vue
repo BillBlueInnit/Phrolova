@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, shallowRef } from "vue";
+import { computed, onMounted, ref, shallowRef, watch } from "vue";
 import { useRouter } from "vue-router";
 import gsap from "gsap";
 
@@ -71,6 +71,29 @@ const attemptSummary = computed(
   () => `已猜 ${singleGameStore.attemptsUsed} / ${singleGameStore.attemptsLimit} · 剩余 ${singleGameStore.attemptsLeft} 次`,
 );
 
+const showWinModal = shallowRef(false);
+const showHints = shallowRef(false);
+
+function toggleHints() {
+  showHints.value = !showHints.value;
+}
+
+function fillHint(name: string) {
+  guessName.value = name;
+  showHints.value = false;
+}
+
+watch(
+  () => singleGameStore.resultMessage,
+  (msg) => {
+    if (msg === "回答正确，本局已完成。") showWinModal.value = true;
+  },
+);
+
+function closeWinModal() {
+  showWinModal.value = false;
+}
+
 async function restartGame() {
   try {
     await singleGameStore.startGame();
@@ -114,6 +137,9 @@ onMounted(async () => {
         </div>
 
         <div class="sg-glass-actions">
+          <button class="sg-glass-btn" :class="{ 'sg-glass-btn--active': showHints }" @click="toggleHints" title="提示">
+            <Icon icon="ph:lightbulb-duotone" aria-hidden="true" />
+          </button>
           <button class="sg-glass-btn" @click="singleGameStore.revealAnswer()" title="查看答案">
             <Icon icon="ph:eye-duotone" aria-hidden="true" />
           </button>
@@ -172,6 +198,26 @@ onMounted(async () => {
         </div>
       </section>
 
+      <!-- ── 提示面板 ── -->
+      <div v-if="showHints" class="sg-hints">
+        <div class="sg-hints-head">
+          <span class="sg-hints-label">
+            <Icon icon="ph:lightbulb-duotone" aria-hidden="true" />
+            {{ singleGameStore.quizType === "skeleton" ? "声骸列表" : "角色列表" }}
+          </span>
+          <span class="sg-hints-count">共 {{ currentNames.length }} 个</span>
+        </div>
+        <div class="sg-hints-grid">
+          <button
+            v-for="item in currentNames"
+            :key="item.name"
+            class="sg-hint-chip"
+            type="button"
+            @click="fillHint(item.name)"
+          >{{ item.name }}</button>
+        </div>
+      </div>
+
       <!-- ── 底部：猜测输入区 ── -->
       <footer class="sg-dock">
         <div class="sg-dock-copy">
@@ -195,6 +241,23 @@ onMounted(async () => {
         </div>
       </footer>
     </div>
+
+    <Teleport to="body">
+      <div v-if="showWinModal" class="win-overlay" @click.self="closeWinModal">
+        <div class="win-modal">
+          <div class="win-glow" />
+          <div class="win-icon"><Icon icon="ph:crown-duotone" aria-hidden="true" /></div>
+          <h2 class="win-title">回答正确</h2>
+          <p class="win-answer">{{ answerText }}</p>
+          <p class="win-attempts">仅用 {{ singleGameStore.attemptsUsed }} 次猜测</p>
+          <p v-if="singleGameStore.earnedScore" class="win-score">+{{ singleGameStore.earnedScore }} 分</p>
+          <div class="win-actions">
+            <button class="win-btn win-btn-primary" @click="closeWinModal(); restartGame();">再来一局</button>
+            <button class="win-btn" @click="router.push('/single')">返回模式选择</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -384,4 +447,117 @@ onMounted(async () => {
   .sg-input-row { gap: 0.4rem; }
   .sg-btn-submit { padding: 0.55rem 0.8rem; }
 }
+
+.sg-glass-btn--active { color: var(--gold); border-color: var(--gold); }
+
+/* ── Hints Panel ── */
+.sg-hints {
+  display: flex; flex-direction: column; gap: 0.5rem;
+  max-height: 180px; overflow: hidden;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--line-soft); border-radius: 8px;
+  background: linear-gradient(180deg, var(--surface-panel-strong), var(--surface-panel));
+}
+
+.sg-hints-head {
+  display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
+}
+
+.sg-hints-label {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  color: var(--text-sub); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em;
+}
+
+.sg-hints-count { color: var(--text-faint); font-size: 0.7rem; }
+
+.sg-hints-grid {
+  flex: 1; overflow-y: auto;
+  display: flex; flex-wrap: wrap; gap: 0.35rem; align-content: flex-start;
+}
+
+.sg-hint-chip {
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--line-soft); border-radius: 5px;
+  background: color-mix(in oklab, var(--gold) 4%, var(--surface-card));
+  color: var(--text-sub); font-size: 0.78rem; cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.sg-hint-chip:hover {
+  border-color: color-mix(in oklab, var(--gold) 35%, transparent);
+  background: color-mix(in oklab, var(--gold) 12%, var(--surface-card));
+  color: var(--text-main);
+}
+
+/* ── Win Modal ── */
+.win-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(6px);
+  animation: winFadeIn 0.25s ease;
+}
+
+.win-modal {
+  position: relative; overflow: hidden;
+  display: grid; justify-items: center; gap: 0.85rem;
+  width: 100%; max-width: 380px; padding: 2.2rem 1.8rem 1.8rem;
+  border: 1px solid color-mix(in oklab, var(--gold) 30%, transparent);
+  border-radius: 12px;
+  background: radial-gradient(circle at 50% 0%, color-mix(in oklab, var(--gold) 12%, var(--surface-panel-strong)) 0%, var(--surface-panel-strong) 60%);
+  text-align: center;
+  animation: winSlideUp 0.35s ease;
+}
+
+.win-glow {
+  position: absolute; top: -60px; left: 50%; transform: translateX(-50%);
+  width: 200px; height: 120px;
+  background: radial-gradient(circle, color-mix(in oklab, var(--gold) 28%, transparent), transparent 70%);
+  pointer-events: none;
+}
+
+.win-icon {
+  display: grid; place-items: center;
+  width: 3.6rem; height: 3.6rem;
+  border: 2px solid var(--gold); border-radius: 50%;
+  background: color-mix(in oklab, var(--gold) 16%, var(--shell-bg-deep));
+  color: var(--gold); font-size: 1.8rem;
+}
+
+.win-title {
+  margin: 0; font-size: 1.4rem; font-weight: 900; letter-spacing: 0.08em; color: var(--gold);
+}
+
+.win-answer {
+  margin: 0; color: var(--text-main); font-size: 1.05rem; font-weight: 700; letter-spacing: 0.04em;
+}
+
+.win-attempts {
+  margin: 0; color: var(--text-sub); font-size: 0.9rem;
+}
+
+.win-score {
+  margin: 0; color: var(--gold); font-size: 1.4rem; font-weight: 900; letter-spacing: 0.04em;
+}
+
+.win-actions {
+  display: flex; flex-direction: column; gap: 0.5rem; width: 100%; margin-top: 0.4rem;
+}
+
+.win-btn {
+  min-height: 44px;
+  border: 1px solid var(--line-strong); border-radius: 8px;
+  background: var(--surface-panel);
+  color: var(--text-sub); font-size: 0.9rem; font-weight: 600; cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+.win-btn:hover { border-color: var(--gold); color: var(--text-main); }
+
+.win-btn-primary {
+  border-color: color-mix(in oklab, var(--gold) 40%, transparent);
+  background: color-mix(in oklab, var(--gold) 16%, var(--surface-panel-strong));
+  color: var(--gold);
+}
+.win-btn-primary:hover { background: color-mix(in oklab, var(--gold) 26%, var(--surface-panel-strong)); }
+
+@keyframes winFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes winSlideUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
 </style>
