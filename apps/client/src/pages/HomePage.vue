@@ -113,6 +113,7 @@ const form = reactive({
 const menuItems = [
   { cn: "单人游戏", en: "Single Player", to: "/single", icon: "ph:user-duotone" },
   { cn: "多人对战", en: "Multiplayer", to: "/multi", icon: "ph:users-three-duotone" },
+  { cn: "数据图鉴", en: "Database", to: "/data", icon: "ph:database-duotone" },
   { cn: "机制规则", en: "Game Rules", to: "/rules", icon: "ph:book-open-text-duotone" },
   { cn: "共鸣榜", en: "Leaderboard", to: "/leaderboard", icon: "ph:trophy-duotone" },
 ] as const;
@@ -178,8 +179,8 @@ onMounted(async () => {
   <section class="page-shell">
     <div id="start-menu" class="home-stage">
       <div class="home-title-block">
-        <h1 class="home-title">Phrolova</h1>
-        <p class="home-subtitle">鸣潮 · 角色猜谜</p>
+        <h1 class="home-title">弗一把</h1>
+        <p class="home-subtitle">Phrolova</p>
       </div>
       <div class="home-portrait" :key="frolovaKey" ref="frolovaRef">
         <div class="home-portrait-inner">
@@ -244,6 +245,17 @@ onMounted(async () => {
           <button class="home-detail-link" type="button" @click="handleLogout">退出登录</button>
         </div>
       </div>
+
+      <div class="home-social">
+        <a href="https://github.com/TeAnLi/Phrolova" target="_blank" rel="noopener" class="home-social-link">
+          <Icon icon="ph:github-logo-duotone" /> GitHub
+        </a>
+        <span class="home-social-divider">·</span>
+        <a target="_blank"
+          href="https://qm.qq.com/cgi-bin/qm/qr?k=hYVfe1ReAYkgLM71ZkQMKABUu8641H-B&jump_from=webapi&authKey=WP+actLjZvH3Q6/JHDiDjU1xj7HpjXNxPSoCB9skVZnH1w0I6jzVf2lvnCCP7I/B">
+          <Icon icon="ph:chat-circle-dots-duotone" /> QQ群 457323277
+        </a>
+      </div>
     </div>
 
     <Teleport to="body">
@@ -264,20 +276,12 @@ onMounted(async () => {
 
           <div class="auth-modal-body">
             <div class="auth-tabs">
-              <button
-                class="auth-tab"
-                :class="{ 'auth-tab--active': authMode === 'login' }"
-                type="button"
-                @click="authMode = 'login'"
-              >
+              <button class="auth-tab" :class="{ 'auth-tab--active': authMode === 'login' }" type="button"
+                @click="authMode = 'login'">
                 登录
               </button>
-              <button
-                class="auth-tab"
-                :class="{ 'auth-tab--active': authMode === 'register' }"
-                type="button"
-                @click="authMode = 'register'"
-              >
+              <button class="auth-tab" :class="{ 'auth-tab--active': authMode === 'register' }" type="button"
+                @click="authMode = 'register'">
                 注册
               </button>
             </div>
@@ -309,7 +313,8 @@ onMounted(async () => {
 
             <p class="auth-modal-foot">
               {{ authMode === "login" ? "还没有账号？" : "已有账号？" }}
-              <button class="auth-switch-link" type="button" @click="authMode = authMode === 'login' ? 'register' : 'login'">
+              <button class="auth-switch-link" type="button"
+                @click="authMode = authMode === 'login' ? 'register' : 'login'">
                 {{ authMode === "login" ? "去注册" : "去登录" }}
               </button>
             </p>
@@ -322,21 +327,27 @@ onMounted(async () => {
 
 <style scoped>
 .home-title-block {
-  position: relative; z-index: 3;
-  text-align: center; padding: 1rem 0 0;
+  position: relative;
+  z-index: 3;
+  text-align: center;
+  padding: 1rem 0 0;
 }
+
 .home-title {
   margin: 0;
   font-family: 'Rajdhani', sans-serif;
   font-size: clamp(2.5rem, 2rem + 3vw, 4rem);
-  font-weight: 700; letter-spacing: 0.12em;
+  font-weight: 700;
+  letter-spacing: 0.12em;
   color: var(--gold);
   text-shadow: 0 0 40px color-mix(in oklab, var(--gold) 30%, transparent);
 }
+
 .home-subtitle {
   margin: 0.2rem 0 0;
   font-size: clamp(0.85rem, 0.7rem + 0.4vw, 1.05rem);
-  color: var(--text-faint); letter-spacing: 0.2em;
+  color: var(--text-faint);
+  letter-spacing: 0.2em;
 }
 
 #start-menu {
@@ -375,7 +386,7 @@ onMounted(async () => {
   inset: 0;
   z-index: 2;
   background: linear-gradient(to left, color-mix(in oklab, var(--shell-bg) 15%, transparent) 0%, transparent 60%),
-              linear-gradient(to top, color-mix(in oklab, var(--shell-bg) 40%, transparent) 0%, transparent 35%);
+    linear-gradient(to top, color-mix(in oklab, var(--shell-bg) 40%, transparent) 0%, transparent 35%);
   pointer-events: none;
 }
 
@@ -828,25 +839,47 @@ onMounted(async () => {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @media (max-width: 960px) {
-  .home-title { font-size: 2rem; }
-  .home-subtitle { font-size: 0.75rem; }
+  .home-title {
+    font-size: 2rem;
+  }
+
+  .home-subtitle {
+    font-size: 0.75rem;
+  }
 
   #start-menu {
     flex-direction: column;
     justify-content: center;
     background: var(--shell-bg-deep);
   }
-  .home-stage { display: flex; flex-direction: column; justify-content: center; }
+
+  .home-stage {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
 
   .home-portrait {
     position: absolute;
@@ -854,67 +887,233 @@ onMounted(async () => {
     width: 100%;
     opacity: 0.15;
     z-index: 0;
-    display: flex; align-items: center; justify-content: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
-  .home-portrait::after { display: none; }
+
+  .home-portrait::after {
+    display: none;
+  }
+
   .home-portrait-inner img {
-    width: 100%; height: 100%; object-fit: cover; object-position: center;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
   }
 
   .menu-container {
-    width: 100%; max-width: 380px; margin: 0 auto;
-    padding: 0; z-index: 2;
+    width: 100%;
+    max-width: 380px;
+    margin: 0 auto;
+    padding: 0;
+    z-index: 2;
   }
+
   .menu-list {
-    display: flex; flex-direction: column; gap: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
   }
-  .menu-li { opacity: 1; transform: none; }
+
+  .menu-li {
+    opacity: 1;
+    transform: none;
+  }
+
   .menu-item {
-    display: flex; align-items: center; gap: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
     padding: 0.9rem 1.2rem;
-    border: 1px solid var(--line-soft); border-radius: 10px;
+    border: 1px solid var(--line-soft);
+    border-radius: 10px;
     background: color-mix(in oklab, var(--surface-panel) 70%, transparent);
     border-bottom: 1px solid var(--line-soft);
     backdrop-filter: blur(8px);
     transition: border-color 0.2s, background 0.2s;
   }
-  .menu-item:hover { transform: none; background: color-mix(in oklab, var(--gold) 8%, var(--surface-panel)); border-color: color-mix(in oklab, var(--gold) 30%, transparent); }
-  .menu-item:hover::before { width: 0; }
-  .menu-item:active { transform: scale(0.98); }
-  .menu-icon { font-size: 1.6rem; color: var(--gold-soft); }
-  .menu-text { gap: 0.5rem; }
-  .menu-item .cn { font-size: 1.3rem; letter-spacing: 0.1em; }
-  .menu-item .en { font-size: 0.78rem; }
+
+  .menu-item:hover {
+    transform: none;
+    background: color-mix(in oklab, var(--gold) 8%, var(--surface-panel));
+    border-color: color-mix(in oklab, var(--gold) 30%, transparent);
+  }
+
+  .menu-item:hover::before {
+    width: 0;
+  }
+
+  .menu-item:active {
+    transform: scale(0.98);
+  }
+
+  .menu-icon {
+    font-size: 1.6rem;
+    color: var(--gold-soft);
+  }
+
+  .menu-text {
+    gap: 0.5rem;
+  }
+
+  .menu-item .cn {
+    font-size: 1.3rem;
+    letter-spacing: 0.1em;
+  }
+
+  .menu-item .en {
+    font-size: 0.78rem;
+  }
 
   .home-detail {
-    position: relative; inset: auto; z-index: 2;
-    width: 100%; max-width: 380px; margin: 1rem auto 0;
+    position: relative;
+    inset: auto;
+    z-index: 2;
+    width: 100%;
+    max-width: 380px;
+    margin: 1rem auto 0;
   }
-  .home-detail-card { text-align: center; }
-  .home-identity-stats { justify-content: center; }
-  .home-identity-header { justify-content: center; }
-  .home-detail-link { margin-left: auto; margin-right: auto; }
+
+  .home-detail-card {
+    text-align: center;
+  }
+
+  .home-identity-stats {
+    justify-content: center;
+  }
+
+  .home-identity-header {
+    justify-content: center;
+  }
+
+  .home-detail-link {
+    margin-left: auto;
+    margin-right: auto;
+  }
 }
 
 @media (max-width: 540px) {
-  .home-stage { padding: 0.6rem; }
-  .home-portrait { opacity: 0.12; }
-  .menu-container { max-width: 100%; padding: 0; }
-  .menu-list { gap: 0.4rem; }
-  .menu-item { padding: 0.75rem 1rem; border-radius: 8px; }
-  .menu-icon { font-size: 1.3rem; }
-  .menu-text { gap: 0.4rem; }
-  .menu-item .cn { font-size: 1.1rem; }
-  .menu-item .en { font-size: 0.7rem; }
-  .home-detail { max-width: 100%; }
-  .home-detail-card { padding: 0.7rem; }
-  .home-detail-card strong { font-size: 0.9rem; }
-  .home-identity-stat-value { font-size: 0.9rem; }
-  .home-identity-avatar { width: 1.8rem; height: 1.8rem; font-size: 0.8rem; }
-  .auth-modal { max-width: 94vw; padding: 1.1rem 0.9rem; border-radius: 10px; }
-  .auth-modal-title { font-size: 1.1rem; }
-  .auth-input { min-height: 36px; font-size: 0.88rem; }
-  .auth-btn { min-height: 36px; }
-  .auth-captcha-box { min-width: 80px; min-height: 36px; }
+  .home-stage {
+    padding: 0.6rem;
+  }
+
+  .home-portrait {
+    opacity: 0.12;
+  }
+
+  .menu-container {
+    max-width: 100%;
+    padding: 0;
+  }
+
+  .menu-list {
+    gap: 0.4rem;
+  }
+
+  .menu-item {
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+  }
+
+  .menu-icon {
+    font-size: 1.3rem;
+  }
+
+  .menu-text {
+    gap: 0.4rem;
+  }
+
+  .menu-item .cn {
+    font-size: 1.1rem;
+  }
+
+  .menu-item .en {
+    font-size: 0.7rem;
+  }
+
+  .home-detail {
+    max-width: 100%;
+  }
+
+  .home-detail-card {
+    padding: 0.7rem;
+  }
+
+  .home-detail-card strong {
+    font-size: 0.9rem;
+  }
+
+  .home-identity-stat-value {
+    font-size: 0.9rem;
+  }
+
+  .home-identity-avatar {
+    width: 1.8rem;
+    height: 1.8rem;
+    font-size: 0.8rem;
+  }
+}
+
+.home-social {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.8rem 0 0.4rem;
+  font-size: 0.82rem;
+  color: var(--text-faint);
+}
+
+.home-social-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--text-faint);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.home-social-link:hover {
+  color: var(--gold);
+}
+
+.home-social-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.home-social-divider {
+  color: var(--line-strong);
+}
+
+@media (max-width: 540px) {
+  .auth-modal {
+    max-width: 94vw;
+    padding: 1.1rem 0.9rem;
+    border-radius: 10px;
+  }
+
+  .auth-modal-title {
+    font-size: 1.1rem;
+  }
+
+  .auth-input {
+    min-height: 36px;
+    font-size: 0.88rem;
+  }
+
+  .auth-btn {
+    min-height: 36px;
+  }
+
+  .auth-captcha-box {
+    min-width: 80px;
+    min-height: 36px;
+  }
 }
 </style>

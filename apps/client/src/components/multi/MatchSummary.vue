@@ -70,4 +70,11 @@ const roundLabel = computed(() => {
   font-size: 0.82rem;
   font-weight: 700;
 }
+
+@media (max-width: 720px) {
+  .summary-band { gap: 0.2rem; }
+  .summary-band-card { padding: 0.25rem 0.35rem; border-radius: 4px; }
+  .summary-band-label { font-size: 0.5rem; letter-spacing: 0.04em; }
+  .summary-band-value { font-size: 0.65rem; margin-top: 0.05rem; }
+}
 </style>

@@ -8,6 +8,7 @@ const MultiplayerLobbyPage = () => import("@/pages/MultiplayerLobbyPage.vue");
 const MultiplayerRoomPage = () => import("@/pages/MultiplayerRoomPage.vue");
 const LeaderboardPage = () => import("@/pages/LeaderboardPage.vue");
 const RulesPage = () => import("@/pages/RulesPage.vue");
+const DataPage = () => import("@/pages/DataPage.vue");
 
 const router = createRouter({
   history: createWebHistory(),
@@ -20,6 +21,7 @@ const router = createRouter({
     { path: "/multi/room", name: "multi-room", component: MultiplayerRoomPage },
     { path: "/leaderboard", name: "leaderboard", component: LeaderboardPage },
     { path: "/rules", name: "rules", component: RulesPage },
+    { path: "/data", name: "data", component: DataPage },
   ],
   scrollBehavior() {
     return { top: 0 };

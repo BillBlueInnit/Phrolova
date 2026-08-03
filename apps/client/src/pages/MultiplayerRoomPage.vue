@@ -848,7 +848,6 @@ watch(
   .mr-glass-chip { font-size: 0.6rem; max-width: 10rem; padding: 0.2rem 0.4rem; }
   .mr-glass-back { width: 1.6rem; height: 1.6rem; font-size: 0.85rem; }
   .mr-glass-btn { width: 1.6rem; height: 1.6rem; font-size: 0.9rem; }
-  .mr-summary-row,
   .status-stack { display: none; }
 
   .mr-stage {
