@@ -3,7 +3,7 @@ import { computed } from "vue";
 
 import LoreBadge from "@/components/shared/LoreBadge.vue";
 import type { CellStatus, CompareStatus, GuessHistoryRow, QuizType, ResonatorCompare, SkeletonCompare } from "@/types/game";
-import { formatGuessValue, getColumns, getStatusClass, renderGroupItem } from "@/utils/game";
+import { formatGuessValue, getCharacterAvatar, getColumns, getStatusClass, getWeaponIcon, renderGroupItem } from "@/utils/game";
 import { resolveBadgeCategory } from "@/utils/presentation";
 
 const props = defineProps<{
@@ -81,7 +81,15 @@ function formatCellValue(row: GuessHistoryRow, key: string) {
             :class="getCellClass(row, column.key)"
           >
             <template v-if="column.key === 'name'">
-              <span class="guess-table-name">{{ row.revealed ? row.guess.name : "***" }}</span>
+              <div class="gt-name-cell">
+                <img
+                  v-if="row.revealed"
+                  :src="getCharacterAvatar(String(row.guess.name))"
+                  class="gt-avatar"
+                  alt=""
+                />
+                <span class="guess-table-name">{{ row.revealed ? row.guess.name : "***" }}</span>
+              </div>
             </template>
 
             <template v-else-if="isGroupField(row, column.key)">
@@ -99,7 +107,15 @@ function formatCellValue(row: GuessHistoryRow, key: string) {
             </template>
 
             <template v-else-if="shouldRenderBadge(column.key)">
-              <LoreBadge :label="String(formatCellValue(row, column.key))" :category="resolveBadgeCategory(column.key, String(row.guess[column.key as keyof typeof row.guess]))" compact />
+              <div class="gt-badge-row">
+                <img
+                  v-if="column.key === 'weapon' && row.revealed"
+                  :src="getWeaponIcon(String(row.guess.weapon))"
+                  class="gt-weapon-icon"
+                  alt=""
+                />
+                <LoreBadge :label="String(formatCellValue(row, column.key))" :category="resolveBadgeCategory(column.key, String(row.guess[column.key as keyof typeof row.guess]))" compact />
+              </div>
             </template>
 
             <template v-else>
@@ -120,6 +136,20 @@ function formatCellValue(row: GuessHistoryRow, key: string) {
 </template>
 
 <style scoped>
+.gt-name-cell {
+  display: flex; align-items: center; gap: 0.45rem;
+}
+.gt-avatar {
+  width: 28px; height: 28px; border-radius: 4px; object-fit: cover;
+  border: 1px solid var(--line-soft); flex-shrink: 0;
+}
+.gt-badge-row {
+  display: flex; align-items: center; gap: 0.35rem;
+}
+.gt-weapon-icon {
+  width: 24px; height: 24px; object-fit: contain; flex-shrink: 0;
+  filter: drop-shadow(0 0 2px rgba(0,0,0,0.4));
+}
 .guess-table-name {
   font-weight: 600;
 }

@@ -76,6 +76,24 @@ export function renderGroupItem(item: CompareAttrItem | CompareSetItem | Compare
   return String(item.loc ?? "");
 }
 
+const WEAPON_ICON_MAP: Record<string, string> = {
+  佩枪: "/media/weapons/佩枪.png",
+  配枪: "/media/weapons/佩枪.png",
+  迅刀: "/media/weapons/迅刀.png",
+  长刃: "/media/weapons/长刃.png",
+  臂铠: "/media/weapons/臂铠.png",
+  音感仪: "/media/weapons/音感仪.png",
+};
+
+export function getWeaponIcon(weapon: string): string | null {
+  return WEAPON_ICON_MAP[weapon] || null;
+}
+
+export function getCharacterAvatar(name: string): string {
+  const base = name.split("-")[0];
+  return `/media/characters/角色 ${base} 头像.png`;
+}
+
 export function toHistoryRow(
   guess: ResonatorRow | SkeletonRow,
   compare: ResonatorCompare | SkeletonCompare,

@@ -9,6 +9,7 @@ import NameAutocompleteInput from "@/components/game/NameAutocompleteInput.vue";
 import StatusBanner from "@/components/shared/StatusBanner.vue";
 import { useDictionaryStore } from "@/stores/dictionary";
 import { useSingleGameStore } from "@/stores/singleGame";
+import { getCharacterAvatar } from "@/utils/game";
 
 const THEME_KEY = "phrolova_theme";
 
@@ -214,7 +215,15 @@ onMounted(async () => {
             class="sg-hint-chip"
             type="button"
             @click="fillHint(item.name)"
-          >{{ item.name }}</button>
+          >
+            <img
+              v-if="singleGameStore.quizType === 'resonator'"
+              :src="getCharacterAvatar(item.name)"
+              class="sg-hint-avatar"
+              alt=""
+            />
+            {{ item.name }}
+          </button>
         </div>
       </div>
 
@@ -232,6 +241,7 @@ onMounted(async () => {
             v-model="guessName"
             :disabled="!singleGameStore.canSubmit || singleGameStore.loading"
             :names="currentNames"
+            :quiz-type="singleGameStore.quizType"
             :placeholder="singleGameStore.quizType === 'skeleton' ? '输入声骸名称' : '输入角色昵称'"
             @submit="submitGuess"
           />
@@ -475,7 +485,12 @@ onMounted(async () => {
   display: flex; flex-wrap: wrap; gap: 0.35rem; align-content: flex-start;
 }
 
+.sg-hint-avatar {
+  width: 20px; height: 20px; border-radius: 3px; object-fit: cover;
+  border: 1px solid var(--line-soft); flex-shrink: 0; vertical-align: middle;
+}
 .sg-hint-chip {
+  display: inline-flex; align-items: center; gap: 0.3rem;
   padding: 0.3rem 0.6rem;
   border: 1px solid var(--line-soft); border-radius: 5px;
   background: color-mix(in oklab, var(--gold) 4%, var(--surface-card));

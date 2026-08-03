@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { computed, shallowRef, useTemplateRef } from "vue";
+import { getCharacterAvatar } from "@/utils/game";
+import type { QuizType } from "@/types/game";
 
 const props = defineProps<{
   names: Array<{ name: string }>;
   placeholder?: string;
   disabled?: boolean;
+  quizType?: QuizType;
 }>();
 
 const model = defineModel<string>({ default: "" });
@@ -80,6 +83,12 @@ function handleKeydown(event: KeyboardEvent) {
         type="button"
         @click="selectSuggestion(item.name)"
       >
+        <img
+          v-if="quizType === 'resonator'"
+          :src="getCharacterAvatar(item.name)"
+          class="ac-avatar"
+          alt=""
+        />
         {{ item.name }}
       </button>
     </div>
@@ -113,9 +122,15 @@ function handleKeydown(event: KeyboardEvent) {
   box-shadow: 10px 10px 0 var(--shadow-plate);
 }
 
+.ac-avatar {
+  width: 24px; height: 24px; border-radius: 4px; object-fit: cover;
+  border: 1px solid var(--line-soft); flex-shrink: 0; vertical-align: middle;
+}
+
 .autocomplete-option {
+  display: flex; align-items: center; gap: 0.45rem;
   width: 100%;
-  padding: 0.78rem 0.9rem;
+  padding: 0.6rem 0.7rem;
   border: 1px solid transparent;
   text-align: left;
   background: color-mix(in oklab, var(--gold) 4%, var(--surface-card));
