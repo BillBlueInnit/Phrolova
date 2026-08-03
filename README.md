@@ -1,147 +1,156 @@
-# 🎭 角色猜谜游戏
+# Phrolova / 鸣潮角色猜谜游戏
 
-一个基于 **Python (Flask) + MySQL** 的角色猜谜网站。
+这是一个面向中文用户的 Web 猜角色游戏项目，当前正在进行第一阶段重构：
 
-系统从数据库**随机抽取一个角色**作为目标，玩家输入角色名进行猜测。系统将目标角色与猜测角色逐项对比，并用**颜色**提示接近程度，帮助玩家逐步锁定答案。
+- 前端：`Vue 3 + Pinia + Vite + TypeScript`
+- 后端：`Flask + Socket.IO + MySQL`
+- 反向代理：`OpenResty`
+- 工程组织：`pnpm monorepo`
+- 部署方式：`Docker Compose`
 
-## 🎨 颜色规则
+## 当前状态
 
-| 颜色 | 含义 | 说明 |
-|------|------|------|
-| 🟢 绿色 | 完全一样 | 猜测项与目标完全一致 |
-| 🟠 橙色 | 相差不大 | 仅限**星级**和**版本**：星级只有 4/5，两者不同即相邻档位；版本相减绝对值 ≤ 0.2 |
-| ⚪ 灰色 | 完全不一样 | 其他所有不匹配情况 |
+第一阶段的目标是先把架构、实时通信、中文界面和 Docker 部署跑通，同时完整保留现有游戏规则：
 
-## 🎮 游戏模式
+- 单人模式
+  - 共鸣者
+  - 声骸
+  - 声骸简单 / 困难
+- 多人模式
+  - 创建房间
+  - 加入房间
+  - 随机匹配
+  - BO1 / BO3 / BO5
+  - 逃逸判负
+  - 刷新后恢复房间
+- 登录 / 注册 / 验证码
+- 玩家 ID 修改
+- 排行榜与积分
 
-### 主菜单
-- 提供 **单人模式 / 多人模式 / 排行榜 / 规则** 四个入口。
-- 如需详细规则请自行查看主菜单的规则入口。
+第二阶段再接入更完整的二次元视觉包装，包括正式开屏资源、角色图和音乐。
 
-### 猜谜类型
-- 无论单人还是多人，在**游戏开始前**都会询问你要猜 **「共鸣者」** 还是 **「声骸」**。
-  - 猜共鸣者：按「属性 / 星级 / 武器 / 出生地 / 实装版本」逐项对比，有 **4 次**机会。
-  - 猜声骸：按「技能属性 / COST / 是否有异相 / 所属套装 / 掉落位置」逐项对比，有 **8 次**机会。
-- 多人模式下，**创建房间**时由房主选择类型；**随机匹配**只会在「选择相同类型」的玩家之间配对；**加入房间**则沿用房主选定的类型。
+## 新目录结构
 
-### 单人模式
-- 猜共鸣者每局 **4 次**猜测机会；猜声骸每局 **8 次**猜测机会。
+```text
+.
+├── apps/
+│   ├── client/                 # Vue 3 前端
+│   └── server/                 # Flask + Socket.IO 后端
+├── infra/
+│   └── openresty/              # OpenResty 单入口
+├── docs/
+│   └── superpowers/
+│       └── specs/              # 设计文档
+├── database_init.sql           # MySQL 初始化脚本（继续兼容）
+├── docker-compose.yml
+├── package.json
+└── pnpm-workspace.yaml
+```
+
+## 启动方式
+
+### 1. 使用 Docker Compose
+
+复制环境变量模板：
+
+```bash
+cp .env.example .env
+```
+
+启动全部服务：
+
+```bash
+docker compose up --build
+```
+
+启动后包含 4 个服务：
+
+- `mysql`
+- `server`
+- `client`
+- `openresty`
+
+浏览器访问：
+
+```text
+http://127.0.0.1
+```
+
+### 2. 仅启动前端
+
+```bash
+pnpm install
+pnpm client:dev
+```
+
+### 3. 仅启动后端
+
+```bash
+cd apps/server
+pip install -r requirements.txt
+python -m phrolova_server.app
+```
+
+## 数据库说明
+
+项目继续兼容现有 `database_init.sql`，包含以下表：
+
+- `characters`
+- `sound_skeletons`
+- `players`
+
+`players` 表用于：
+
+- 登录账号
+- 玩家积分
+- 胜场与总场次
+- Socket 身份 token
+
+## 规则摘要
+
+### 颜色规则
+
+- `match`：完全一致
+- `near`：相差不大
+- `different`：完全不同
+- `partial`：多值字段部分命中
+
+### 共鸣者
+
+- 猜测字段：
+  - 属性
+  - 星级
+  - 武器
+  - 出生地
+  - 实装版本
+- 每局 4 次机会
+
+### 声骸
+
+- 猜测字段：
+  - 技能属性
+  - COST
+  - 是否异相
+  - 所属套装
+  - 掉落位置
+- 每局 8 次机会
+- 支持简单 / 困难
 
 ### 多人模式
-- 两名玩家对抗，目标（共鸣者或声骸）相同，**先猜中者赢得该局**。
-- **三局两胜**，每局限时 **1 分 30 秒**。
-- 猜共鸣者每人最多 **4 次**猜测机会；猜声骸每人最多 **8 次**猜测机会。
-- 可以看到双方的猜测记录；对手的猜测所有信息以 `*` 打码，仅显示每项底部的颜色。
-- 支持 **创建房间 / 随机匹配 / 加入房间** 三种匹配方式。
-- 整场获胜 **+30 分**，整场落败 **-30 分**。
 
-### 排行榜
-- 按玩家总分降序展示「玩家ID + 得分」。
+- 共鸣者每局 90 秒
+- 声骸每局 150 秒
+- 匹配成功后统一 2 秒倒计时开局
+- 主动退出判负
+- 对手名称打码，仅保留颜色反馈
 
-### 玩家 ID
-- 每个设备自动生成唯一玩家 ID（可自行修改），不同设备不能重名。
+## 兼容说明
 
-## 📁 项目结构
+仓库根目录原有的单体 Flask 文件仍保留，用于迁移期参考：
 
-```
-├── app.py              # Flask 后端主程序+单人主要路由
-├── core.py             # 调用
-├── multi.py            # 多人主要路由
-├── auth_routes.py      # 验证码生成、账号相关
-├── dbfixer.py          # 简便的数据库修改工具（独立文件，需要重新配置数据库连接地址等等）
-├── config.py           # 数据库连接配置
-├── database_init.sql   # 数据库初始化脚本（角色表 + 玩家表）
-├── requirements.txt    # Python 依赖
-├── static/app.js       # 前端逻辑
-├── static/style.css    # 前端样式
-└── templates/index.html # 前端页面
-```
+- `app.py`
+- `core.py`
+- `multi.py`
+- `auth_routes.py`
 
-## 🚀 快速开始
-
-### 1. 初始化数据库
-
-确保 MySQL 已启动，然后执行 `database_init.sql`。
-> 该脚本会创建 `characters`（角色）和 `players`（玩家得分）两张表，并写入示例角色。
-> 若已运行过旧脚本，需重新执行一次以创建 `players` 表。
-
-**Windows (PowerShell)：**
-```powershell
-cmd /c "mysql -uroot -p --default-character-set=utf8mb4 < database_init.sql"
-```
-
-**Linux/Mac：**
-```bash
-mysql -uroot -p --default-character-set=utf8mb4 < database_init.sql
-```
-
-
-
-### 2. 配置数据库连接
-
-打开 `config.py`，修改为你本地的 MySQL 账号密码：
-
-```python
-DB_CONFIG = {
-    'host': 'localhost',
-    'port': 3306,
-    'user': 'root',
-    'password': '你的密码',   # ← 改成你的 MySQL 密码
-    'database': 'phrolova_game',
-    'charset': 'utf8mb4',
-}
-```
-
-### 3. 安装依赖
-
-```bash
-pip install -r requirements.txt
-```
-
-### 4. 启动服务
-
-```bash
-python app.py
-```
-
-浏览器访问：**http://127.0.0.1:5000**
-
-> 💡 多人模式需要两个设备（或两个浏览器）同时访问并连接同一个后端才能对战。
-
-## 🔧 添加/修改角色数据
-
-可在数据库 `characters` 表中增删改角色：
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| name | VARCHAR | 姓名 |
-| attribute | VARCHAR | 属性 |
-| star_rating | TINYINT | 星级 |
-| weapon | VARCHAR | 武器 |
-| birthplace | VARCHAR | 出生地 |
-| version | DOUBLE | 实装版本 |
-
-示例：
-```sql
-INSERT INTO characters (name, attribute, star_rating, weapon, birthplace, version)
-VALUES ('角色名', '属性', 5, '武器', '出生地', 1.0);
-```
-
-## 🔧 添加/修改声骸数据
-
-可在数据库 `sound_skeletons` 表中增删改声骸：
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| name | VARCHAR | 声骸名称 |
-| skill_attribute | VARCHAR | 技能属性 |
-| cost | INT | COST 值（1/3/4） |
-| is_aberration | VARCHAR | 是否有异相（有/无） |
-| set_name | VARCHAR | 所属套装 |
-| drop_location | VARCHAR | 掉落位置 |
-
-示例：
-```sql
-INSERT INTO sound_skeletons (name, skill_attribute, cost, is_aberration, set_name, drop_location)
-VALUES ('声骸名', '技能属性', 4, '无', '隐世回响', '归墟港市');
-```
+第一阶段的新启动路径以 `apps/client`、`apps/server` 和 `infra/openresty` 为准。
