@@ -1,0 +1,82 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Components — guess table, feedback cells, summary band
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Guess table ── */
+.guess-table-shell {
+  overflow: auto;
+  border: 1px solid var(--line-soft);
+  background: linear-gradient(180deg, var(--surface-panel-strong), var(--surface-panel));
+}
+
+.guess-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+}
+
+.guess-table-head {
+  padding: 0.9rem 0.8rem;
+  border-bottom: 1px solid var(--line-soft);
+  background: color-mix(in oklab, var(--gold) 6%, var(--surface-card));
+  color: var(--text-sub);
+  text-align: left;
+  font-size: 0.84rem;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.guess-table-index,
+.guess-table-cell {
+  padding: 0.82rem 0.72rem;
+  border-bottom: 1px solid color-mix(in oklab, var(--text-main) 6%, transparent);
+  vertical-align: top;
+}
+
+.guess-table-index {
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.guess-table-empty {
+  margin: 0;
+  padding: 1.18rem 1rem;
+  color: var(--text-faint);
+}
+
+/* ── Feedback cells ── */
+.feedback-cell {
+  background-clip: padding-box;
+}
+
+.feedback-cell-match {
+  background: color-mix(in oklab, var(--color-success) 38%, transparent);
+  color: var(--text-main);
+}
+
+.feedback-cell-near {
+  background: color-mix(in oklab, var(--color-warning) 38%, transparent);
+  color: var(--text-main);
+}
+
+.feedback-cell-different {
+  background: color-mix(in oklab, var(--text-main) 6%, transparent);
+}
+
+.feedback-cell-partial {
+  background: color-mix(in oklab, var(--color-accent) 32%, transparent);
+  color: var(--text-main);
+}
+
+/* ── Summary band ── */
+@media (min-width: 960px) {
+  .summary-band {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1240px) {
+  .summary-band {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
