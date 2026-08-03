@@ -815,83 +815,80 @@ onMounted(async () => {
 }
 
 @media (max-width: 960px) {
+  #start-menu {
+    flex-direction: column;
+    justify-content: center;
+    background: var(--shell-bg-deep);
+  }
+  .home-stage { display: flex; flex-direction: column; justify-content: center; }
+
   .home-portrait {
     position: absolute;
-    right: -5%;
-    bottom: -5%;
-    width: 55%;
-    opacity: 0.25;
+    inset: 0;
+    width: 100%;
+    opacity: 0.15;
     z-index: 0;
+    display: flex; align-items: center; justify-content: center;
   }
-
-  .home-portrait::after {
-    background: linear-gradient(to top, color-mix(in oklab, var(--shell-bg) 60%, transparent) 0%, transparent 40%);
+  .home-portrait::after { display: none; }
+  .home-portrait-inner img {
+    width: 100%; height: 100%; object-fit: cover; object-position: center;
   }
 
   .menu-container {
-    width: 100%;
-    padding: 0.8rem;
-    z-index: 2;
+    width: 100%; max-width: 380px; margin: 0 auto;
+    padding: 0; z-index: 2;
   }
-
-  .menu-list { gap: 1.2rem; }
-  .menu-icon { font-size: 2.2rem; }
-  .menu-item .cn { font-size: clamp(1.5rem, 1.2rem + 1vw, 2.4rem); }
-  .menu-item .en { font-size: 0.85rem; }
+  .menu-list {
+    display: flex; flex-direction: column; gap: 0.5rem;
+  }
+  .menu-li { opacity: 1; transform: none; }
+  .menu-item {
+    display: flex; align-items: center; gap: 0.8rem;
+    padding: 0.9rem 1.2rem;
+    border: 1px solid var(--line-soft); border-radius: 10px;
+    background: color-mix(in oklab, var(--surface-panel) 70%, transparent);
+    border-bottom: 1px solid var(--line-soft);
+    backdrop-filter: blur(8px);
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .menu-item:hover { transform: none; background: color-mix(in oklab, var(--gold) 8%, var(--surface-panel)); border-color: color-mix(in oklab, var(--gold) 30%, transparent); }
+  .menu-item:hover::before { width: 0; }
+  .menu-item:active { transform: scale(0.98); }
+  .menu-icon { font-size: 1.6rem; color: var(--gold-soft); }
+  .menu-text { gap: 0.5rem; }
+  .menu-item .cn { font-size: 1.3rem; letter-spacing: 0.1em; }
+  .menu-item .en { font-size: 0.78rem; }
 
   .home-detail {
-    position: relative;
-    inset: auto;
-    width: 100%;
-    margin: 1rem 0 0;
-    z-index: 2;
+    position: relative; inset: auto; z-index: 2;
+    width: 100%; max-width: 380px; margin: 1rem auto 0;
   }
-
   .home-detail-card { text-align: center; }
   .home-identity-stats { justify-content: center; }
   .home-identity-header { justify-content: center; }
   .home-detail-link { margin-left: auto; margin-right: auto; }
-  .menu-li { opacity: 1; transform: none; }
-  .menu-item:hover { transform: none; }
-  .menu-item:hover::before { width: 0; }
-  .menu-item:active { transform: translateX(8px); }
-  .menu-item:active::before { width: 100%; }
-  .menu-item:active .cn { color: var(--gold); }
-  .menu-item:active .en { color: var(--gold-soft); }
 }
 
 @media (max-width: 540px) {
-  .home-stage {
-    padding: 0.5rem;
-  }
-  .home-portrait {
-    width: 70%;
-    opacity: 0.18;
-  }
-  .menu-container {
-    padding: 0.5rem;
-  }
-  .menu-list { gap: 0.9rem; }
-  .menu-icon { font-size: 1.6rem; }
-  .menu-text { gap: 0.6rem; }
-  .menu-item .cn { font-size: 1.3rem; }
-  .menu-item .en { font-size: 0.72rem; }
-  .menu-item { gap: 0.6rem; padding-bottom: 0.5rem; }
+  .home-stage { padding: 0.6rem; }
+  .home-portrait { opacity: 0.12; }
+  .menu-container { max-width: 100%; padding: 0; }
+  .menu-list { gap: 0.4rem; }
+  .menu-item { padding: 0.75rem 1rem; border-radius: 8px; }
+  .menu-icon { font-size: 1.3rem; }
+  .menu-text { gap: 0.4rem; }
+  .menu-item .cn { font-size: 1.1rem; }
+  .menu-item .en { font-size: 0.7rem; }
+  .home-detail { max-width: 100%; }
   .home-detail-card { padding: 0.7rem; }
-  .home-detail-card strong { font-size: 0.95rem; }
-  .home-identity-stat-value { font-size: 0.95rem; }
-  .home-identity-avatar { width: 2rem; height: 2rem; font-size: 0.9rem; }
-
-  .auth-modal {
-    max-width: 94vw;
-    padding: 1.2rem 1rem;
-    border-radius: 10px;
-  }
-  .auth-modal-header { margin-bottom: 0.8rem; }
-  .auth-modal-title { font-size: 1.15rem; }
-  .auth-input { min-height: 38px; font-size: 0.9rem; }
-  .auth-btn { min-height: 38px; }
-  .auth-tab { font-size: 0.82rem; padding: 0.45rem 0; }
+  .home-detail-card strong { font-size: 0.9rem; }
+  .home-identity-stat-value { font-size: 0.9rem; }
+  .home-identity-avatar { width: 1.8rem; height: 1.8rem; font-size: 0.8rem; }
+  .auth-modal { max-width: 94vw; padding: 1.1rem 0.9rem; border-radius: 10px; }
+  .auth-modal-title { font-size: 1.1rem; }
+  .auth-input { min-height: 36px; font-size: 0.88rem; }
+  .auth-btn { min-height: 36px; }
   .auth-captcha-box { min-width: 80px; min-height: 36px; }
 }
 </style>
