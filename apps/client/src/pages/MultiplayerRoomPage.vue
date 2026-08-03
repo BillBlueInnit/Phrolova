@@ -95,8 +95,10 @@ watch(
 const matchResultText = computed(() => {
   const state = multiGameStore.roomState;
   if (!state) return "";
-  const iWon = state.overallWinner !== null && state.players[state.overallWinner]?.isMe;
-  return iWon ? "胜利" : "失败";
+  const myId = authStore.playerId;
+  const winnerPlayer = state.overallWinner !== null ? state.players[state.overallWinner] : null;
+  if (!winnerPlayer) return "平局";
+  return winnerPlayer.playerId === myId ? "胜利" : "失败";
 });
 
 const matchScoreText = computed(() => {
@@ -316,7 +318,7 @@ watch(
         <div class="mr-result-modal">
           <div class="mr-result-header">
             <Icon
-              :icon="matchResultText === '胜利' ? 'ph:crown-fill' : 'ph:hand-waving-duotone'"
+              :icon="matchResultText === '胜利' ? 'ph:crown-fill' : matchResultText === '平局' ? 'ph:handshake-duotone' : 'ph:hand-waving-duotone'"
               class="mr-result-icon"
               :class="{ 'mr-result-icon--win': matchResultText === '胜利' }"
             />

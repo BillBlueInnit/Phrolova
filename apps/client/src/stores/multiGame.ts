@@ -87,9 +87,7 @@ export const useMultiGameStore = defineStore("multiGame", () => {
     });
     currentSocket.on(S2C.KICKED, () => {
       if (kicked.value) return;
-      const authStore = useAuthStore();
       disconnect();
-      authStore.logout();
       kicked.value = true;
     });
   }

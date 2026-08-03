@@ -34,6 +34,12 @@ function handleLogout() {
   router.push("/");
 }
 
+function handleKickedConfirm() {
+  authStore.logout();
+  multiGameStore.kicked = false;
+  router.push("/");
+}
+
 watch(
   () => multiGameStore.roomState?.roomCode,
   (roomCode) => {
@@ -65,12 +71,12 @@ onMounted(async () => {
     </main>
 
     <Teleport to="body">
-      <div v-if="multiGameStore.kicked" class="kicked-overlay" @click.self="multiGameStore.kicked = false; router.push('/')">
+      <div v-if="multiGameStore.kicked" class="kicked-overlay" @click.self="handleKickedConfirm">
         <div class="kicked-modal">
           <Icon icon="ph:warning-duotone" class="kicked-icon" />
           <h2 class="kicked-title">账号在别处登录</h2>
           <p class="kicked-desc">你的账号已在其他设备登录，当前会话已被强制退出。</p>
-          <button class="kicked-btn" @click="multiGameStore.kicked = false; router.push('/')">确定</button>
+          <button class="kicked-btn" @click="handleKickedConfirm">确定</button>
         </div>
       </div>
     </Teleport>
