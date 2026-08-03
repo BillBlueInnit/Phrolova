@@ -1,0 +1,112 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Design Tokens — CSS custom properties (colors, radii, spacing, typography)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Night theme (default) ── */
+:root,
+[data-theme="phrolova-night"] {
+  color-scheme: dark;
+
+  /* DaisyUI-originated color slots */
+  --color-base-100: oklch(18% 0.018 95);
+  --color-base-200: oklch(22% 0.02 95);
+  --color-base-300: oklch(28% 0.018 100);
+  --color-base-content: oklch(92% 0.012 95);
+  --color-primary: oklch(68% 0.14 78);
+  --color-primary-content: oklch(18% 0.02 78);
+  --color-secondary: oklch(58% 0.06 85);
+  --color-secondary-content: oklch(15% 0.01 85);
+  --color-accent: oklch(72% 0.10 82);
+  --color-accent-content: oklch(16% 0.02 80);
+  --color-neutral: oklch(32% 0.012 90);
+  --color-neutral-content: oklch(94% 0.01 90);
+  --color-info: oklch(58% 0.06 85);
+  --color-info-content: oklch(15% 0.01 85);
+  --color-success: oklch(62% 0.10 145);
+  --color-success-content: oklch(14% 0.015 145);
+  --color-warning: oklch(72% 0.17 80);
+  --color-warning-content: oklch(16% 0.03 80);
+  --color-error: oklch(55% 0.18 22);
+  --color-error-content: oklch(14% 0.02 22);
+
+  /* Radii & sizing tokens */
+  --radius-selector: 0.75rem;
+  --radius-field: 0.35rem;
+  --radius-box: 0.85rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+
+  /* Layout token */
+  --site-header-height: 5.25rem;
+
+  /* Semantic surface tokens — night */
+  --shell-bg: #080806;
+  --shell-bg-deep: #0f0e0a;
+  --surface-panel: rgba(22, 20, 14, 0.94);
+  --surface-panel-strong: rgba(28, 25, 18, 0.96);
+  --surface-card: rgba(20, 18, 13, 0.96);
+  --line-soft: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.18);
+  --text-main: #faf8f0;
+  --text-sub: #b5ad90;
+  --text-faint: rgba(181, 173, 144, 0.60);
+  --gold: #e6b84d;
+  --gold-soft: rgba(230, 184, 77, 0.45);
+  --shadow-plate: rgba(0, 0, 0, 0.8);
+}
+
+/* ── Light theme ── */
+[data-theme="phrolova-light"] {
+  color-scheme: light;
+
+  --color-base-100: oklch(96% 0.008 90);
+  --color-base-200: oklch(92% 0.012 90);
+  --color-base-300: oklch(86% 0.018 95);
+  --color-base-content: oklch(22% 0.02 90);
+  --color-primary: oklch(55% 0.14 78);
+  --color-primary-content: oklch(96% 0.005 78);
+  --color-secondary: oklch(48% 0.06 85);
+  --color-secondary-content: oklch(95% 0.01 85);
+  --color-accent: oklch(58% 0.10 82);
+  --color-accent-content: oklch(95% 0.005 82);
+  --color-neutral: oklch(45% 0.012 90);
+  --color-neutral-content: oklch(96% 0.01 90);
+  --color-info: oklch(50% 0.06 85);
+  --color-info-content: oklch(95% 0.01 85);
+  --color-success: oklch(52% 0.10 145);
+  --color-success-content: oklch(95% 0.005 145);
+  --color-warning: oklch(60% 0.17 80);
+  --color-warning-content: oklch(15% 0.02 80);
+  --color-error: oklch(48% 0.18 22);
+  --color-error-content: oklch(95% 0.005 22);
+
+  /* Radii & sizing (same as night) */
+  --radius-selector: 0.75rem;
+  --radius-field: 0.35rem;
+  --radius-box: 0.85rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+
+  --site-header-height: 5.25rem;
+
+  /* Semantic surface tokens — light */
+  --shell-bg: #f5f2e8;
+  --shell-bg-deep: #ede8d8;
+  --surface-panel: rgba(255, 252, 242, 0.94);
+  --surface-panel-strong: rgba(252, 248, 232, 0.96);
+  --surface-card: rgba(250, 246, 230, 0.96);
+  --line-soft: rgba(0, 0, 0, 0.06);
+  --line-strong: rgba(0, 0, 0, 0.14);
+  --text-main: #2a2416;
+  --text-sub: #6b6040;
+  --text-faint: rgba(107, 96, 64, 0.55);
+  --gold: #b8922e;
+  --gold-soft: rgba(184, 146, 46, 0.35);
+  --shadow-plate: rgba(0, 0, 0, 0.1);
+}

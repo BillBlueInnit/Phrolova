@@ -1,0 +1,112 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Components — guess table, feedback cells, summary band
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Guess table ── */
+.guess-table-shell {
+  overflow: auto;
+  padding: 0.5rem;
+  background: var(--shell-bg-deep);
+  border-radius: 12px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.guess-table {
+  width: 100%;
+  min-width: 780px;
+  border-collapse: separate;
+  border-spacing: 6px 6px;
+}
+
+.guess-table-head {
+  padding: 0.75rem 0.8rem;
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--gold) 8%, var(--surface-card));
+  color: var(--text-sub);
+  text-align: left;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.guess-table-index,
+.guess-table-cell {
+  padding: 0.9rem 0.8rem;
+  border-radius: 8px;
+  background: var(--surface-panel);
+  vertical-align: middle;
+  text-align: center;
+}
+
+.guess-table-index {
+  width: 40px;
+  color: var(--text-faint);
+  font-size: 0.82rem;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.guess-table-empty {
+  margin: 0;
+  padding: 1.18rem 1rem;
+  color: var(--text-faint);
+}
+
+/* ── Mobile table ── */
+@media (max-width: 720px) {
+  .guess-table-shell { padding: 0.35rem; }
+  .guess-table {
+    min-width: 540px;
+    border-spacing: 4px 4px;
+  }
+  .guess-table-head {
+    padding: 0.55rem 0.45rem;
+    font-size: 0.65rem;
+  }
+  .guess-table-index,
+  .guess-table-cell {
+    padding: 0.6rem 0.45rem;
+  }
+  .guess-table-index {
+    width: 32px; font-size: 0.7rem;
+  }
+}
+
+/* ── Feedback cells ── */
+.feedback-cell {
+  background-clip: padding-box;
+  overflow: hidden;
+}
+
+.feedback-cell-match {
+  background: color-mix(in oklab, var(--color-success) 30%, var(--surface-panel));
+  color: var(--text-main);
+}
+
+.feedback-cell-near {
+  background: color-mix(in oklab, var(--color-warning) 30%, var(--surface-panel));
+  color: var(--text-main);
+}
+
+.feedback-cell-different {
+  background: var(--surface-panel);
+}
+
+.feedback-cell-partial {
+  background: color-mix(in oklab, var(--color-accent) 26%, var(--surface-panel));
+  color: var(--text-main);
+}
+
+/* ── Summary band ── */
+@media (min-width: 960px) {
+  .summary-band {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1240px) {
+  .summary-band {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}

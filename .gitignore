@@ -47,3 +47,12 @@ vscode/
 # Miscellaneous
 *.mo
 *.pot
+.env
+.DS_Store
+node_modules/
+.pnpm-store/
+apps/client/dist/
+apps/client/.vite/
+apps/server/.venv/
+.pytest_cache/
+*.pyc

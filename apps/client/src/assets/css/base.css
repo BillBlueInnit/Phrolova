@@ -1,0 +1,79 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Base — CSS reset, element defaults, body background
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+  width: 100%;
+  margin: 0;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  position: relative;
+  overflow-x: hidden;
+  background:
+    radial-gradient(circle at 72% 16%, color-mix(in oklab, var(--gold) 10%, transparent), transparent 28%),
+    radial-gradient(circle at 18% 92%, color-mix(in oklab, var(--gold) 5%, transparent), transparent 34%),
+    linear-gradient(180deg, color-mix(in oklab, var(--shell-bg-deep) 62%, var(--shell-bg)) 0%, var(--shell-bg) 100%);
+  color: var(--text-main);
+  font-family: 'Noto Sans SC', "Noto Serif SC", "Source Han Serif SC", "PingFang SC", "Microsoft YaHei", serif;
+}
+
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+body::before {
+  background:
+    linear-gradient(125deg, transparent 0%, color-mix(in oklab, var(--gold) 6%, transparent) 46%, transparent 64%),
+    repeating-linear-gradient(165deg, color-mix(in oklab, var(--text-main) 4%, transparent) 0 2px, transparent 2px 14px);
+  opacity: 0.55;
+}
+
+body::after {
+  background:
+    radial-gradient(circle at 50% 0, color-mix(in oklab, var(--gold) 5%, transparent), transparent 30%),
+    radial-gradient(circle at 90% 10%, color-mix(in oklab, var(--gold) 5%, transparent), transparent 20%);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  border: 0;
+  cursor: pointer;
+  background: transparent;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
