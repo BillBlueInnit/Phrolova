@@ -16,6 +16,7 @@ export const useMultiGameStore = defineStore("multiGame", () => {
   const inQueue = shallowRef(false);
   const roomState = ref<MultiplayerRoomState | null>(null);
   const kicked = shallowRef(false);
+  const matchScoreDelta = ref(0);
 
   const me = computed(() => roomState.value?.players.find((player) => player.isMe) ?? null);
   const opponent = computed(() => roomState.value?.players.find((player) => !player.isMe) ?? null);
@@ -82,12 +83,14 @@ export const useMultiGameStore = defineStore("multiGame", () => {
       error.value = "";
     });
     currentSocket.on(S2C.MATCH_FINISHED, (payload) => {
+      matchScoreDelta.value = payload.scoreDelta || 0;
       infoMessage.value =
         payload.scoreDelta >= 0
           ? `整场获胜，积分 +${payload.scoreDelta}`
           : `整场结束，积分 ${payload.scoreDelta}`;
     });
     currentSocket.on(S2C.OPPONENT_FORFEIT, (payload) => {
+      matchScoreDelta.value = payload.scoreDelta || 0;
       infoMessage.value = payload.message || "对手已退出";
     });
     currentSocket.on(S2C.KICKED, () => {
@@ -183,6 +186,7 @@ export const useMultiGameStore = defineStore("multiGame", () => {
     inQueue.value = false;
     roomState.value = null;
     kicked.value = false;
+    matchScoreDelta.value = 0;
   }
 
   return {
@@ -195,6 +199,7 @@ export const useMultiGameStore = defineStore("multiGame", () => {
     opponent,
     canGuess,
     kicked,
+    matchScoreDelta,
     ensureConnected,
     resumeRoom,
     createRoom,

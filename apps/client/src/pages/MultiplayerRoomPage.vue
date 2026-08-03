@@ -92,19 +92,18 @@ watch(
   },
 );
 
+const matchScoreDelta = ref(0);
+
 const matchResultText = computed(() => {
-  const state = multiGameStore.roomState;
-  if (!state) return "";
-  const myId = authStore.playerId;
-  const winnerPlayer = state.overallWinner !== null ? state.players[state.overallWinner] : null;
-  if (!winnerPlayer) return "平局";
-  return winnerPlayer.playerId === myId ? "胜利" : "失败";
+  if (matchScoreDelta.value > 0) return "胜利";
+  if (matchScoreDelta.value < 0) return "失败";
+  return "平局";
 });
 
 const matchScoreText = computed(() => {
-  const state = multiGameStore.roomState;
-  if (!state || !state.scoreDelta) return "";
-  return state.scoreDelta > 0 ? `+${state.scoreDelta} 分` : `${state.scoreDelta} 分`;
+  const d = multiGameStore.matchScoreDelta;
+  if (!d) return "";
+  return d > 0 ? `+${d} 分` : `${d} 分`;
 });
 
 function closeMatchResult() {
