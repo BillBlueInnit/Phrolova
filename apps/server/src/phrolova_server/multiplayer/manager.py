@@ -52,7 +52,6 @@ class MultiplayerManager:
                     None,
                 )
                 if old_sid:
-                    self.socketio.emit("multi:kicked", {"message": "账号在别处登录"}, to=old_sid)
                     self.sid_to_player.pop(old_sid, None)
                 self.sid_to_player[request.sid] = player_id
             socket_join_room(player_id)
