@@ -10,11 +10,13 @@ from .players import (
     ensure_secret_column,
     ensure_single_score_columns,
     ensure_stats_columns,
+    set_kick_sockets_hook,
 )
 from .routes import auth_bp, game_bp, leaderboard_bp
 
 socketio = SocketIO(cors_allowed_origins="*", async_mode="gevent", path="/socket.io")
 multiplayer_manager = MultiplayerManager(socketio)
+set_kick_sockets_hook(multiplayer_manager.kick_player)
 
 
 def create_app():

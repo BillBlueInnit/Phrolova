@@ -12,6 +12,7 @@ from ..players import (
     ensure_secret_column,
     ensure_stats_columns,
     get_player,
+    kick_player_sockets,
     public_player,
     set_password,
     set_player_secret,
@@ -41,6 +42,7 @@ def player_init():
     if not player_id:
         return jsonify({"status": "error", "message": "缺少玩家ID"}), 400
     player = ensure_player(player_id)
+    kick_player_sockets(player_id)
     return jsonify({"status": "success", "player": public_player(player), "token": player["secret"]})
 
 
@@ -125,8 +127,8 @@ def auth_login():
         return jsonify({"status": "error", "message": "账号不存在"}), 404
     if not check_password_hash(player["password"], password):
         return jsonify({"status": "error", "message": "账号或密码错误"}), 401
-    if not player.get("secret"):
-        player["secret"] = set_player_secret(username)
+    player["secret"] = set_player_secret(username)
+    kick_player_sockets(username)
     return jsonify(
         {
             "status": "success",

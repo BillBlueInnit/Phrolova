@@ -47,6 +47,13 @@ class MultiplayerManager:
                 return False
             player_id = player["player_id"]
             with self.lock:
+                old_sid = next(
+                    (sid for sid, pid in self.sid_to_player.items() if pid == player_id),
+                    None,
+                )
+                if old_sid:
+                    self.socketio.emit("multi:kicked", {"message": "账号在别处登录"}, to=old_sid)
+                    self.sid_to_player.pop(old_sid, None)
                 self.sid_to_player[request.sid] = player_id
             socket_join_room(player_id)
             emit(
@@ -307,6 +314,13 @@ class MultiplayerManager:
     def _player_id_from_sid(self) -> str | None:
         with self.lock:
             return self.sid_to_player.get(request.sid)
+
+    def kick_player(self, player_id: str):
+        with self.lock:
+            sids = [sid for sid, pid in self.sid_to_player.items() if pid == player_id]
+            for sid in sids:
+                self.socketio.emit("multi:kicked", {"message": "账号在别处登录"}, to=sid)
+                self.sid_to_player.pop(sid, None)
 
     def _emit_error(self, player_id: str, message: str):
         self._emit_to_player(player_id, "multi:error", {"message": message})

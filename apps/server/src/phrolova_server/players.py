@@ -165,8 +165,7 @@ def ensure_player(player_id: str):
     player = get_player(player_id)
     if not player:
         return create_player(player_id)
-    if not player.get("secret"):
-        player["secret"] = set_player_secret(player_id)
+    player["secret"] = set_player_secret(player_id)
     return player
 
 
@@ -256,3 +255,16 @@ def update_player_id(old_id: str, new_id: str):
         connection.commit()
     finally:
         connection.close()
+
+
+_kick_sockets_hook = None
+
+
+def set_kick_sockets_hook(hook):
+    global _kick_sockets_hook
+    _kick_sockets_hook = hook
+
+
+def kick_player_sockets(player_id: str):
+    if _kick_sockets_hook:
+        _kick_sockets_hook(player_id)

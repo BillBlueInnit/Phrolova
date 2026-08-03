@@ -88,6 +88,10 @@ export const useMultiGameStore = defineStore("multiGame", () => {
       infoMessage.value = payload.message || "对手已退出";
       await authStore.refreshPlayer().catch(() => undefined);
     });
+    currentSocket.on("multi:kicked", (payload) => {
+      error.value = payload.message || "账号在别处登录";
+      disconnect();
+    });
   }
 
   async function ensureConnected() {

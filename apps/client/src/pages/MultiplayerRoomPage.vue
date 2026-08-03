@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef } from "vue";
 import { useRouter } from "vue-router";
 import gsap from "gsap";
 
@@ -21,29 +21,6 @@ const dictionaryStore = useDictionaryStore();
 const multiGameStore = useMultiGameStore();
 const router = useRouter();
 const guessName = shallowRef("");
-
-const localTimer = ref(0);
-let timerInterval: ReturnType<typeof setInterval> | null = null;
-
-watch(
-  () => multiGameStore.roomState,
-  (state) => {
-    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
-    if (!state) { localTimer.value = 0; return; }
-    const serverTime = state.timeLeft || state.countdownLeft || 0;
-    if (serverTime <= 0) { localTimer.value = 0; return; }
-    localTimer.value = serverTime;
-    timerInterval = setInterval(() => {
-      localTimer.value = Math.max(0, localTimer.value - 1);
-      if (localTimer.value <= 0 && timerInterval) { clearInterval(timerInterval); timerInterval = null; }
-    }, 1000);
-  },
-  { deep: true, immediate: true },
-);
-
-onBeforeUnmount(() => {
-  if (timerInterval) clearInterval(timerInterval);
-});
 
 const currentTheme = ref<"phrolova-light" | "phrolova-night">(
   (localStorage.getItem(THEME_KEY) as "phrolova-light" | "phrolova-night") || "phrolova-light",
@@ -82,7 +59,8 @@ const hasBattleHistory = computed(() =>
 const roomHintText = computed(() => {
   const roomState = multiGameStore.roomState;
   if (!roomState) return "";
-  return `房间 ${roomState.roomCode} · 第 ${roomState.round} 局 / BO${roomState.bestOf} · 剩余 ${localTimer.value} 秒`;
+  const timer = roomState.countdownLeft || roomState.timeLeft || 0;
+  return `房间 ${roomState.roomCode} · 第 ${roomState.round} 局 / BO${roomState.bestOf} · 剩余 ${timer} 秒`;
 });
 
 const answerText = computed(() => multiGameStore.roomState?.target?.name ?? "");
