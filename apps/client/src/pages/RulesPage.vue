@@ -204,10 +204,10 @@ const router = useRouter();
   transition: transform 0.8s ease, opacity 0.8s ease;
 }
 
-.bg-1 { background-image: url("/media/rule-bg-1.png"); }
-.bg-2 { background-image: url("/media/rule-bg-2.png"); }
-.bg-3 { background-image: url("/media/rule-bg-3.png"); }
-.bg-4 { background-image: url("/media/rule-bg-4.png"); }
+.bg-1 { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Cpath d='M0 40 L80 40 M40 0 L40 80' stroke='%23d4a843' stroke-width='0.5' opacity='0.3'/%3E%3Ccircle cx='40' cy='40' r='3' fill='%23d4a843' opacity='0.4'/%3E%3Ccircle cx='0' cy='0' r='2' fill='%23d4a843' opacity='0.3'/%3E%3Ccircle cx='80' cy='80' r='2' fill='%23d4a843' opacity='0.3'/%3E%3C/svg%3E"); }
+.bg-2 { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Cpath d='M0 30 L60 30 M30 0 L30 60' stroke='%23b0b8c0' stroke-width='0.5' opacity='0.25'/%3E%3Cpath d='M15 0 L30 15 L45 0 L60 15 L60 45 L45 60 L30 45 L15 60 L0 45 L0 15 Z' fill='none' stroke='%23c4946c' stroke-width='0.5' opacity='0.3' transform='translate(15,15)'/%3E%3C/svg%3E"); }
+.bg-3 { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Ccircle cx='50' cy='50' r='30' fill='none' stroke='%23d4a843' stroke-width='0.4' opacity='0.3'/%3E%3Ccircle cx='50' cy='50' r='15' fill='none' stroke='%23d4a843' stroke-width='0.6' opacity='0.4'/%3E%3Ccircle cx='50' cy='50' r='3' fill='%23d4a843' opacity='0.5'/%3E%3Ccircle cx='0' cy='0' r='20' fill='none' stroke='%23b0b8c0' stroke-width='0.4' opacity='0.2'/%3E%3Ccircle cx='100' cy='100' r='20' fill='none' stroke='%23b0b8c0' stroke-width='0.4' opacity='0.2'/%3E%3C/svg%3E"); }
+.bg-4 { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='70' height='70'%3E%3Cpath d='M0 0 L70 70 M70 0 L0 70' stroke='%23c4946c' stroke-width='0.5' opacity='0.25'/%3E%3Crect x='32' y='32' width='6' height='6' fill='%23d4a843' opacity='0.4' transform='rotate(45 35 35)'/%3E%3C/svg%3E"); }
 
 .card:hover .card-bg {
   transform: scale(1.05);
