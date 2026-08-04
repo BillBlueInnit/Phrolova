@@ -7,6 +7,7 @@ import random
 import secrets
 import threading
 import time
+from pathlib import Path
 
 from PIL import ImageFont
 
@@ -14,7 +15,11 @@ CAPTCHA_TTL = 180
 CAPTCHAS: dict[str, dict[str, float | str]] = {}
 CAPTCHA_LOCK = threading.Lock()
 
+_BASE_DIR = Path(__file__).resolve().parent
+_BUNDLED_FONT = _BASE_DIR / "assets" / "fonts" / "arialbd.ttf"
+
 _FONT_CANDIDATES = [
+    str(_BUNDLED_FONT),
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
     "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
     "C:/Windows/Fonts/arialbd.ttf",
@@ -45,7 +50,10 @@ def _load_font(size: int):
                 return ImageFont.truetype(path, size)
         except Exception:
             continue
-    return ImageFont.load_default()
+    try:
+        return ImageFont.load_default(size=size)
+    except TypeError:
+        return ImageFont.load_default()
 
 
 def _make_captcha_image(text: str):
@@ -54,13 +62,13 @@ def _make_captcha_image(text: str):
     width, height = 132, 46
     image = Image.new("RGB", (width, height), (22, 27, 47))
     draw = ImageDraw.Draw(image)
-    font = _load_font(36)
+    font = _load_font(32)
     for _ in range(150):
         x = random.randint(0, width - 1)
         y = random.randint(0, height - 1)
         color = random.randint(120, 255)
         draw.point((x, y), fill=(color, color, color))
-    for _ in range(5):
+    for _ in range(4):
         x1 = random.randint(-10, width)
         y1 = random.randint(0, height)
         x2 = random.randint(-10, width)
@@ -73,8 +81,8 @@ def _make_captcha_image(text: str):
     step = width // (len(text) + 1)
     for index, char in enumerate(text):
         color = (random.randint(200, 255), random.randint(180, 255), random.randint(120, 220))
-        x = step + index * step + random.randint(-3, 3)
-        y = random.randint(6, 14)
+        x = step + index * step + random.randint(-2, 2)
+        y = random.randint(2, 10)
         draw.text((x, y), char, font=font, fill=color)
     buffer = io.BytesIO()
     image.save(buffer, format="PNG")

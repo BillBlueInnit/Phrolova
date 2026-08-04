@@ -19,7 +19,11 @@ const filteredCharacters = computed(() => {
   const q = search.value.toLowerCase();
   if (!q) return characters.value;
   return characters.value.filter(c =>
-    c.name.toLowerCase().includes(q) || c.attribute.includes(q)
+    c.name.toLowerCase().includes(q) ||
+    c.attribute.toLowerCase().includes(q) ||
+    c.weapon.toLowerCase().includes(q) ||
+    c.birthplace.toLowerCase().includes(q) ||
+    String(c.version).includes(q)
   );
 });
 
@@ -27,7 +31,12 @@ const filteredSkeletons = computed(() => {
   const q = search.value.toLowerCase();
   if (!q) return skeletons.value;
   return skeletons.value.filter(s =>
-    s.name.toLowerCase().includes(q) || s.skill_attribute.includes(q) || s.set_name.includes(q)
+    s.name.toLowerCase().includes(q) ||
+    s.skill_attribute.toLowerCase().includes(q) ||
+    s.set_name.toLowerCase().includes(q) ||
+    s.drop_location.toLowerCase().includes(q) ||
+    s.is_aberration.toLowerCase().includes(q) ||
+    String(s.cost).includes(q)
   );
 });
 
@@ -69,22 +78,37 @@ onMounted(async () => {
 
     <div v-else-if="tab === 'resonator'" class="dp-grid">
       <div v-for="char in filteredCharacters" :key="char.name" class="dp-card">
-        <img :src="getCharacterAvatar(char.name)" class="dp-card-avatar" alt="" loading="lazy" />
-        <div class="dp-card-info">
-          <strong class="dp-card-name">{{ char.name }}</strong>
-          <span class="dp-card-meta">{{ char.attribute }} · {{ '★'.repeat(char.star_rating) }}</span>
+        <div class="dp-card-head">
+          <img :src="getCharacterAvatar(char.name)" class="dp-card-avatar" alt="" loading="lazy" />
+          <div class="dp-card-title">
+            <strong class="dp-card-name">{{ char.name }}</strong>
+            <span class="dp-card-stars">{{ '★'.repeat(char.star_rating) }}</span>
+          </div>
         </div>
+        <dl class="dp-card-detail">
+          <div class="dp-row"><dt>属性</dt><dd>{{ char.attribute }}</dd></div>
+          <div class="dp-row"><dt>武器</dt><dd>{{ char.weapon }}</dd></div>
+          <div class="dp-row"><dt>出生地</dt><dd>{{ char.birthplace }}</dd></div>
+          <div class="dp-row"><dt>版本</dt><dd>{{ char.version }}</dd></div>
+        </dl>
       </div>
       <p v-if="!filteredCharacters.length" class="dp-empty">未找到匹配角色</p>
     </div>
 
     <div v-else class="dp-grid">
       <div v-for="sk in filteredSkeletons" :key="sk.name" class="dp-card">
-        <img :src="getSkeletonAvatar(sk.name)" class="dp-card-avatar" alt="" loading="lazy" />
-        <div class="dp-card-info">
-          <strong class="dp-card-name">{{ sk.name }}</strong>
-          <span class="dp-card-meta">{{ sk.skill_attribute }} · COST {{ sk.cost }} · {{ sk.set_name }}</span>
+        <div class="dp-card-head">
+          <img :src="getSkeletonAvatar(sk.name)" class="dp-card-avatar" alt="" loading="lazy" />
+          <div class="dp-card-title">
+            <strong class="dp-card-name">{{ sk.name }}</strong>
+            <span class="dp-card-stars">COST {{ sk.cost }} · {{ sk.is_aberration === '有' ? '异相' : '常规' }}</span>
+          </div>
         </div>
+        <dl class="dp-card-detail">
+          <div class="dp-row"><dt>技能属性</dt><dd>{{ sk.skill_attribute }}</dd></div>
+          <div class="dp-row"><dt>套装</dt><dd>{{ sk.set_name }}</dd></div>
+          <div class="dp-row"><dt>掉落位置</dt><dd>{{ sk.drop_location }}</dd></div>
+        </dl>
       </div>
       <p v-if="!filteredSkeletons.length" class="dp-empty">未找到匹配声骸</p>
     </div>
@@ -100,7 +124,7 @@ onMounted(async () => {
 
 .dp-top {
   display: flex; align-items: center; justify-content: space-between;
-  width: 100%; max-width: 900px; margin-bottom: 0.8rem;
+  width: 100%; max-width: 1100px; margin-bottom: 0.8rem;
 }
 .dp-back {
   display: inline-flex; align-items: center; gap: 0.35rem;
@@ -145,40 +169,66 @@ onMounted(async () => {
 
 .dp-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 0.8rem;
-  width: 100%; max-width: 900px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.9rem;
+  width: 100%; max-width: 1100px;
 }
 
 .dp-card {
-  display: flex; align-items: center; gap: 0.7rem;
-  padding: 0.7rem;
-  border: 1px solid var(--line-soft); border-radius: 10px;
+  display: flex; flex-direction: column; gap: 0.6rem;
+  padding: 0.85rem;
+  border: 1px solid var(--line-soft); border-radius: 12px;
   background: linear-gradient(180deg, var(--surface-panel-strong), var(--surface-panel));
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, transform 0.2s;
 }
-.dp-card:hover { border-color: color-mix(in oklab, var(--gold) 30%, transparent); }
+.dp-card:hover {
+  border-color: color-mix(in oklab, var(--gold) 35%, transparent);
+  transform: translateY(-2px);
+}
 
+.dp-card-head {
+  display: flex; align-items: center; gap: 0.7rem;
+}
 .dp-card-avatar {
-  width: 52px; height: 52px; border-radius: 8px; object-fit: cover;
+  width: 60px; height: 60px; border-radius: 10px; object-fit: cover;
   border: 1px solid var(--line-soft); flex-shrink: 0;
 }
-.dp-card-info { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
+.dp-card-title {
+  display: flex; flex-direction: column; gap: 0.2rem; min-width: 0;
+}
 .dp-card-name {
-  font-size: 0.9rem; font-weight: 700; letter-spacing: 0.04em;
+  font-size: 0.95rem; font-weight: 700; letter-spacing: 0.04em;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.dp-card-meta {
-  font-size: 0.7rem; color: var(--text-sub);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+.dp-card-stars {
+  font-size: 0.75rem; color: var(--gold); font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.dp-card-detail {
+  margin: 0; display: flex; flex-direction: column; gap: 0.3rem;
+  padding-top: 0.5rem; border-top: 1px solid var(--line-soft);
+}
+.dp-row {
+  display: flex; align-items: baseline; gap: 0.5rem;
+  font-size: 0.8rem; line-height: 1.4;
+}
+.dp-row dt {
+  flex-shrink: 0; min-width: 3.5rem;
+  color: var(--text-faint); font-weight: 500;
+}
+.dp-row dd {
+  margin: 0; color: var(--text-sub); flex: 1;
+  word-break: break-all;
 }
 
 @media (max-width: 540px) {
   .dp-page { padding: 0.8rem 0.6rem 2rem; }
-  .dp-grid { grid-template-columns: repeat(2, 1fr); gap: 0.5rem; }
-  .dp-card { padding: 0.5rem; gap: 0.4rem; }
-  .dp-card-avatar { width: 40px; height: 40px; }
-  .dp-card-name { font-size: 0.78rem; }
-  .dp-card-meta { font-size: 0.64rem; }
+  .dp-grid { grid-template-columns: 1fr; gap: 0.6rem; }
+  .dp-card { padding: 0.6rem; gap: 0.5rem; }
+  .dp-card-avatar { width: 48px; height: 48px; }
+  .dp-card-name { font-size: 0.85rem; }
+  .dp-row { font-size: 0.75rem; }
+  .dp-row dt { min-width: 3rem; }
 }
 </style>

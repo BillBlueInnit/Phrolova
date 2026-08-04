@@ -27,13 +27,18 @@ export interface ResonatorNameEntry {
   name: string;
   attribute: string;
   star_rating: number;
+  weapon: string;
+  birthplace: string;
+  version: number;
 }
 
 export interface SkeletonNameEntry {
   name: string;
   skill_attribute: string;
   cost: number;
+  is_aberration: string;
   set_name: string;
+  drop_location: string;
 }
 
 export interface CompareAttrItem {

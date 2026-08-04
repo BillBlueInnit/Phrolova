@@ -340,11 +340,10 @@ onMounted(async () => {
 .home-title {
   margin: 0;
   font-family: 'Rajdhani', sans-serif;
-  font-size: clamp(2.5rem, 2rem + 3vw, 4rem);
+  font-size: clamp(2rem, 1.6rem + 2vw, 3.2rem);
   font-weight: 700;
   letter-spacing: 0.12em;
   color: var(--gold);
-  text-shadow: 0 0 40px color-mix(in oklab, var(--gold) 30%, transparent);
 }
 
 .home-subtitle {
@@ -361,7 +360,23 @@ onMounted(async () => {
   flex: 1;
   overflow: hidden;
   border: 1px solid var(--line-soft);
-  background: radial-gradient(circle at 75% 50%, var(--shell-bg-deep) 0%, var(--shell-bg) 50%);
+  background:
+    radial-gradient(circle at 75% 50%, var(--shell-bg-deep) 0%, var(--shell-bg) 50%),
+    radial-gradient(circle at 20% 80%, color-mix(in oklab, var(--gold) 6%, transparent) 0%, transparent 40%);
+}
+
+#start-menu::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image:
+    linear-gradient(color-mix(in oklab, var(--gold) 4%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklab, var(--gold) 4%, transparent) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse at 30% 50%, black 0%, transparent 70%);
+  -webkit-mask-image: radial-gradient(ellipse at 30% 50%, black 0%, transparent 70%);
+  pointer-events: none;
 }
 
 .home-stage {
@@ -406,7 +421,6 @@ onMounted(async () => {
   max-width: 100%;
   object-fit: contain;
   object-position: bottom right;
-  filter: drop-shadow(0 0 60px color-mix(in oklab, var(--gold) 22%, transparent));
 }
 
 .menu-container {
@@ -414,15 +428,14 @@ onMounted(async () => {
   z-index: 2;
   display: grid;
   gap: 1.45rem;
-  width: min(45rem, 46%);
-  min-height: 100%;
+  width: min(34rem, 38%);
   padding: clamp(1rem, 1.8vw, 1.5rem);
 }
 
 .menu-list {
   display: flex;
   flex-direction: column;
-  gap: 1.8rem;
+  gap: 1.2rem;
   padding: 0;
   margin: 0;
   list-style: none;
@@ -432,12 +445,13 @@ onMounted(async () => {
   position: relative;
   display: flex;
   align-items: flex-end;
-  gap: 1.15rem;
+  gap: 0.85rem;
   width: 100%;
-  padding-bottom: 0.85rem;
+  padding: 0.5rem 0.8rem 0.6rem 0.6rem;
   border-bottom: 1px solid var(--line-strong);
+  border-radius: 8px 8px 0 0;
   text-decoration: none;
-  transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), border-color 0.4s ease;
+  transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), border-color 0.4s ease, background 0.3s ease;
 }
 
 .menu-item::before {
@@ -451,47 +465,64 @@ onMounted(async () => {
   transition: width 0.4s ease;
 }
 
+.menu-item::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 8px 8px 0 0;
+  background: linear-gradient(135deg, color-mix(in oklab, var(--gold) 10%, transparent) 0%, transparent 60%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
 .menu-item:hover {
-  transform: translateX(18px);
+  transform: translateX(12px);
   border-bottom-color: transparent;
+  background: color-mix(in oklab, var(--gold) 6%, transparent);
 }
 
 .menu-item:hover::before {
   width: 100%;
 }
 
+.menu-item:hover::after {
+  opacity: 1;
+}
+
 .menu-icon {
   flex-shrink: 0;
-  font-size: 2.4rem;
+  font-size: 2.2rem;
   color: var(--text-faint);
-  transition: color 0.3s ease;
-  margin-bottom: -0.2rem;
+  transition: color 0.3s ease, transform 0.3s ease;
+  margin-bottom: -0.15rem;
 }
 
 .menu-item:hover .menu-icon {
   color: var(--gold-soft);
+  transform: scale(1.15);
 }
 
 .menu-text {
   display: flex;
   align-items: flex-end;
-  gap: 1.15rem;
+  gap: 0.85rem;
 }
 
 .menu-item .cn {
   color: var(--text-main);
-  font-size: clamp(2rem, 1.5rem + 1.4vw, 3.15rem);
+  font-size: clamp(1.4rem, 1.1rem + 0.9vw, 2.1rem);
   font-weight: 900;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.16em;
   transition: color 0.3s ease;
 }
 
 .menu-item .en {
-  margin-bottom: 0.28rem;
+  margin-bottom: 0.22rem;
   color: var(--text-sub);
-  font-size: 1rem;
+  font-size: 0.86rem;
   font-weight: 600;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   transition: color 0.3s ease;
 }
@@ -505,13 +536,14 @@ onMounted(async () => {
 }
 
 .home-detail {
-  position: absolute;
-  left: clamp(1rem, 2vw, 2rem);
-  bottom: clamp(1rem, 2vw, 2rem);
-  z-index: 3;
+  position: relative;
+  align-self: flex-start;
+  width: min(34rem, 38%);
+  padding: 0 clamp(1rem, 1.8vw, 1.5rem);
+  margin-top: auto;
+  z-index: 4;
   display: grid;
   gap: 1rem;
-  width: min(28rem, 32%);
 }
 
 .home-detail-card {
@@ -521,9 +553,22 @@ onMounted(async () => {
 }
 
 .home-detail-card--ghost {
-  background: transparent;
-  border: 1px solid var(--line-strong);
-  backdrop-filter: blur(4px);
+  position: relative;
+  background: linear-gradient(180deg, var(--surface-panel-strong), var(--surface-panel));
+  border: 1px solid color-mix(in oklab, var(--gold) 45%, transparent);
+  border-radius: 10px;
+  backdrop-filter: blur(8px);
+  overflow: hidden;
+}
+
+.home-detail-card--ghost::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at top right,
+      color-mix(in oklab, var(--gold) 16%, transparent),
+      transparent 70%);
+  pointer-events: none;
 }
 
 .home-detail-card strong {
@@ -565,6 +610,40 @@ onMounted(async () => {
 
 .home-detail-link:hover {
   color: var(--text-main);
+}
+
+/* ── prominent login button (ghost card only) ── */
+
+.home-detail-card--ghost .home-detail-link {
+  position: relative;
+  justify-content: center;
+  width: 100%;
+  margin-top: 1.1rem;
+  padding: 0.7rem 1.2rem;
+  border: 1px solid color-mix(in oklab, var(--gold) 55%, transparent);
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--gold) 20%, var(--surface-panel-strong));
+  color: var(--gold);
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.24em;
+  transition: background 0.2s ease, transform 0.2s ease, color 0.2s ease;
+}
+
+.home-detail-card--ghost .home-detail-link:hover {
+  background: color-mix(in oklab, var(--gold) 34%, var(--surface-panel-strong));
+  color: var(--text-main);
+  transform: translateY(-1px);
+}
+
+.home-detail-card--ghost .home-detail-link:active {
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-item:hover .menu-icon {
+    transform: none;
+  }
 }
 
 /* ── identity card ── */
@@ -637,6 +716,15 @@ onMounted(async () => {
 .home-detail-card .feature-panel-kicker {
   font-weight: 600;
   letter-spacing: 0.22em;
+}
+
+.home-detail-card--ghost .feature-panel-kicker {
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.home-detail-card--ghost strong {
+  color: var(--text-main);
 }
 
 /* ── auth modal ── */
@@ -776,6 +864,7 @@ onMounted(async () => {
 .auth-captcha-row {
   display: flex;
   gap: 0.5rem;
+  align-items: stretch;
 }
 
 .auth-captcha-box {
@@ -975,9 +1064,11 @@ onMounted(async () => {
     position: relative;
     inset: auto;
     z-index: 2;
+    align-self: center;
     width: 100%;
     max-width: 380px;
     margin: 1rem auto 0;
+    padding: 0;
   }
 
   .home-detail-card {
@@ -1067,7 +1158,7 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  padding: 0.8rem 0 0.4rem;
+  padding: 0.3rem 0 0.4rem;
   font-size: 0.82rem;
   color: var(--text-faint);
 }
@@ -1116,8 +1207,9 @@ onMounted(async () => {
   }
 
   .auth-captcha-box {
-    min-width: 80px;
-    min-height: 36px;
+    flex: 0 0 auto;
+    width: 130px;
+    height: 46px;
   }
 }
 </style>

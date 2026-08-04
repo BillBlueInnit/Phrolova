@@ -6,7 +6,6 @@ import gsap from "gsap";
 import FeedbackLegend from "@/components/game/FeedbackLegend.vue";
 import GuessTable from "@/components/game/GuessTable.vue";
 import NameAutocompleteInput from "@/components/game/NameAutocompleteInput.vue";
-import StatusBanner from "@/components/shared/StatusBanner.vue";
 import { useDictionaryStore } from "@/stores/dictionary";
 import { useSingleGameStore } from "@/stores/singleGame";
 
@@ -49,7 +48,7 @@ const targetCost = computed(() => {
 
 const answerText = computed(() => {
   const target = singleGameStore.target;
-  if (!target || !singleGameStore.answerVisible) return "";
+  if (!target) return "";
   return singleGameStore.quizType === "skeleton"
     ? `${target.name} / COST ${target.cost} / ${target.skill_attribute}`
     : `${target.name} / ${target.attribute} / ${target.weapon} / ${target.version}`;
@@ -67,27 +66,32 @@ const stagePromptSubtitle = computed(() =>
     : "绿色正确，黄色接近，箭头提示目标数值方向",
 );
 
-const attemptSummary = computed(
-  () => `已猜 ${singleGameStore.attemptsUsed} / ${singleGameStore.attemptsLimit} · 剩余 ${singleGameStore.attemptsLeft} 次`,
-);
+const isWin = computed(() => singleGameStore.resultMessage === "回答正确，本局已完成。");
 
-const showWinModal = shallowRef(false);
+const roundEndTitle = computed(() => {
+  if (isWin.value) return "回答正确";
+  if (singleGameStore.resultMessage === "已显示本局答案。") return "已揭晓答案";
+  return "机会已用尽";
+});
+
+const showRoundEndModal = shallowRef(false);
 
 watch(
-  () => singleGameStore.resultMessage,
-  (msg) => {
-    if (msg === "回答正确，本局已完成。") showWinModal.value = true;
+  () => singleGameStore.gameOver,
+  (over) => {
+    if (over) showRoundEndModal.value = true;
   },
 );
 
-function closeWinModal() {
-  showWinModal.value = false;
+function closeRoundEndModal() {
+  showRoundEndModal.value = false;
 }
 
 async function restartGame() {
   try {
     await singleGameStore.startGame();
     guessName.value = "";
+    showRoundEndModal.value = false;
     gsap.from(".sg-stage", { opacity: 0, y: 16, duration: 0.4, ease: "power2.out" });
   } catch {
     return;
@@ -139,21 +143,22 @@ onMounted(async () => {
         </div>
       </header>
 
-      <!-- ── 状态行 ── -->
-      <div class="sg-utility-row">
-        <div class="sg-stats">
-          <span class="sg-stat-chip">
-            <Icon icon="ph:hourglass-duotone" class="sg-chip-icon" aria-hidden="true" />
-            剩余 {{ singleGameStore.attemptsLeft }} 次
-          </span>
-          <span class="sg-stat-chip">{{ attemptSummary }}</span>
+      <!-- ── 居中比分 ── -->
+      <div class="sg-score-bar">
+        <div class="sg-score-item">
+          <span class="sg-score-label">已猜</span>
+          <span class="sg-score-value">{{ singleGameStore.attemptsUsed }}</span>
         </div>
-      </div>
-
-      <div class="status-stack">
-        <StatusBanner v-if="singleGameStore.error" :message="singleGameStore.error" tone="error" />
-        <StatusBanner v-else-if="singleGameStore.resultMessage" :message="singleGameStore.resultMessage" tone="success" />
-        <StatusBanner v-if="answerText" :message="`本局答案：${answerText}`" />
+        <div class="sg-score-divider">/</div>
+        <div class="sg-score-item">
+          <span class="sg-score-label">上限</span>
+          <span class="sg-score-value">{{ singleGameStore.attemptsLimit }}</span>
+        </div>
+        <div class="sg-score-divider sg-score-divider--gap">·</div>
+        <div class="sg-score-item">
+          <span class="sg-score-label">剩余</span>
+          <span class="sg-score-value sg-score-value--accent">{{ singleGameStore.attemptsLeft }}</span>
+        </div>
       </div>
 
       <!-- ── 中部：游戏面板 ── -->
@@ -162,7 +167,7 @@ onMounted(async () => {
           <div class="sg-stage-copy">
             <p class="sg-stage-kicker">PLAYFIELD</p>
             <h2 class="sg-stage-title">{{ hasGuessHistory ? "猜测记录" : stagePromptTitle }}</h2>
-            <p class="sg-stage-sub">{{ hasGuessHistory ? attemptSummary : stagePromptSubtitle }}</p>
+            <p class="sg-stage-sub">{{ hasGuessHistory ? "" : stagePromptSubtitle }}</p>
           </div>
           <FeedbackLegend v-if="hasGuessHistory" />
         </div>
@@ -211,16 +216,18 @@ onMounted(async () => {
     </div>
 
     <Teleport to="body">
-      <div v-if="showWinModal" class="win-overlay" @click.self="closeWinModal">
+      <div v-if="showRoundEndModal" class="win-overlay" @click.self="closeRoundEndModal">
         <div class="win-modal">
-          <div class="win-glow" />
-          <div class="win-icon"><Icon icon="ph:crown-duotone" aria-hidden="true" /></div>
-          <h2 class="win-title">回答正确</h2>
+          <div class="win-icon" :class="{ 'win-icon--win': isWin, 'win-icon--lose': !isWin }">
+            <Icon :icon="isWin ? 'ph:crown-duotone' : 'ph:eye-duotone'" aria-hidden="true" />
+          </div>
+          <h2 class="win-title">{{ roundEndTitle }}</h2>
+          <p class="win-answer-label">正确答案</p>
           <p class="win-answer">{{ answerText }}</p>
-          <p class="win-attempts">仅用 {{ singleGameStore.attemptsUsed }} 次猜测</p>
+          <p v-if="isWin" class="win-attempts">仅用 {{ singleGameStore.attemptsUsed }} 次猜测</p>
           <p v-if="singleGameStore.earnedScore" class="win-score">+{{ singleGameStore.earnedScore }} 分</p>
           <div class="win-actions">
-            <button class="win-btn win-btn-primary" @click="closeWinModal(); restartGame();">再来一局</button>
+            <button class="win-btn win-btn-primary" @click="restartGame">再来一局</button>
             <button class="win-btn" @click="router.push('/single')">返回模式选择</button>
           </div>
         </div>
@@ -238,10 +245,12 @@ onMounted(async () => {
 
 .sg-shell {
   height: 100dvh;
+  max-width: 1400px;
+  margin: 0 auto;
   display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
-  gap: 0.6rem;
-  padding: 0.5rem 1rem 0.6rem;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 0.8rem;
+  padding: 0.8rem clamp(1rem, 4vw, 3rem) 0.8rem;
   overflow: hidden;
 }
 
@@ -280,18 +289,58 @@ onMounted(async () => {
 .sg-glass-btn:hover { color: var(--gold); border-color: var(--gold); }
 .sg-glass-theme { color: var(--gold-soft); }
 
-/* ── 工具行 ── */
-.sg-utility-row { display: flex; justify-content: flex-end; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
-.sg-stats { display: flex; gap: 0.45rem; flex-wrap: wrap; }
-
-.sg-stat-chip {
-  display: inline-flex; align-items: center; gap: 0.3rem;
-  min-height: 36px; padding: 0.38rem 0.75rem;
-  border: 1px solid var(--line-soft); border-radius: 6px;
-  background: color-mix(in oklab, var(--gold) 4%, var(--surface-card));
-  color: var(--text-sub); font-size: 0.8rem;
+/* ── 居中比分 ── */
+.sg-score-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.2rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  background: linear-gradient(180deg, var(--surface-panel-strong), var(--surface-panel));
 }
-.sg-chip-icon { font-size: 0.9rem; color: var(--gold-soft); }
+
+.sg-score-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.sg-score-label {
+  color: var(--text-faint);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sg-score-value {
+  color: var(--text-main);
+  font-size: clamp(1.8rem, 1.4rem + 1.6vw, 2.8rem);
+  font-weight: 900;
+  font-family: 'Rajdhani', sans-serif;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  min-width: 1.2em;
+  text-align: center;
+}
+
+.sg-score-value--accent {
+  color: var(--gold);
+}
+
+.sg-score-divider {
+  color: var(--text-faint);
+  font-size: 1.6rem;
+  font-weight: 700;
+  font-family: 'Rajdhani', sans-serif;
+  line-height: 1;
+}
+
+.sg-score-divider--gap {
+  margin: 0 0.3rem;
+}
 
 /* ── 中部面板 ── */
 .sg-stage {
@@ -322,17 +371,17 @@ onMounted(async () => {
 
 /* ── 底部 dock ── */
 .sg-dock {
-  display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap;
+  display: flex; align-items: center; gap: 0.8rem; flex-wrap: nowrap;
   padding: 0.75rem 0.9rem 0.85rem;
   border: 1px solid var(--line-soft); border-radius: 10px;
   background: linear-gradient(180deg, var(--surface-panel-strong), var(--surface-panel));
 }
-.sg-dock-copy { display: grid; gap: 0.18rem; min-width: min(100%, 14rem); }
+.sg-dock-copy { display: grid; gap: 0.18rem; flex-shrink: 0; }
 .sg-dock-label { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--text-faint); font-size: 0.68rem; letter-spacing: 0.2em; text-transform: uppercase; }
 .sg-dock-label-icon { font-size: 0.95rem; color: var(--gold-soft); }
 
-.sg-input-row { flex: 1; display: flex; gap: 0.5rem; }
-.sg-input-row > :first-child { flex: 1; }
+.sg-input-row { flex: 1; min-width: 0; display: flex; gap: 0.5rem; }
+.sg-input-row > :first-child { flex: 1; min-width: 0; }
 
 .sg-btn {
   display: inline-flex; align-items: center; gap: 0.3rem;
@@ -350,9 +399,9 @@ onMounted(async () => {
 /* ── 响应式 ── */
 @media (max-width: 720px) {
   .sg-shell {
-    padding: 0;
-    gap: 0;
-    grid-template-rows: auto minmax(0, 1fr) auto;
+    padding: 0.4rem 0.6rem;
+    gap: 0.4rem;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
   }
 
   .sg-glass-header {
@@ -363,10 +412,17 @@ onMounted(async () => {
     padding: 0.5rem 0.7rem;
   }
 
-  .sg-utility-row,
-  .status-stack {
-    display: none;
+  .sg-score-bar {
+    gap: 0.8rem;
+    padding: 0.4rem 0.6rem;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
   }
+
+  .sg-score-label { font-size: 0.72rem; }
+  .sg-score-value { font-size: 1.6rem; }
+  .sg-score-divider { font-size: 1.3rem; }
 
   .sg-stage {
     border: none;
@@ -416,7 +472,7 @@ onMounted(async () => {
   .sg-btn-submit { padding: 0.55rem 0.8rem; }
 }
 
-/* ── Win Modal ── */
+/* ── Round End Modal ── */
 .win-overlay {
   position: fixed; inset: 0; z-index: 1000;
   display: flex; align-items: center; justify-content: center;
@@ -430,16 +486,9 @@ onMounted(async () => {
   width: 100%; max-width: 380px; padding: 2.2rem 1.8rem 1.8rem;
   border: 1px solid color-mix(in oklab, var(--gold) 30%, transparent);
   border-radius: 12px;
-  background: radial-gradient(circle at 50% 0%, color-mix(in oklab, var(--gold) 12%, var(--surface-panel-strong)) 0%, var(--surface-panel-strong) 60%);
+  background: var(--surface-panel-strong);
   text-align: center;
   animation: winSlideUp 0.35s ease;
-}
-
-.win-glow {
-  position: absolute; top: -60px; left: 50%; transform: translateX(-50%);
-  width: 200px; height: 120px;
-  background: radial-gradient(circle, color-mix(in oklab, var(--gold) 28%, transparent), transparent 70%);
-  pointer-events: none;
 }
 
 .win-icon {
@@ -454,8 +503,13 @@ onMounted(async () => {
   margin: 0; font-size: 1.4rem; font-weight: 900; letter-spacing: 0.08em; color: var(--gold);
 }
 
+.win-answer-label {
+  margin: 0; color: var(--text-faint); font-size: 0.72rem; font-weight: 600;
+  letter-spacing: 0.2em; text-transform: uppercase;
+}
+
 .win-answer {
-  margin: 0; color: var(--text-main); font-size: 1.05rem; font-weight: 700; letter-spacing: 0.04em;
+  margin: 0; color: var(--text-main); font-size: 1.1rem; font-weight: 700; letter-spacing: 0.04em;
 }
 
 .win-attempts {

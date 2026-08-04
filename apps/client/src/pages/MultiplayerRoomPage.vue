@@ -7,7 +7,6 @@ import FeedbackLegend from "@/components/game/FeedbackLegend.vue";
 import GuessTable from "@/components/game/GuessTable.vue";
 import NameAutocompleteInput from "@/components/game/NameAutocompleteInput.vue";
 import MatchSummary from "@/components/multi/MatchSummary.vue";
-import StatusBanner from "@/components/shared/StatusBanner.vue";
 import { useAuthStore } from "@/stores/auth";
 import { useDictionaryStore } from "@/stores/dictionary";
 import { useMultiGameStore } from "@/stores/multiGame";
@@ -110,6 +109,19 @@ function closeMatchResult() {
   showMatchResult.value = false;
 }
 
+function openFullResultPage() {
+  if (!multiGameStore.roomState) return;
+  sessionStorage.setItem(
+    "phrolova_match_result",
+    JSON.stringify({
+      roomState: multiGameStore.roomState,
+      scoreDelta: multiGameStore.matchScoreDelta,
+    }),
+  );
+  const url = router.resolve({ name: "multi-result" }).href;
+  window.open(url, "_blank");
+}
+
 async function submitGuess() {
   if (!guessName.value.trim()) return;
   try {
@@ -184,35 +196,27 @@ watch(
           </div>
         </header>
 
-        <!-- ── 对局摘要 ── -->
-        <MatchSummary :room-state="multiGameStore.roomState" />
-
-        <!-- ── 分数 + 状态行 ── -->
-        <div class="mr-summary-row">
+        <!-- ── 对局信息 + 计分板（合并卡片） ── -->
+        <div class="mr-info-card">
+          <MatchSummary :room-state="multiGameStore.roomState" />
+          <div class="mr-info-divider" />
           <div class="mr-score-panel">
-            <p class="mr-score-kicker">SCORE</p>
-            <div class="mr-score-ribbon">
-              <div class="mr-score-side">
+            <div class="mr-score-bar">
+              <div class="mr-score-item">
                 <span class="mr-score-label">我方</span>
-                <strong class="mr-score-value" :class="{ 'mr-score-value--lead': myWins >= winsNeeded }">{{ myWins }}</strong>
+                <span class="mr-score-value" :class="{ 'mr-score-value--lead': myWins >= winsNeeded }">{{ myWins }}</span>
               </div>
-
-              <div class="mr-score-center">
-                <span class="mr-score-vs">VS</span>
-                <span class="mr-score-target">先 {{ winsNeeded }} 胜</span>
-              </div>
-
-              <div class="mr-score-side">
+              <div class="mr-score-divider">VS</div>
+              <div class="mr-score-item">
                 <span class="mr-score-label">对手</span>
-                <strong class="mr-score-value" :class="{ 'mr-score-value--lead': opponentWins >= winsNeeded }">{{ opponentWins }}</strong>
+                <span class="mr-score-value" :class="{ 'mr-score-value--lead': opponentWins >= winsNeeded }">{{ opponentWins }}</span>
+              </div>
+              <div class="mr-score-divider mr-score-divider--gap">·</div>
+              <div class="mr-score-item">
+                <span class="mr-score-label">先胜</span>
+                <span class="mr-score-value mr-score-value--accent">{{ winsNeeded }}</span>
               </div>
             </div>
-          </div>
-
-          <div class="status-stack">
-            <StatusBanner v-if="multiGameStore.error" :message="multiGameStore.error" tone="error" />
-            <StatusBanner v-else-if="multiGameStore.infoMessage" :message="multiGameStore.infoMessage" />
-            <StatusBanner v-if="answerText" :message="`本局答案：${answerText}`" tone="success" />
           </div>
         </div>
 
@@ -268,6 +272,7 @@ watch(
                 :quiz-type="multiGameStore.roomState.quizType"
                 :rows="multiGameStore.opponent?.guesses ?? []"
                 empty-label="等待对手提交第一条猜测"
+                :hidden-keys="['version', 'star_rating']"
                 :target-version="multiGameStore.roomState.targetVersion"
                 :target-cost="multiGameStore.roomState.targetCost"
               />
@@ -325,41 +330,14 @@ watch(
               {{ matchResultText }}
             </h2>
             <p v-if="matchScoreText" class="mr-result-score">{{ matchScoreText }}</p>
-          </div>
-
-          <div class="mr-result-body">
-            <div v-if="multiGameStore.roomState?.roundHistory?.length" class="mr-result-rounds">
-              <div v-for="entry in multiGameStore.roomState.roundHistory" :key="entry.round" class="mr-result-round">
-                <h4 class="mr-result-round-label">第 {{ entry.round }} 局</h4>
-                <div class="mr-result-round-boards">
-                  <div class="mr-result-board">
-                    <h5 class="mr-result-board-title">我的猜测</h5>
-                    <GuessTable
-                      v-if="multiGameStore.roomState"
-                      :quiz-type="multiGameStore.roomState.quizType"
-                      :rows="(entry.players[0]?.guesses as any) ?? []"
-                      empty-label="-"
-                      :target-version="entry.target ? ('version' in entry.target ? Number((entry.target as any).version) : null) : multiGameStore.roomState.targetVersion"
-                      :target-cost="entry.target ? ('cost' in entry.target ? Number((entry.target as any).cost) : null) : multiGameStore.roomState.targetCost"
-                    />
-                  </div>
-                  <div class="mr-result-board">
-                    <h5 class="mr-result-board-title">对手猜测</h5>
-                    <GuessTable
-                      v-if="multiGameStore.roomState"
-                      :quiz-type="multiGameStore.roomState.quizType"
-                      :rows="(entry.players[1]?.guesses as any) ?? []"
-                      empty-label="-"
-                      :target-version="entry.target ? ('version' in entry.target ? Number((entry.target as any).version) : null) : multiGameStore.roomState.targetVersion"
-                      :target-cost="entry.target ? ('cost' in entry.target ? Number((entry.target as any).cost) : null) : multiGameStore.roomState.targetCost"
-                    />
-                  </div>
-                </div>
-              </div>
+            <div v-if="answerText" class="mr-result-answer">
+              <span class="mr-result-answer-label">正确答案</span>
+              <span class="mr-result-answer-value">{{ answerText }}</span>
             </div>
           </div>
 
           <div class="mr-result-actions">
+            <button class="mr-result-btn" @click="openFullResultPage">查看完整对局</button>
             <button class="mr-result-btn mr-result-btn--primary" @click="closeMatchResult(); leaveRoom();">返回大厅</button>
           </div>
         </div>
@@ -379,10 +357,12 @@ watch(
 
 .mr-shell {
   height: 100dvh;
+  max-width: 1400px;
+  margin: 0 auto;
   display: grid;
   grid-template-rows: auto auto auto minmax(0, 1fr) auto;
-  gap: 0.35rem;
-  padding: 0.35rem 0.8rem 0.4rem;
+  gap: 0.6rem;
+  padding: 0.8rem clamp(1rem, 4vw, 3rem) 0.8rem;
   overflow: hidden;
 }
 
@@ -512,80 +492,71 @@ watch(
   flex-shrink: 0;
 }
 
-/* ── 分数面板 ── */
-.mr-summary-row {
-  display: grid;
-  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+/* ── 对局信息 + 计分板合并卡片 ── */
+.mr-info-card {
+  display: flex;
+  align-items: center;
   gap: 0.6rem;
-  align-items: start;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: linear-gradient(180deg, var(--surface-panel-strong), var(--surface-panel));
+}
+
+.mr-info-divider {
+  flex-shrink: 0;
+  width: 1px;
+  align-self: stretch;
+  background: var(--line-soft);
 }
 
 .mr-score-panel {
-  padding: 0.45rem 0.65rem;
-  border: 1px solid var(--line-soft);
-  border-radius: 8px;
-  background:
-    radial-gradient(circle at 50% 0, color-mix(in oklab, var(--gold) 6%, transparent), transparent 18%),
-    linear-gradient(180deg, var(--surface-panel-strong), var(--surface-panel));
+  flex-shrink: 0;
 }
 
-.mr-score-kicker {
-  margin: 0 0 0.15rem;
-  color: var(--text-faint);
-  font-size: 0.58rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-}
-
-.mr-score-ribbon {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  gap: 0.5rem;
+.mr-score-bar {
+  display: flex;
   align-items: center;
+  gap: 0.8rem;
 }
 
-.mr-score-side {
-  display: grid;
-  justify-items: center;
-  gap: 0.3rem;
+.mr-score-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
 }
 
 .mr-score-label {
   color: var(--text-faint);
-  font-size: 0.66rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-}
-
-.mr-score-center {
-  display: grid;
-  justify-items: center;
-  gap: 0.15rem;
-}
-
-.mr-score-vs {
-  color: var(--text-faint);
-  font-size: 0.88rem;
-  font-weight: 900;
-  letter-spacing: 0.2em;
-}
-
-.mr-score-target {
-  color: var(--text-faint);
-  font-size: 0.6rem;
-  letter-spacing: 0.16em;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
 .mr-score-value {
-  font-size: 1.5rem;
+  color: var(--text-main);
+  font-size: clamp(1.4rem, 1.1rem + 1vw, 2rem);
   font-weight: 900;
-  transition: color 0.4s ease;
+  font-family: 'Rajdhani', sans-serif;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  min-width: 1em;
+  text-align: center;
 }
 
-.mr-score-value--lead {
-  color: var(--gold);
+.mr-score-value--lead { color: var(--gold); }
+.mr-score-value--accent { color: var(--gold); }
+
+.mr-score-divider {
+  color: var(--text-faint);
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-family: 'Rajdhani', sans-serif;
+  line-height: 1;
 }
+
+.mr-score-divider--gap { margin-left: 0.3rem; }
 
 /* ── 中部面板 ── */
 .mr-stage {
@@ -727,7 +698,7 @@ watch(
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   padding: 0.45rem 0.6rem;
   border: 1px solid var(--line-soft);
   border-radius: 8px;
@@ -737,7 +708,7 @@ watch(
 .mr-dock-copy {
   display: grid;
   gap: 0.18rem;
-  min-width: min(100%, 14rem);
+  flex-shrink: 0;
 }
 
 .mr-dock-label {
@@ -757,12 +728,14 @@ watch(
 
 .mr-input-row {
   flex: 1;
+  min-width: 0;
   display: flex;
   gap: 0.5rem;
 }
 
 .mr-input-row > :first-child {
   flex: 1;
+  min-width: 0;
 }
 
 /* ── 空状态页 ── */
@@ -835,9 +808,9 @@ watch(
 
 @media (max-width: 720px) {
   .mr-shell {
-    padding: 0;
-    gap: 0;
-    grid-template-rows: auto minmax(0, 1fr) auto;
+    padding: 0.4rem 0.6rem;
+    gap: 0.35rem;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
   }
   .mr-glass-header {
     border-radius: 0; border-left: none; border-right: none; border-top: none;
@@ -848,7 +821,28 @@ watch(
   .mr-glass-chip { font-size: 0.6rem; max-width: 10rem; padding: 0.2rem 0.4rem; }
   .mr-glass-back { width: 1.6rem; height: 1.6rem; font-size: 0.85rem; }
   .mr-glass-btn { width: 1.6rem; height: 1.6rem; font-size: 0.9rem; }
-  .status-stack { display: none; }
+
+  .mr-info-card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.3rem;
+    padding: 0.3rem 0.5rem;
+    border-left: none; border-right: none;
+    border-radius: 0;
+  }
+  .mr-info-divider {
+    width: 100%;
+    height: 1px;
+    align-self: stretch;
+  }
+  .mr-score-bar {
+    justify-content: center;
+    gap: 0.5rem;
+  }
+  .mr-score-value {
+    font-size: clamp(1.2rem, 1rem + 0.8vw, 1.6rem);
+  }
+  .mr-score-label { font-size: 0.6rem; }
 
   .mr-stage {
     border: none; border-radius: 0;
@@ -893,12 +887,13 @@ watch(
 .mr-result-overlay {
   position: fixed; inset: 0; z-index: 1000;
   display: flex; align-items: center; justify-content: center;
+  padding: 1.5rem;
   background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(6px);
   animation: mrFadeIn 0.25s ease;
 }
 .mr-result-modal {
   display: flex; flex-direction: column;
-  width: 100%; max-width: 680px; max-height: 90vh;
+  width: 100%; max-width: 1100px; max-height: 95vh;
   border: 1px solid var(--line-soft); border-radius: 14px;
   background: var(--surface-panel-strong);
   overflow: hidden;
@@ -906,38 +901,55 @@ watch(
 }
 .mr-result-header {
   display: grid; justify-items: center; gap: 0.4rem;
-  padding: 2rem 1.5rem 1.2rem;
+  padding: 1.4rem 1.5rem 1rem;
   background: radial-gradient(ellipse 100% 140% at 50% 0%, color-mix(in oklab, var(--gold) 12%, transparent), transparent);
 }
 .mr-result-icon {
-  font-size: 2.6rem; color: var(--text-sub);
+  font-size: 2.2rem; color: var(--text-sub);
 }
 .mr-result-icon--win { color: var(--gold); }
 .mr-result-title {
-  margin: 0; font-size: 1.6rem; font-weight: 900; letter-spacing: 0.06em;
+  margin: 0; font-size: 1.5rem; font-weight: 900; letter-spacing: 0.06em;
 }
 .mr-result-title--win { color: var(--gold); }
 .mr-result-score {
-  margin: 0; color: var(--gold); font-size: 1.15rem; font-weight: 700;
+  margin: 0; color: var(--gold); font-size: 1.1rem; font-weight: 700;
+}
+.mr-result-answer {
+  display: flex; flex-direction: column; align-items: center; gap: 0.2rem;
+  margin-top: 0.6rem; padding: 0.6rem 1.2rem;
+  border: 1px solid var(--line-soft); border-radius: 8px;
+  background: color-mix(in oklab, var(--surface-panel) 60%, transparent);
+}
+.mr-result-answer-label {
+  color: var(--text-sub); font-size: 0.65rem; letter-spacing: 0.16em; text-transform: uppercase;
+}
+.mr-result-answer-value {
+  color: var(--gold); font-size: 1.3rem; font-weight: 800; letter-spacing: 0.04em;
 }
 .mr-result-body {
-  flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.8rem;
-  padding: 0.8rem 1rem;
+  flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem;
+  padding: 1rem 1.2rem;
 }
-.mr-result-rounds { display: flex; flex-direction: column; gap: 0.8rem; }
-.mr-result-round { display: flex; flex-direction: column; gap: 0.35rem; }
+.mr-result-rounds { display: flex; flex-direction: column; gap: 1rem; }
+.mr-result-round {
+  display: flex; flex-direction: column; gap: 0.5rem;
+  padding: 0.8rem;
+  border: 1px solid var(--line-soft); border-radius: 10px;
+  background: color-mix(in oklab, var(--surface-panel) 60%, transparent);
+}
 .mr-result-round-label {
-  margin: 0; font-size: 0.8rem; font-weight: 700; color: var(--gold); letter-spacing: 0.06em;
+  margin: 0; font-size: 0.9rem; font-weight: 700; color: var(--gold); letter-spacing: 0.06em;
 }
 .mr-result-round-boards {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem;
 }
 .mr-result-board { display: flex; flex-direction: column; min-height: 0; }
 .mr-result-board-title {
-  margin: 0 0 0.3rem; font-size: 0.72rem; font-weight: 700; color: var(--text-sub); letter-spacing: 0.04em;
+  margin: 0 0 0.4rem; font-size: 0.8rem; font-weight: 700; color: var(--text-sub); letter-spacing: 0.04em;
 }
 .mr-result-board :deep(.guess-table-shell) {
-  max-height: 200px; overflow: auto;
+  max-height: none; overflow: auto;
 }
 .mr-result-actions {
   display: flex; justify-content: center; gap: 0.6rem;
@@ -961,8 +973,10 @@ watch(
 @keyframes mrSlideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
 @media (max-width: 720px) {
-  .mr-result-modal { max-width: 96vw; max-height: 85vh; }
+  .mr-result-modal { max-width: 96vw; max-height: 92vh; }
   .mr-result-body { padding: 0.7rem; }
-  .mr-result-board :deep(.guess-table-shell) { max-height: 160px; }
+  .mr-result-round { padding: 0.5rem; }
+  .mr-result-round-boards { grid-template-columns: 1fr; gap: 0.5rem; }
+  .mr-result-board :deep(.guess-table-shell) { max-height: 240px; }
 }
 </style>

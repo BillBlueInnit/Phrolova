@@ -212,13 +212,31 @@ def compare_drop_locations(target_locs: list[str], guess_locs: list[str]):
     return result
 
 
+# 有序版本号数组：相邻两个版本视为相近版本
+_VERSION_ORDER = [
+    "1.0", "1.1", "1.2", "1.3", "1.4",
+    "2.0", "2.1", "2.2", "2.3", "2.4", "2.5", "2.6", "2.7", "2.8",
+    "3.0", "3.1", "3.2", "3.3", "3.4", "3.5",
+]
+_VERSION_INDEX = {v: i for i, v in enumerate(_VERSION_ORDER)}
+
+
+def _is_adjacent_version(a: Any, b: Any) -> bool:
+    """判断两个版本号在有序数组中是否相邻"""
+    ia = _VERSION_INDEX.get(str(a).strip())
+    ib = _VERSION_INDEX.get(str(b).strip())
+    if ia is None or ib is None:
+        return False
+    return abs(ia - ib) == 1
+
+
 def compare_field(target_val: Any, guess_val: Any, field_name: str) -> str:
     if target_val == guess_val:
         return "match"
     if field_name == "star_rating":
         return "near"
     if field_name == "version":
-        if abs(float(target_val) - float(guess_val)) <= 0.25:
+        if _is_adjacent_version(target_val, guess_val):
             return "near"
         return "different"
     return "different"
@@ -288,7 +306,9 @@ def get_skeleton_names():
     connection = get_connection()
     try:
         with connection.cursor() as cursor:
-            cursor.execute("SELECT name, skill_attribute, cost, set_name FROM sound_skeletons ORDER BY name")
+            cursor.execute(
+                "SELECT name, skill_attribute, cost, is_aberration, set_name, drop_location FROM sound_skeletons ORDER BY name"
+            )
             rows = cursor.fetchall()
     finally:
         connection.close()

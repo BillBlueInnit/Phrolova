@@ -376,7 +376,6 @@ onBeforeUnmount(() => {
   width: 2.4rem; height: 2.4rem; border-radius: 50%;
   background: color-mix(in oklab, var(--gold) 16%, var(--surface-panel-strong));
   color: var(--gold); font-size: 1.3rem;
-  box-shadow: 0 0 20px color-mix(in oklab, var(--gold) 20%, transparent);
 }
 
 .ml-match-info {
@@ -446,7 +445,7 @@ onBeforeUnmount(() => {
 }
 .ml-foot-status { display: flex; align-items: center; gap: 0.45rem; color: var(--text-sub); font-size: 0.8rem; }
 .ml-foot-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-faint); }
-.ml-foot-dot--on { background: var(--color-success); box-shadow: 0 0 6px var(--color-success); }
+.ml-foot-dot--on { background: var(--color-success); }
 .ml-foot-hint { color: var(--text-faint); font-size: 0.76rem; }
 
 /* ── 响应式 ── */

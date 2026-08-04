@@ -6,6 +6,7 @@ const PreGamePage = () => import("@/pages/PreGamePage.vue");
 const SingleGamePage = () => import("@/pages/SingleGamePage.vue");
 const MultiplayerLobbyPage = () => import("@/pages/MultiplayerLobbyPage.vue");
 const MultiplayerRoomPage = () => import("@/pages/MultiplayerRoomPage.vue");
+const MultiplayerResultPage = () => import("@/pages/MultiplayerResultPage.vue");
 const LeaderboardPage = () => import("@/pages/LeaderboardPage.vue");
 const RulesPage = () => import("@/pages/RulesPage.vue");
 const DataPage = () => import("@/pages/DataPage.vue");
@@ -19,6 +20,7 @@ const router = createRouter({
     { path: "/single/play", name: "single-play", component: SingleGamePage },
     { path: "/multi", name: "multi-lobby", component: MultiplayerLobbyPage },
     { path: "/multi/room", name: "multi-room", component: MultiplayerRoomPage },
+    { path: "/multi/result", name: "multi-result", component: MultiplayerResultPage },
     { path: "/leaderboard", name: "leaderboard", component: LeaderboardPage },
     { path: "/rules", name: "rules", component: RulesPage },
     { path: "/data", name: "data", component: DataPage },
