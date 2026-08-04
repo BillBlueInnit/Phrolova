@@ -1,0 +1,25 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   SingleGamePage — single-player game screen
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.sg-stage-body--empty { align-items: center; justify-content: center; overflow: hidden; }
+.sg-empty-state { max-width: 600px; display: grid; justify-items: center; gap: 0.7rem; text-align: center; }
+.sg-empty-glyph { display: grid; place-items: center; width: 3.2rem; height: 3.2rem; border: 1px solid color-mix(in oklab, var(--line-strong) 90%, transparent); border-radius: 999px; color: var(--text-faint); font-size: 1.2rem; }
+
+.sg-win-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(6px); animation: sgWinFadeIn 0.25s ease; }
+.sg-win-modal { position: relative; overflow: hidden; display: grid; justify-items: center; gap: 0.85rem; width: 100%; max-width: 380px; padding: 2.2rem 1.8rem 1.8rem; border: 1px solid color-mix(in oklab, var(--gold) 30%, transparent); border-radius: 12px; background: var(--surface-panel-strong); text-align: center; animation: sgWinSlideUp 0.35s ease; }
+.sg-win-icon { display: grid; place-items: center; width: 3.6rem; height: 3.6rem; border: 2px solid var(--gold); border-radius: 50%; background: color-mix(in oklab, var(--gold) 16%, var(--shell-bg-deep)); color: var(--gold); font-size: 1.8rem; }
+.sg-win-title { margin: 0; font-size: 1.4rem; font-weight: 900; letter-spacing: 0.08em; color: var(--gold); }
+.sg-win-answer-label { margin: 0; color: var(--text-faint); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; }
+.sg-win-answer { margin: 0; color: var(--text-main); font-size: 1.1rem; font-weight: 700; letter-spacing: 0.04em; }
+.sg-win-attempts { margin: 0; color: var(--text-sub); font-size: 0.9rem; }
+.sg-win-score { margin: 0; color: var(--gold); font-size: 1.4rem; font-weight: 900; letter-spacing: 0.04em; }
+.sg-win-actions { display: flex; flex-direction: column; gap: 0.5rem; width: 100%; margin-top: 0.4rem; }
+
+@keyframes sgWinFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sgWinSlideUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+
+@media (max-width: 720px) {
+  .score-bar.sg-score-bar { gap: 0.8rem; padding: 0.4rem 0.6rem; border-radius: 0; border-left: none; border-right: none; }
+  .sg-empty-glyph { width: 2.6rem; height: 2.6rem; font-size: 1rem; }
+}

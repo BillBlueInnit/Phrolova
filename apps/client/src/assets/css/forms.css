@@ -1,0 +1,67 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Forms — shared form inputs, fields, labels
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.form-label {
+  color: var(--text-faint);
+  font-size: 0.82rem;
+}
+
+.form-input {
+  min-height: 44px;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--shell-bg);
+  color: var(--text-main);
+}
+
+.form-input::placeholder {
+  color: var(--text-faint);
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: color-mix(in oklab, var(--gold) 50%, transparent);
+}
+
+/* ── Captcha row ── */
+.form-captcha-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.form-captcha-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 100px;
+  min-height: 42px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--shell-bg);
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.2s ease;
+}
+
+.form-captcha-box:hover {
+  border-color: color-mix(in oklab, var(--gold) 40%, transparent);
+}
+
+.form-captcha-img {
+  display: block;
+  image-rendering: pixelated;
+}
+
+.form-captcha-placeholder {
+  color: var(--text-faint);
+  font-size: 0.76rem;
+}

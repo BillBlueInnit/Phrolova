@@ -1,17 +1,15 @@
 import { computed, reactive, shallowRef } from "vue";
 import { defineStore } from "pinia";
 
-import type { AuthResponse } from "@/types/game";
+import { useLocalStorage, removeLocalStorage } from "@/composables/useStorage";
+import type { AuthResponse } from "@/types";
 import * as api from "@/api";
 
-const PLAYER_ID_KEY = "phrolova_player_id";
-const TOKEN_KEY = "phrolova_player_token";
-const AUTH_KEY = "phrolova_logged_in";
-
 export const useAuthStore = defineStore("auth", () => {
-  const playerId = shallowRef("");
-  const token = shallowRef("");
-  const loggedIn = shallowRef(false);
+  const playerId = useLocalStorage("phrolova_player_id", "");
+  const token = useLocalStorage("phrolova_player_token", "");
+  const loggedIn = useLocalStorage("phrolova_logged_in", false);
+
   const loading = shallowRef(false);
   const error = shallowRef("");
   const stats = reactive({
@@ -34,12 +32,6 @@ export const useAuthStore = defineStore("auth", () => {
     stats.single_skeleton_score = player.single_skeleton_score;
   }
 
-  function persist() {
-    localStorage.setItem(PLAYER_ID_KEY, playerId.value);
-    localStorage.setItem(TOKEN_KEY, token.value);
-    localStorage.setItem(AUTH_KEY, loggedIn.value ? "1" : "0");
-  }
-
   function clearSession() {
     playerId.value = "";
     token.value = "";
@@ -49,9 +41,9 @@ export const useAuthStore = defineStore("auth", () => {
     stats.matches = 0;
     stats.single_resonator_score = 0;
     stats.single_skeleton_score = 0;
-    localStorage.removeItem(PLAYER_ID_KEY);
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(AUTH_KEY);
+    removeLocalStorage("phrolova_player_id");
+    removeLocalStorage("phrolova_player_token");
+    removeLocalStorage("phrolova_logged_in");
   }
 
   async function refreshPlayer() {
@@ -61,13 +53,9 @@ export const useAuthStore = defineStore("auth", () => {
     if (data.token) {
       token.value = data.token;
     }
-    persist();
   }
 
   async function hydrate() {
-    playerId.value = localStorage.getItem(PLAYER_ID_KEY) || "";
-    token.value = localStorage.getItem(TOKEN_KEY) || "";
-    loggedIn.value = localStorage.getItem(AUTH_KEY) === "1";
     if (!loggedIn.value || !playerId.value) {
       clearSession();
       return;
@@ -89,7 +77,6 @@ export const useAuthStore = defineStore("auth", () => {
       loggedIn.value = true;
       applyPlayer(data.player);
       token.value = data.token || "";
-      persist();
       return data;
     } catch (reason) {
       error.value = reason instanceof Error ? reason.message : "登录失败";
@@ -107,7 +94,6 @@ export const useAuthStore = defineStore("auth", () => {
       loggedIn.value = true;
       applyPlayer(data.player);
       token.value = data.token || "";
-      persist();
       return data;
     } catch (reason) {
       error.value = reason instanceof Error ? reason.message : "注册失败";
@@ -131,7 +117,6 @@ export const useAuthStore = defineStore("auth", () => {
       });
       applyPlayer(data.player);
       token.value = data.token || token.value;
-      persist();
       return data;
     } catch (reason) {
       error.value = reason instanceof Error ? reason.message : "修改 ID 失败";

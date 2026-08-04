@@ -1,6 +1,7 @@
 import { computed, ref, shallowRef } from "vue";
 import { defineStore } from "pinia";
 
+import { useLocalStorage } from "@/composables/useStorage";
 import type {
   Difficulty,
   GuessHistoryRow,
@@ -9,7 +10,7 @@ import type {
   ResonatorRow,
   SkeletonCompare,
   SkeletonRow,
-} from "@/types/game";
+} from "@/types";
 import * as api from "@/api";
 import { toHistoryRow } from "@/utils/game";
 import { useAuthStore } from "./auth";
@@ -28,12 +29,8 @@ function isWinningCompare(compare: ResonatorCompare | SkeletonCompare) {
 }
 
 export const useSingleGameStore = defineStore("singleGame", () => {
-  const quizType = shallowRef<QuizType>(
-    (localStorage.getItem("sg_quiz_type") as QuizType) || "resonator",
-  );
-  const difficulty = shallowRef<Difficulty>(
-    (localStorage.getItem("sg_difficulty") as Difficulty) || "hard",
-  );
+  const quizType = useLocalStorage<QuizType>("sg_quiz_type", "resonator");
+  const difficulty = useLocalStorage<Difficulty>("sg_difficulty", "hard");
   const target = ref<ResonatorRow | SkeletonRow | null>(null);
   const guessHistory = ref<GuessHistoryRow[]>([]);
   const loading = shallowRef(false);
@@ -51,8 +48,6 @@ export const useSingleGameStore = defineStore("singleGame", () => {
   function setConfig(nextQuizType: QuizType, nextDifficulty: Difficulty) {
     quizType.value = nextQuizType;
     difficulty.value = nextDifficulty;
-    localStorage.setItem("sg_quiz_type", nextQuizType);
-    localStorage.setItem("sg_difficulty", nextDifficulty);
   }
 
   async function startGame() {

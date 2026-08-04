@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { reactive, shallowRef } from "vue";
+import { computed, reactive, shallowRef } from "vue";
 import { useRouter } from "vue-router";
 
+import GlassHeader from "@/components/shared/GlassHeader.vue";
 import StatusBanner from "@/components/shared/StatusBanner.vue";
 import { useAuthStore } from "@/stores/auth";
 import { useMultiGameStore } from "@/stores/multiGame";
@@ -16,6 +17,13 @@ const form = reactive({ newPlayerId: "" });
 if (!authStore.isAuthenticated) {
   router.replace("/");
 }
+
+const winRate = computed(() => {
+  if (!authStore.stats.matches) return 0;
+  return Math.round((authStore.stats.wins / authStore.stats.matches) * 100);
+});
+
+const initials = computed(() => authStore.playerId?.charAt(0)?.toUpperCase() ?? "?");
 
 async function savePlayerId() {
   localError.value = "";
@@ -35,147 +43,80 @@ function logout() {
 </script>
 
 <template>
-  <section class="page-shell page-shell-narrow" v-if="authStore.isAuthenticated">
-    <header class="page-heading">
-      <p class="page-kicker">Account</p>
-      <h1 class="page-title">账号中心</h1>
-      <p class="page-desc">管理你的玩家 ID 与账号状态。</p>
-    </header>
+  <div class="ap-root" v-if="authStore.isAuthenticated">
+    <div class="ap-shell">
+      <GlassHeader kicker="Account" title="账号中心" back-to="/" />
 
-    <StatusBanner v-if="localError || authStore.error" :message="localError || authStore.error" tone="error" />
+      <StatusBanner v-if="localError || authStore.error" :message="localError || authStore.error" tone="error" />
 
-    <div class="account-card">
-      <div class="account-stats">
-        <div class="account-stat">
-          <span class="account-stat-label">玩家 ID</span>
-          <strong class="account-stat-value">{{ authStore.playerId }}</strong>
-        </div>
-        <div class="account-stat">
-          <span class="account-stat-label">当前积分</span>
-          <strong class="account-stat-value">{{ authStore.stats.score }}</strong>
-        </div>
-        <div class="account-stat">
-          <span class="account-stat-label">多人胜场</span>
-          <strong class="account-stat-value">{{ authStore.stats.wins }}</strong>
-        </div>
-        <div class="account-stat">
-          <span class="account-stat-label">多人总场次</span>
-          <strong class="account-stat-value">{{ authStore.stats.matches }}</strong>
-        </div>
-      </div>
+      <div class="ap-grid">
+        <!-- 左侧：个人信息 + 统计 -->
+        <section class="ap-profile">
+          <div class="ap-profile-head">
+            <div class="ap-avatar">{{ initials }}</div>
+            <div class="ap-profile-info">
+              <strong class="ap-player-name">{{ authStore.playerId }}</strong>
+              <span class="ap-player-role">Player</span>
+            </div>
+          </div>
 
-      <label class="auth-field">
-        <span class="auth-field-label">修改玩家 ID</span>
-        <input v-model="form.newPlayerId" class="auth-input" type="text" placeholder="输入新的玩家 ID" />
-      </label>
+          <div class="ap-stats">
+            <div class="ap-stat">
+              <Icon icon="ph:coin-duotone" class="ap-stat-icon" />
+              <span class="ap-stat-value">{{ authStore.stats.score }}</span>
+              <span class="ap-stat-label">总积分</span>
+            </div>
+            <div class="ap-stat ap-stat--accent">
+              <Icon icon="ph:trophy-duotone" class="ap-stat-icon" />
+              <span class="ap-stat-value">{{ winRate }}%</span>
+              <span class="ap-stat-label">胜率</span>
+            </div>
+            <div class="ap-stat">
+              <Icon icon="ph:crown-duotone" class="ap-stat-icon" />
+              <span class="ap-stat-value">{{ authStore.stats.wins }}</span>
+              <span class="ap-stat-label">胜场</span>
+            </div>
+            <div class="ap-stat">
+              <Icon icon="ph:game-controller-duotone" class="ap-stat-icon" />
+              <span class="ap-stat-value">{{ authStore.stats.matches }}</span>
+              <span class="ap-stat-label">总场次</span>
+            </div>
+          </div>
 
-      <div class="auth-actions">
-        <button class="auth-btn" type="button" @click="savePlayerId">保存新 ID</button>
-        <button class="auth-btn-ghost" type="button" @click="logout">退出登录</button>
+          <div class="ap-sub-stats">
+            <div class="ap-sub-stat">
+              <span class="ap-sub-stat-label">单人 · 共鸣者积分</span>
+              <span class="ap-sub-stat-value">{{ authStore.stats.single_resonator_score }}</span>
+            </div>
+            <div class="ap-sub-stat">
+              <span class="ap-sub-stat-label">单人 · 声骸积分</span>
+              <span class="ap-sub-stat-value">{{ authStore.stats.single_skeleton_score }}</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- 右侧：操作区 -->
+        <section class="ap-actions">
+          <div class="ap-card">
+            <h3 class="ap-card-title">
+              <Icon icon="ph:pencil-duotone" class="ap-card-icon" /> 修改玩家 ID
+            </h3>
+            <p class="ap-card-desc">修改后前台评分板与排行将同步为新 ID</p>
+            <div class="ap-id-row">
+              <input v-model="form.newPlayerId" class="form-input" type="text" placeholder="输入新的玩家 ID" />
+              <button class="btn" type="button" :disabled="!form.newPlayerId.trim()" @click="savePlayerId">保存</button>
+            </div>
+          </div>
+
+          <div class="ap-card ap-card--danger">
+            <h3 class="ap-card-title">
+              <Icon icon="ph:warning-duotone" class="ap-card-icon" /> 退出账号
+            </h3>
+            <p class="ap-card-desc">退出后返回首页，多人房间将断开连接</p>
+            <button class="btn-ghost" type="button" @click="logout">退出登录</button>
+          </div>
+        </section>
       </div>
     </div>
-  </section>
+  </div>
 </template>
-
-<style scoped>
-.account-card {
-  padding: 1.5rem;
-  border: 1px solid var(--line-soft);
-  border-radius: 8px;
-  background: var(--surface-panel);
-}
-
-.account-stats {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.7rem;
-  margin-bottom: 1.2rem;
-}
-
-.account-stat {
-  padding: 0.7rem 0.8rem;
-  border: 1px solid var(--line-soft);
-  border-radius: 6px;
-  background: var(--shell-bg);
-}
-
-.account-stat-label {
-  display: block;
-  color: var(--text-faint);
-  font-size: 0.78rem;
-  margin-bottom: 0.2rem;
-}
-
-.account-stat-value {
-  font-size: 1.1rem;
-}
-
-.auth-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  margin-bottom: 0.8rem;
-}
-
-.auth-field-label {
-  color: var(--text-faint);
-  font-size: 0.82rem;
-}
-
-.auth-input {
-  min-height: 44px;
-  padding: 0.6rem 0.8rem;
-  border: 1px solid var(--line-strong);
-  border-radius: 6px;
-  background: var(--shell-bg);
-  color: var(--text-main);
-}
-
-.auth-input::placeholder {
-  color: var(--text-faint);
-}
-
-.auth-input:focus {
-  outline: none;
-  border-color: color-mix(in oklab, var(--gold) 50%, transparent);
-}
-
-.auth-actions {
-  display: flex;
-  gap: 0.6rem;
-}
-
-.auth-btn {
-  flex: 1;
-  min-height: 44px;
-  border: 1px solid color-mix(in oklab, var(--gold) 40%, transparent);
-  border-radius: 6px;
-  background: color-mix(in oklab, var(--gold) 16%, var(--surface-panel-strong));
-  color: var(--gold);
-  font-size: 0.92rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s ease;
-}
-
-.auth-btn:hover {
-  background: color-mix(in oklab, var(--gold) 24%, var(--surface-panel-strong));
-}
-
-.auth-btn-ghost {
-  min-height: 44px;
-  padding: 0 1.2rem;
-  border: 1px solid var(--line-strong);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-sub);
-  font-size: 0.92rem;
-  cursor: pointer;
-  transition: border-color 0.2s ease, color 0.2s ease;
-}
-
-.auth-btn-ghost:hover {
-  border-color: var(--text-sub);
-  color: var(--text-main);
-}
-</style>

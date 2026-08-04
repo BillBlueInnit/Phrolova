@@ -1,0 +1,191 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Game Layout — shared game-page shell, stage, dock, score-bar patterns
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Full-screen game page ── */
+.game-screen {
+  width: 100vw;
+  height: 100dvh;
+  margin-left: calc(50% - 50vw);
+  max-width: 100vw;
+  overflow: hidden;
+}
+
+.game-shell {
+  height: 100dvh;
+  max-width: 1400px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 0.6rem;
+  padding: 0.8rem clamp(1rem, 4vw, 3rem) 0.8rem;
+  overflow: hidden;
+}
+
+/* ── Score bar ── */
+.score-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.2rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  background: linear-gradient(180deg, var(--surface-panel-strong), var(--surface-panel));
+}
+
+.score-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.score-label {
+  color: var(--text-faint);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.score-value {
+  color: var(--text-main);
+  font-size: clamp(1.8rem, 1.4rem + 1.6vw, 2.8rem);
+  font-weight: 900;
+  font-family: 'Rajdhani', sans-serif;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  min-width: 1.2em;
+  text-align: center;
+}
+
+.score-value--accent {
+  color: var(--gold);
+}
+
+.score-divider {
+  color: var(--text-faint);
+  font-size: 1.6rem;
+  font-weight: 700;
+  font-family: 'Rajdhani', sans-serif;
+  line-height: 1;
+}
+
+.score-divider--gap {
+  margin: 0 0.3rem;
+}
+
+/* ── Game stage panel ── */
+.game-stage {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0.6rem;
+  padding: 0.9rem 0.9rem 0.8rem;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 50% 18%, color-mix(in oklab, var(--gold) 8%, transparent), transparent 22%),
+    linear-gradient(180deg, var(--surface-panel-strong), var(--surface-panel));
+  overflow: hidden;
+}
+
+.game-stage--empty {
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.stage-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+}
+
+.stage-copy {
+  display: grid;
+  gap: 0.22rem;
+}
+
+.stage-kicker {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: 0.68rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.stage-title {
+  margin: 0;
+  font-size: clamp(1.18rem, 1rem + 0.6vw, 1.7rem);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.stage-sub {
+  margin: 0;
+  color: var(--text-sub);
+  font-size: 0.84rem;
+  line-height: 1.6;
+}
+
+.stage-body {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+
+/* ── Game dock (bottom input bar) ── */
+.game-dock {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: nowrap;
+  padding: 0.75rem 0.9rem 0.85rem;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  background: linear-gradient(180deg, var(--surface-panel-strong), var(--surface-panel));
+}
+
+.dock-copy {
+  display: grid;
+  gap: 0.18rem;
+  flex-shrink: 0;
+}
+
+.dock-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--text-faint);
+  font-size: 0.68rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.dock-label-icon {
+  font-size: 0.95rem;
+  color: var(--gold-soft);
+}
+
+.dock-meta {
+  margin: 0;
+  color: var(--text-sub);
+  font-size: 0.84rem;
+  line-height: 1.6;
+}
+
+.dock-input-row {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.dock-input-row > :first-child {
+  flex: 1;
+  min-width: 0;
+}

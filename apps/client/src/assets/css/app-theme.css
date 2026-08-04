@@ -1,0 +1,31 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   App.vue — theme controls, accent picker, kicked overlay
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.theme-controls { position: fixed; top: 1.2rem; right: 1.2rem; z-index: 100; display: flex; align-items: center; gap: 0.5rem; }
+.theme-toggle { width: 2.6rem; height: 2.6rem; display: grid; place-items: center; border: 1px solid var(--line-strong); border-radius: 50%; background: var(--surface-panel-strong); color: var(--gold); font-size: 1.2rem; cursor: pointer; backdrop-filter: blur(8px); transition: transform 0.3s, border-color 0.3s; }
+.theme-toggle:hover { border-color: var(--gold); transform: scale(1.1); }
+.theme-accent-btn { position: relative; width: 2.6rem; height: 2.6rem; display: grid; place-items: center; border: 1px solid var(--line-strong); border-radius: 50%; background: var(--surface-panel-strong); color: var(--text-sub); font-size: 1.2rem; cursor: pointer; backdrop-filter: blur(8px); transition: transform 0.3s, border-color 0.3s, color 0.3s; }
+.theme-accent-btn:hover { border-color: var(--gold); color: var(--gold); transform: scale(1.1); }
+.theme-accent-dot { position: absolute; bottom: 3px; right: 3px; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--shell-bg); }
+
+.accent-picker { position: absolute; top: calc(100% + 0.6rem); right: 0; z-index: 101; width: 220px; padding: 0.9rem; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--surface-panel-strong); backdrop-filter: blur(12px); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); }
+.accent-picker-title { margin: 0 0 0.7rem; font-size: 0.78rem; font-weight: 600; color: var(--text-faint); letter-spacing: 0.1em; text-transform: uppercase; }
+.accent-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+.accent-swatch { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; padding: 0.5rem 0.3rem; border: 1px solid var(--line-soft); border-radius: 8px; background: transparent; cursor: pointer; transition: border-color 0.2s, background 0.2s; }
+.accent-swatch:hover { border-color: var(--swatch-color); background: color-mix(in oklab, var(--swatch-color) 8%, transparent); }
+.accent-swatch--active { border-color: var(--swatch-color); background: color-mix(in oklab, var(--swatch-color) 12%, transparent); }
+.accent-swatch-dot { width: 20px; height: 20px; border-radius: 50%; background: var(--swatch-color); }
+.accent-swatch-label { font-size: 0.72rem; color: var(--text-sub); font-weight: 500; }
+.accent-swatch--active .accent-swatch-label { color: var(--text-main); }
+
+.accent-pop-enter-active, .accent-pop-leave-active { transition: opacity 0.2s ease, transform 0.2s ease; }
+.accent-pop-enter-from, .accent-pop-leave-to { opacity: 0; transform: translateY(-8px) scale(0.95); }
+
+.kicked-overlay { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(8px); }
+.kicked-modal { display: grid; justify-items: center; gap: 0.8rem; width: 100%; max-width: 360px; padding: 2rem 1.8rem; border: 1px solid color-mix(in oklab, var(--color-error) 40%, transparent); border-radius: 12px; background: var(--surface-panel-strong); text-align: center; }
+.kicked-icon { font-size: 2.8rem; color: var(--color-error); }
+.kicked-title { margin: 0; font-size: 1.2rem; font-weight: 900; color: var(--text-main); }
+.kicked-desc { margin: 0; color: var(--text-sub); font-size: 0.88rem; line-height: 1.6; }
+.kicked-btn { margin-top: 0.5rem; padding: 0.6rem 2rem; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface-panel); color: var(--text-main); font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+.kicked-btn:hover { border-color: var(--gold); color: var(--gold); }

@@ -1,0 +1,64 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   LeaderboardPage — leaderboard page
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.lb-page { display: flex; flex-direction: column; align-items: center; min-height: 100vh; width: 100%; padding: 1.5rem 1.5rem 3rem; }
+.lb-top { display: flex; align-items: center; justify-content: space-between; width: 100%; max-width: 720px; margin-bottom: 0.8rem; }
+.lb-header-center { text-align: center; }
+.lb-title { margin: 0; font-size: 1.5rem; font-weight: 900; letter-spacing: 0.06em; }
+.lb-sub { margin: 0.15rem 0 0; color: var(--text-faint); font-size: 0.78rem; letter-spacing: 0.1em; }
+.lb-header-right { min-width: 120px; display: flex; justify-content: flex-end; }
+.lb-me-chip { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.35rem 0.7rem; border: 1px solid var(--line-soft); border-radius: 20px; background: var(--surface-panel); }
+.lb-me-id { color: var(--text-sub); font-size: 0.8rem; font-weight: 600; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-me-rank { color: var(--gold); font-weight: 900; font-size: 0.85rem; }
+
+.lb-main { width: 100%; max-width: 640px; flex: 1; margin-top: 1rem; }
+.lb-card { border: 1px solid var(--line-soft); border-radius: 12px; background: linear-gradient(180deg, var(--surface-panel-strong), var(--surface-panel)); overflow: hidden; }
+.lb-loading, .lb-empty { margin: 0; padding: 3rem 1rem; text-align: center; color: var(--text-faint); font-size: 0.9rem; }
+
+/* ── Podium ── */
+.lb-podium { display: grid; grid-template-columns: 1fr 1.2fr 1fr; gap: 0; padding: 1.5rem 1rem 0.8rem; align-items: end; border-bottom: 1px solid var(--line-soft); background: radial-gradient(ellipse 80% 100% at 50% 100%, color-mix(in oklab, var(--gold) 8%, transparent), transparent); }
+.lb-podium-item { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; padding: 0.5rem 0.3rem; }
+.lb-podium-item--1 { order: 2; }
+.lb-podium-item--2 { order: 1; }
+.lb-podium-item--3 { order: 3; }
+.lb-podium-avatar { position: relative; display: grid; place-items: center; width: 3rem; height: 3rem; border-radius: 50%; border: 2px solid var(--line-strong); background: var(--surface-panel); }
+.lb-podium-item--1 .lb-podium-avatar { width: 3.6rem; height: 3.6rem; border-color: var(--gold); background: color-mix(in oklab, var(--gold) 14%, var(--shell-bg-deep)); }
+.lb-podium-item--2 .lb-podium-avatar { border-color: #b0b8c0; }
+.lb-podium-item--3 .lb-podium-avatar { border-color: #c4946c; }
+.lb-podium-crown { position: absolute; top: -14px; font-size: 1.1rem; color: var(--gold); }
+.lb-podium-rank { font-weight: 900; font-size: 1.1rem; color: var(--text-sub); }
+.lb-podium-item--1 .lb-podium-rank { color: var(--gold); font-size: 1.3rem; }
+.lb-podium-name { font-weight: 700; font-size: 0.92rem; letter-spacing: 0.04em; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-podium-item--1 .lb-podium-name { font-size: 1rem; color: var(--text-main); }
+.lb-podium-score { font-weight: 900; color: var(--gold); font-size: 0.95rem; }
+.lb-podium-item--1 .lb-podium-score { font-size: 1.15rem; }
+.lb-podium-rate { font-size: 0.75rem; color: var(--text-sub); font-weight: 600; }
+
+/* ── Rows ── */
+.lb-row { display: flex; align-items: center; gap: 0.8rem; padding: 0.7rem 1.2rem; border-bottom: 1px solid color-mix(in oklab, var(--line-soft) 50%, transparent); transition: background 0.15s; }
+.lb-row:last-child { border-bottom: none; }
+.lb-row:hover { background: color-mix(in oklab, var(--text-main) 3%, transparent); }
+.lb-row-rank { width: 2rem; text-align: center; font-weight: 700; color: var(--text-faint); font-size: 0.85rem; }
+.lb-row-name { flex: 1; font-weight: 600; font-size: 0.95rem; letter-spacing: 0.04em; }
+.lb-row-score { font-weight: 900; color: var(--gold); font-size: 0.95rem; min-width: 4rem; text-align: right; }
+.lb-row-rate { color: var(--text-sub); font-weight: 600; font-size: 0.85rem; min-width: 3.5rem; text-align: right; }
+
+@media (max-width: 640px) {
+  .lb-page { padding: 0.8rem 0.6rem 2rem; }
+  .lb-top { gap: 0.5rem; }
+  .lb-title { font-size: 1.2rem; }
+  .lb-header-right { min-width: auto; }
+  .lb-me-chip { padding: 0.25rem 0.5rem; }
+  .lb-me-id { max-width: 60px; font-size: 0.72rem; }
+  .lb-main { max-width: 100%; }
+  .lb-podium { padding: 1rem 0.5rem 0.5rem; }
+  .lb-podium-avatar { width: 2.4rem; height: 2.4rem; }
+  .lb-podium-item--1 .lb-podium-avatar { width: 2.8rem; height: 2.8rem; }
+  .lb-podium-name { font-size: 0.76rem; }
+  .lb-podium-item--1 .lb-podium-name { font-size: 0.82rem; }
+  .lb-podium-score { font-size: 0.78rem; }
+  .lb-row { padding: 0.55rem 0.8rem; }
+  .lb-row-name { font-size: 0.82rem; }
+  .lb-row-score { font-size: 0.82rem; }
+}
