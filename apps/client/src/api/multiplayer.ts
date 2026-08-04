@@ -9,6 +9,7 @@ export const C2S = {
   QUEUE_CANCEL: "multi:queue_cancel",
   SUBMIT_GUESS: "multi:submit_guess",
   LEAVE_ROOM: "multi:leave_room",
+  RESTART_ROOM: "multi:restart_room",
 } as const;
 
 // ── Server → Client event names ──

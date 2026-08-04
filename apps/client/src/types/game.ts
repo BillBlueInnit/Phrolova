@@ -173,6 +173,8 @@ export interface MultiplayerRoomState {
   targetCost: number | null;
   overallWinner: number | null;
   forfeitBy: string | null;
+  creator: string;
+  rematchVotes: string[];
   players: RoomPlayerView[];
   opponentId: string;
   roundHistory?: Array<{

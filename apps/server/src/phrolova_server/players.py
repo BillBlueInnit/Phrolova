@@ -171,11 +171,12 @@ def ensure_player(player_id: str):
 
 
 def apply_score(player_id: str, delta: int):
+    """Apply score delta. Score cannot go below 0."""
     connection = get_connection()
     try:
         with connection.cursor() as cursor:
             cursor.execute(
-                "UPDATE players SET score = score + %s WHERE player_id = %s",
+                "UPDATE players SET score = GREATEST(0, score + %s) WHERE player_id = %s",
                 (delta, player_id),
             )
         connection.commit()

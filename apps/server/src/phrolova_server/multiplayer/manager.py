@@ -293,11 +293,50 @@ class MultiplayerManager:
                     self.rooms.pop(room["code"], None)
                     self._emit_to_player(player_id, "multi:match_finished", {"message": "已退出房间"})
                     return
+                if room["status"] == "finished":
+                    self.player_to_room.pop(player_id, None)
+                    self.rooms.pop(room["code"], None)
+                    self._emit_to_player(player_id, "multi:match_finished", {"message": "房间已关闭"})
+                    return
                 if room["status"] in ("countdown", "playing") and len(room["players"]) >= 2:
                     winner_index = 1 - player_index
                     self._finish_match_by_forfeit(room, winner_index, player_index)
                 self.player_to_room.pop(player_id, None)
                 room["updated_at"] = time.time()
+            self._emit_room_state(room)
+
+        @self.socketio.on("multi:restart_room")
+        def handle_restart_room(payload):
+            player_id = self._player_id_from_sid()
+            if not player_id:
+                return
+            room_code = (payload.get("roomCode") or "").strip().upper()
+            with self.lock:
+                room = self.rooms.get(room_code)
+                if not room or room["status"] != "finished":
+                    self._emit_error(player_id, "房间状态不允许重新开始")
+                    return
+                votes = room.setdefault("rematch_votes", set())
+                votes.add(player_id)
+                player_count = len(room["players"])
+                if len(votes) < player_count:
+                    self._emit_room_state(room)
+                    return
+                votes.clear()
+                room["status"] = "waiting"
+                room["round_status"] = "idle"
+                room["round"] = 1
+                room["round_winner"] = None
+                room["overall_winner"] = None
+                room["target"] = None
+                room["targetVersion"] = None
+                room["targetCost"] = None
+                room["forfeit_by"] = None
+                room["countdownLeft"] = 0
+                for slot in room["players"]:
+                    slot["round_wins"] = 0
+                    slot["attempts"] = 0
+                    slot["guesses"] = []
             self._emit_room_state(room)
 
     def max_attempts(self, quiz_type: str) -> int:
@@ -368,6 +407,8 @@ class MultiplayerManager:
             "finished_at": None,
             "forfeit_by": None,
             "round_history": [],
+            "creator": player_id,
+            "rematch_votes": set(),
         }
         self.rooms[code] = room
         return room
@@ -482,8 +523,7 @@ class MultiplayerManager:
                 room["status"] = "finished"
                 room["overall_winner"] = index
                 room["finished_at"] = time.time()
-                for slot in room["players"]:
-                    self.player_to_room.pop(slot["player_id"], None)
+                room["rematch_votes"] = set()
                 score = self.multi_score(room["quiz_type"], room["difficulty"], best_of)
                 winner_id = room["players"][index]["player_id"]
                 loser_id = room["players"][1 - index]["player_id"]
@@ -510,6 +550,7 @@ class MultiplayerManager:
                         "target": room["target"],
                     },
                 )
+                self._emit_room_state(room)
                 break
         self._emit_to_room_players(
             room,
@@ -532,8 +573,7 @@ class MultiplayerManager:
         room["round_resolved_at"] = time.time()
         room["finished_at"] = time.time()
         room["forfeit_by"] = room["players"][loser_index]["player_id"]
-        for slot in room["players"]:
-            self.player_to_room.pop(slot["player_id"], None)
+        room["rematch_votes"] = set()
         room["players"][winner_index]["round_wins"] = max(
             room["players"][winner_index]["round_wins"],
             room["best_of"] // 2 + 1,
@@ -606,6 +646,8 @@ class MultiplayerManager:
             "targetCost": room["target"]["cost"] if room["quiz_type"] == "skeleton" and room["target"] else None,
             "overallWinner": room["overall_winner"],
             "forfeitBy": room["forfeit_by"],
+            "creator": room.get("creator", ""),
+            "rematchVotes": list(room.get("rematch_votes", set())),
             "players": [
                 {
                     "playerId": mine["player_id"],

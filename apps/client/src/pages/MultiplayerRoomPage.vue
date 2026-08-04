@@ -95,6 +95,20 @@ const matchScoreText = computed(() => {
   return d > 0 ? `+${d} 分` : `${d} 分`;
 });
 
+const isCreator = computed(() =>
+  multiGameStore.roomState?.creator === authStore.playerId,
+);
+
+const hasVotedRematch = computed(() =>
+  multiGameStore.roomState?.rematchVotes?.includes(authStore.playerId) ?? false,
+);
+
+const allVotedRematch = computed(() => {
+  const room = multiGameStore.roomState;
+  if (!room) return false;
+  return room.rematchVotes.length >= room.players.length;
+});
+
 function closeMatchResult() { showMatchResult.value = false; }
 
 function openFullResultPage() {
@@ -102,6 +116,7 @@ function openFullResultPage() {
   writeLocalStorage("phrolova_match_result", {
     roomState: multiGameStore.roomState,
     scoreDelta: multiGameStore.matchScoreDelta,
+    myPlayerId: authStore.playerId,
   });
   const url = router.resolve({ name: "multi-result" }).href;
   window.open(url, "_blank");
@@ -277,8 +292,11 @@ watch(
         </div>
       </div>
       <div class="mr-result-actions">
+        <button class="btn" :disabled="hasVotedRematch" @click="multiGameStore.restartRoom()">
+          {{ hasVotedRematch ? '已投票，等待对手...' : '再来一局' }}
+        </button>
         <button class="btn-ghost" @click="openFullResultPage">查看完整对局</button>
-        <button class="btn" @click="closeMatchResult(); leaveRoom();">返回大厅</button>
+        <button v-if="isCreator" class="btn-ghost" @click="closeMatchResult(); leaveRoom();">关闭房间</button>
       </div>
     </ModalOverlay>
   </div>

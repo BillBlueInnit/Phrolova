@@ -9,15 +9,17 @@ import type { MultiplayerRoomState } from "@/types";
 const router = useRouter();
 const roomState = ref<MultiplayerRoomState | null>(null);
 const matchDelta = ref(0);
+const myPlayerId = ref("");
 
 onMounted(() => {
-  const data = readLocalStorage<{ roomState: MultiplayerRoomState; scoreDelta: number } | null>("phrolova_match_result", null);
+  const data = readLocalStorage<{ roomState: MultiplayerRoomState; scoreDelta: number; myPlayerId: string } | null>("phrolova_match_result", null);
   if (!data) {
     router.replace({ name: "multi-lobby" });
     return;
   }
   roomState.value = data.roomState;
   matchDelta.value = data.scoreDelta ?? 0;
+  myPlayerId.value = data.myPlayerId ?? "";
 });
 
 const matchResultText = computed(() => {
@@ -58,7 +60,7 @@ function backToLobby() {
         <h2 class="mrp-round-label">第 {{ entry.round }} 局</h2>
         <div class="mrp-round-boards">
           <div class="mrp-board">
-            <h3 class="mrp-board-title">我的猜测</h3>
+            <h3 class="mrp-board-title">{{ entry.players[0]?.player_id === myPlayerId ? '我的猜测' : '对手猜测' }}</h3>
             <GuessTable
               :quiz-type="roomState.quizType"
               :rows="(entry.players[0]?.guesses as any) ?? []"
@@ -68,7 +70,7 @@ function backToLobby() {
             />
           </div>
           <div class="mrp-board">
-            <h3 class="mrp-board-title">对手猜测</h3>
+            <h3 class="mrp-board-title">{{ entry.players[1]?.player_id === myPlayerId ? '我的猜测' : '对手猜测' }}</h3>
             <GuessTable
               :quiz-type="roomState.quizType"
               :rows="(entry.players[1]?.guesses as any) ?? []"

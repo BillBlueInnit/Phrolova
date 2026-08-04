@@ -2,7 +2,7 @@
    RulesPage — game rules page
    ═══════════════════════════════════════════════════════════════════════════ */
 
-#rules-screen { display: flex; background-color: var(--shell-bg-deep); min-height: calc(100vh - var(--site-header-height) - 6.25rem); width: 100%; position: relative; border: 1px solid var(--line-soft); overflow-y: auto; overflow-x: hidden; }
+#rules-screen { display: flex; background-color: var(--shell-bg-deep); height: calc(100vh - var(--site-header-height) - 6.25rem); width: 100%; position: relative; border: 1px solid var(--line-soft); overflow: hidden; }
 .rules-back-btn { position: absolute; top: 24px; left: 24px; z-index: 50; background: var(--shell-bg-deep); border: 1px solid var(--line-strong); border-radius: 6px; color: var(--text-main); font-family: 'Rajdhani', sans-serif; font-size: 1rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; padding: 0.4rem 0.8rem; letter-spacing: 1px; transition: all 0.3s ease; backdrop-filter: blur(4px); }
 .rules-back-btn:hover { color: var(--gold); border-color: var(--gold); }
 .rules-back-btn .arrow { font-size: 1.2rem; }
@@ -48,10 +48,11 @@
 .rules-score-table td:last-child { text-align: right; font-weight: 700; color: var(--gold); }
 
 @media (max-width: 960px) {
-  .accordion { flex-direction: column; }
-  .rules-card { border-right: none; border-bottom: 1px solid var(--line-strong); }
+  #rules-screen { height: auto; min-height: 100vh; overflow-y: auto; }
+  .accordion { flex-direction: column; height: auto; }
+  .rules-card { flex: auto; border-right: none; border-bottom: 1px solid var(--line-strong); min-height: 80px; }
   .rules-card:last-child { border-bottom: none; }
-  .rules-card-content { transform: translateY(0); padding: 18px 28px; }
+  .rules-card-content { transform: translateY(0); padding: 18px 28px; position: relative; }
   .rules-card-detail { display: none; }
   .rules-card:hover .rules-card-detail { display: block; }
 }

@@ -179,6 +179,11 @@ export const useMultiGameStore = defineStore("multiGame", () => {
     roundHistory.value = [];
   }
 
+  function restartRoom() {
+    if (!roomState.value || !socket.value) return;
+    socket.value.emit(C2S.RESTART_ROOM, { roomCode: roomState.value.roomCode });
+  }
+
   function disconnect() {
     socket.value?.disconnect();
     socket.value = null;
@@ -208,6 +213,7 @@ export const useMultiGameStore = defineStore("multiGame", () => {
     cancelQueue,
     submitGuess,
     leaveRoom,
+    restartRoom,
     disconnect,
   };
 });
