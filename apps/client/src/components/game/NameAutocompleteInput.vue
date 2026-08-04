@@ -59,6 +59,14 @@ function handleKeydown(event: KeyboardEvent) {
     emit("submit");
   }
 }
+
+/** 提交猜测之后focus输入框. */
+function focus() {
+  inputRef.value?.focus();
+}
+
+defineExpose({ focus });
+
 </script>
 
 <template>

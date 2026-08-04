@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch } from "vue";
 import { useRouter } from "vue-router";
 import gsap from "gsap";
 
@@ -41,7 +41,26 @@ const queueSummary = computed(() => {
   return `共鸣者 / BO${config.bestOf}`;
 });
 
+const showRoomActiveModal = shallowRef(false);
+
+function promptStillInRoom() {
+  showRoomActiveModal.value = true;
+}
+
+function closeRoomActiveModal() {
+  showRoomActiveModal.value = false;
+}
+
+function goToActiveRoom() {
+  showRoomActiveModal.value = false;
+  router.push("/multi/room");
+}
+
 async function createRoom() {
+  if (multiGameStore.roomState) {
+    promptStillInRoom();
+    return;
+  }
   try {
     await multiGameStore.createRoom(config.quizType, config.bestOf, config.difficulty);
   } catch (reason) {
@@ -51,6 +70,10 @@ async function createRoom() {
 
 async function joinRoom() {
   if (!config.roomCode.trim()) return;
+  if (multiGameStore.roomState) {
+    promptStillInRoom();
+    return;
+  }
   try {
     await multiGameStore.joinRoom(config.roomCode.trim().toUpperCase());
   } catch (reason) {
@@ -59,6 +82,10 @@ async function joinRoom() {
 }
 
 async function randomMatch() {
+  if (multiGameStore.roomState) {
+    promptStillInRoom();
+    return;
+  }
   try {
     await multiGameStore.joinQueue(config.quizType, config.difficulty, config.bestOf);
   } catch (reason) {
@@ -233,6 +260,27 @@ onBeforeUnmount(() => {
         <span class="ml-foot-hint">选择一个模式开始</span>
       </footer>
     </div>
+
+    <Teleport to="body">
+      <div v-if="showRoomActiveModal" class="ml-modal-overlay" @click.self="closeRoomActiveModal">
+        <div class="ml-modal">
+          <div class="ml-modal-icon">
+            <Icon icon="ph:warning-circle-duotone" aria-hidden="true" />
+          </div>
+          <p class="ml-modal-kicker">NOTICE</p>
+          <h2 class="ml-modal-title">你仍然在房间里</h2>
+          <p class="ml-modal-desc">
+            当前你还在房间 {{ multiGameStore.roomState?.roomCode }} 对局中，请先退出房间后再创建或匹配新的对局。
+          </p>
+          <div class="ml-modal-actions">
+            <button class="ml-modal-btn ml-modal-btn--primary" type="button" @click="goToActiveRoom">
+              <Icon icon="ph:arrow-right-duotone" class="ml-modal-btn-icon" aria-hidden="true" /> 前往房间
+            </button>
+            <button class="ml-modal-btn" type="button" @click="closeRoomActiveModal">知道了</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -289,7 +337,7 @@ onBeforeUnmount(() => {
 
 /* ── 配置行 ── */
 .ml-config {
-  display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+  display: flex; align-items: center; justify-content: center; gap: 0.5rem; flex-wrap: wrap;
 }
 
 .ml-tabs {
@@ -314,8 +362,9 @@ onBeforeUnmount(() => {
 
 /* ── 卡片网格 ── */
 .ml-grid {
-  display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.8rem;
-  min-height: 0; align-content: start; overflow: auto;
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.8rem;
+  min-height: 0; align-content: center; overflow: auto;
+  max-width: 1100px; width: 100%; margin: 0 auto;
 }
 
 .ml-card {
@@ -465,4 +514,72 @@ onBeforeUnmount(() => {
   .ml-join-row { flex-direction: column; }
   .ml-foot { flex-direction: column; align-items: flex-start; gap: 0.3rem; }
 }
+
+/* ── 仍在房间提示弹窗 ── */
+.ml-modal-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+  padding: 1.5rem;
+  background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(6px);
+  animation: mlFadeIn 0.2s ease;
+}
+
+.ml-modal {
+  display: grid; justify-items: center; gap: 0.7rem;
+  width: 100%; max-width: 380px; padding: 2rem 1.8rem 1.7rem;
+  border: 1px solid color-mix(in oklab, var(--gold) 30%, transparent);
+  border-radius: 12px;
+  background: var(--surface-panel-strong);
+  text-align: center;
+  animation: mlSlideUp 0.3s ease;
+}
+
+.ml-modal-icon {
+  display: grid; place-items: center;
+  width: 3.4rem; height: 3.4rem;
+  border: 2px solid var(--gold); border-radius: 50%;
+  background: color-mix(in oklab, var(--gold) 14%, var(--shell-bg-deep));
+  color: var(--gold); font-size: 1.7rem;
+}
+
+.ml-modal-kicker {
+  margin: 0; color: var(--text-faint); font-size: 0.7rem;
+  letter-spacing: 0.24em; text-transform: uppercase;
+}
+
+.ml-modal-title {
+  margin: 0; font-size: 1.3rem; font-weight: 900;
+  letter-spacing: 0.06em; color: var(--gold);
+}
+
+.ml-modal-desc {
+  margin: 0; color: var(--text-sub); font-size: 0.88rem; line-height: 1.65;
+}
+
+.ml-modal-actions {
+  display: flex; flex-direction: column; gap: 0.5rem; width: 100%; margin-top: 0.4rem;
+}
+
+.ml-modal-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem;
+  min-height: 44px;
+  border: 1px solid var(--line-strong); border-radius: 8px;
+  background: var(--surface-panel);
+  color: var(--text-sub); font-size: 0.9rem; font-weight: 600; cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+.ml-modal-btn:hover { border-color: var(--gold); color: var(--text-main); }
+
+.ml-modal-btn--primary {
+  border-color: color-mix(in oklab, var(--gold) 40%, transparent);
+  background: color-mix(in oklab, var(--gold) 16%, var(--surface-panel-strong));
+  color: var(--gold);
+}
+.ml-modal-btn--primary:hover { background: color-mix(in oklab, var(--gold) 26%, var(--surface-panel-strong)); }
+
+.ml-modal-btn-icon { font-size: 1rem; }
+
+@keyframes mlFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes mlSlideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
 </style>

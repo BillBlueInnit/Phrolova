@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, shallowRef, watch } from "vue";
+import { computed, nextTick, onMounted, ref, shallowRef, useTemplateRef, watch } from "vue";
 import { useRouter } from "vue-router";
 import gsap from "gsap";
 
@@ -15,6 +15,7 @@ const dictionaryStore = useDictionaryStore();
 const singleGameStore = useSingleGameStore();
 const router = useRouter();
 const guessName = shallowRef("");
+const guessInputRef = useTemplateRef<{ focus: () => void }>("guessInput");
 
 const currentTheme = ref<"phrolova-light" | "phrolova-night">(
   (localStorage.getItem(THEME_KEY) as "phrolova-light" | "phrolova-night") || "phrolova-light",
@@ -103,7 +104,9 @@ async function submitGuess() {
   try {
     await singleGameStore.submitGuess(guessName.value.trim());
     guessName.value = "";
+    nextTick(() => guessInputRef.value?.focus());
   } catch {
+    guessInputRef.value?.focus();
     return;
   }
 }
@@ -201,6 +204,7 @@ onMounted(async () => {
 
         <div class="sg-input-row">
           <NameAutocompleteInput
+            ref="guessInput"
             v-model="guessName"
             :disabled="!singleGameStore.canSubmit || singleGameStore.loading"
             :names="currentNames"

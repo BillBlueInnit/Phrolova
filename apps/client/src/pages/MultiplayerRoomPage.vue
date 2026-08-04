@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from "vue";
 import { useRouter } from "vue-router";
 import gsap from "gsap";
 
@@ -127,7 +127,9 @@ async function submitGuess() {
   try {
     await multiGameStore.submitGuess(guessName.value.trim());
     guessName.value = "";
+    nextTick(() => guessInputRef.value?.focus());
   } catch {
+    guessInputRef.value?.focus();
     return;
   }
 }
@@ -292,6 +294,7 @@ watch(
 
           <div class="mr-input-row">
             <NameAutocompleteInput
+              ref="guessInput"
               v-model="guessName"
               :disabled="!multiGameStore.canGuess"
               :names="names"
