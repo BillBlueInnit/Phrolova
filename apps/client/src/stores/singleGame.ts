@@ -105,7 +105,7 @@ export const useSingleGameStore = defineStore("singleGame", () => {
           earnedScore.value = data.score;
           await authStore.refreshPlayer().catch(() => undefined);
         }
-      } else if (data.attempts && data.limit && data.attempts >= data.limit) {
+      } else if (attemptsUsed.value >= attemptsLimit.value) {
         gameOver.value = true;
         answerVisible.value = true;
         resultMessage.value = "机会已用尽，可以重新开始。";

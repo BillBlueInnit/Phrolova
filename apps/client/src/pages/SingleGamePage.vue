@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, shallowRef, useTemplateRef, watch } from "vue";
+import { computed, nextTick, onMounted, ref, shallowRef, useTemplateRef } from "vue";
 import { useRouter } from "vue-router";
 import gsap from "gsap";
 
@@ -66,24 +66,21 @@ const roundEndTitle = computed(() => {
   return "机会已用尽";
 });
 
-const showRoundEndModal = shallowRef(false);
+const modalDismissed = ref(false);
 
-watch(
-  () => singleGameStore.gameOver,
-  (over) => {
-    if (over) showRoundEndModal.value = true;
-  },
+const showRoundEndModal = computed(() =>
+  singleGameStore.gameOver && !modalDismissed.value,
 );
 
 function closeRoundEndModal() {
-  showRoundEndModal.value = false;
+  modalDismissed.value = true;
 }
 
 async function restartGame() {
   try {
     await singleGameStore.startGame();
     guessName.value = "";
-    showRoundEndModal.value = false;
+    modalDismissed.value = false;
     gsap.from(".sg-stage", { opacity: 0, y: 16, duration: 0.4, ease: "power2.out" });
   } catch {
     return;
@@ -198,20 +195,24 @@ onMounted(async () => {
       </footer>
     </div>
 
-    <ModalOverlay v-if="showRoundEndModal" panel-class="sg-win-modal" max-width="380px" no-close @close="closeRoundEndModal">
-      <div class="sg-win-icon" :class="{ 'sg-win-icon--win': isWin, 'sg-win-icon--lose': !isWin }">
-        <Icon :icon="isWin ? 'ph:crown-duotone' : 'ph:eye-duotone'" aria-hidden="true" />
+    <Teleport v-if="showRoundEndModal" to="body">
+      <div class="sg-win-overlay" @click.self="closeRoundEndModal">
+        <div class="sg-win-modal">
+          <div class="sg-win-icon" :class="{ 'sg-win-icon--win': isWin, 'sg-win-icon--lose': !isWin }">
+            <Icon :icon="isWin ? 'ph:crown-duotone' : 'ph:eye-duotone'" aria-hidden="true" />
+          </div>
+          <h2 class="sg-win-title">{{ roundEndTitle }}</h2>
+          <p class="sg-win-answer-label">正确答案</p>
+          <p class="sg-win-answer">{{ answerText }}</p>
+          <p v-if="isWin" class="sg-win-attempts">仅用 {{ singleGameStore.attemptsUsed }} 次猜测</p>
+          <p v-if="singleGameStore.earnedScore" class="sg-win-score">+{{ singleGameStore.earnedScore }} 分</p>
+          <div class="sg-win-actions">
+            <button class="btn" @click="restartGame">再来一局</button>
+            <button class="btn-ghost" @click="router.push('/single')">返回模式选择</button>
+          </div>
+        </div>
       </div>
-      <h2 class="sg-win-title">{{ roundEndTitle }}</h2>
-      <p class="sg-win-answer-label">正确答案</p>
-      <p class="sg-win-answer">{{ answerText }}</p>
-      <p v-if="isWin" class="sg-win-attempts">仅用 {{ singleGameStore.attemptsUsed }} 次猜测</p>
-      <p v-if="singleGameStore.earnedScore" class="sg-win-score">+{{ singleGameStore.earnedScore }} 分</p>
-      <div class="sg-win-actions">
-        <button class="btn" @click="restartGame">再来一局</button>
-        <button class="btn-ghost" @click="router.push('/single')">返回模式选择</button>
-      </div>
-    </ModalOverlay>
+    </Teleport>
   </div>
 </template>
 

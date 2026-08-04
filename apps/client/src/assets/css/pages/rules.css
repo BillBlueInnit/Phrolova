@@ -2,7 +2,7 @@
    RulesPage — game rules page
    ═══════════════════════════════════════════════════════════════════════════ */
 
-#rules-screen { display: flex; background-color: var(--shell-bg-deep); height: calc(100vh - var(--site-header-height) - 6.25rem); width: 100%; position: relative; border: 1px solid var(--line-soft); overflow: hidden; }
+#rules-screen { display: flex; background-color: var(--shell-bg-deep); min-height: calc(100vh - var(--site-header-height) - 6.25rem); width: 100%; position: relative; border: 1px solid var(--line-soft); overflow-y: auto; overflow-x: hidden; }
 .rules-back-btn { position: absolute; top: 24px; left: 24px; z-index: 50; background: var(--shell-bg-deep); border: 1px solid var(--line-strong); border-radius: 6px; color: var(--text-main); font-family: 'Rajdhani', sans-serif; font-size: 1rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; padding: 0.4rem 0.8rem; letter-spacing: 1px; transition: all 0.3s ease; backdrop-filter: blur(4px); }
 .rules-back-btn:hover { color: var(--gold); border-color: var(--gold); }
 .rules-back-btn .arrow { font-size: 1.2rem; }

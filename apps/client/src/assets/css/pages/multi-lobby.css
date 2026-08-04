@@ -2,8 +2,8 @@
    MultiplayerLobbyPage — lobby page
    ═══════════════════════════════════════════════════════════════════════════ */
 
-.ml-screen { width: 100vw; height: 100dvh; margin-left: calc(50% - 50vw); max-width: 100vw; overflow: hidden; }
-.ml-shell { height: 100dvh; display: grid; grid-template-rows: auto auto auto minmax(0, 1fr) auto; gap: 0.6rem; padding: 0.5rem 1rem 0.6rem; overflow: hidden; }
+.ml-screen { width: 100vw; min-height: 100dvh; margin-left: calc(50% - 50vw); max-width: 100vw; overflow-y: auto; overflow-x: hidden; }
+.ml-shell { min-height: 100dvh; display: grid; grid-template-rows: auto auto auto minmax(0, 1fr) auto; gap: 0.6rem; padding: 0.5rem 1rem 0.6rem; }
 
 .ml-config { display: flex; align-items: center; justify-content: center; gap: 0.5rem; flex-wrap: wrap; }
 .ml-config-summary { padding: 0.4rem 0.8rem; border: 1px solid var(--line-soft); border-radius: 6px; background: color-mix(in oklab, var(--gold) 4%, var(--surface-card)); color: var(--text-sub); font-size: 0.8rem; font-weight: 600; }

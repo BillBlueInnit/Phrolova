@@ -22,8 +22,7 @@ const suggestions = computed(() => {
   const keyword = model.value.trim().toLowerCase();
   if (!keyword) return [];
   return props.names
-    .filter((item) => item.name.toLowerCase().includes(keyword))
-    .slice(0, 8);
+    .filter((item) => item.name.toLowerCase().includes(keyword));
 });
 
 function selectSuggestion(name: string) {

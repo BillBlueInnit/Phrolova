@@ -126,8 +126,9 @@ def guess():
         return jsonify({"status": "error", "message": f"数据库中不存在名为「{guess_name}」的目标"}), 404
 
     compare_result = build_compare_by_type(target, guess_row, quiz_type)
+    limit = 4 if quiz_type == "resonator" else 8
     return jsonify({
         "status": "success", "type": quiz_type,
         "guess": guess_row, "compare": compare_result,
-        "score": None,
+        "score": None, "limit": limit,
     })

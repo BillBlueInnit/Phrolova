@@ -77,3 +77,34 @@ img {
   display: block;
   max-width: 100%;
 }
+
+/* ── Custom scrollbar — visible on all platforms including mobile ── */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklab, var(--line-strong) 80%, var(--text-sub));
+}
+
+/* Ensure scrollable elements show scrollbars on touch devices */
+.guess-table-shell,
+.autocomplete-panel,
+.dp-filter-group,
+.ml-grid,
+.game-stage,
+.game-dock {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}

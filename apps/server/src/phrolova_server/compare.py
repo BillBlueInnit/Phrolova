@@ -127,16 +127,38 @@ def split_field(value: Any) -> list[str]:
     return [item.strip() for item in str(value).replace("，", ",").split(",") if item.strip()]
 
 
-def _cell_status(target_list: list[str], guess_list: list[str]) -> str:
+def _cell_status(
+    target_list: list[str],
+    guess_list: list[str],
+    token_statuses: list[str] | None = None,
+) -> str:
+    """Determine cell-level background color for a multi-value field.
+
+    Rules (per 声骸猜测逻辑):
+      - match  (green):  all tokens green AND count matches target
+      - different (gray): no green tokens at all; OR has green but count diff >= 2
+      - partial (orange): everything else
+    """
     if not guess_list:
         return "different"
+
     target_set = set(target_list)
     guess_set = set(guess_list)
     if guess_set == target_set:
         return "match"
-    if guess_set & target_set:
-        return "partial"
-    return "different"
+
+    if token_statuses is None:
+        # Legacy path: no per-token data, fall back to simple overlap check
+        return "partial" if guess_set & target_set else "different"
+
+    green_count = sum(1 for s in token_statuses if s == "match")
+    count_diff = abs(len(target_set) - len(guess_set))
+
+    if green_count == 0:
+        return "different"
+    if count_diff >= 2:
+        return "different"
+    return "partial"
 
 
 def compare_skill_attributes(
@@ -221,13 +243,21 @@ _VERSION_ORDER = [
 _VERSION_INDEX = {v: i for i, v in enumerate(_VERSION_ORDER)}
 
 
-def _is_adjacent_version(a: Any, b: Any) -> bool:
-    """判断两个版本号在有序数组中是否相邻"""
-    ia = _VERSION_INDEX.get(str(a).strip())
-    ib = _VERSION_INDEX.get(str(b).strip())
+def _normalize_version(v: Any) -> str:
+    """将版本值统一为 'X.Y' 格式，兼容整数 2 和浮点 2.0"""
+    try:
+        return f"{float(str(v).strip()):.1f}"
+    except (ValueError, TypeError):
+        return str(v).strip()
+
+
+def _is_near_version(a: Any, b: Any) -> bool:
+    """版本号在有序数组中相差 ≤ 2 位即视为相近"""
+    ia = _VERSION_INDEX.get(_normalize_version(a))
+    ib = _VERSION_INDEX.get(_normalize_version(b))
     if ia is None or ib is None:
         return False
-    return abs(ia - ib) == 1
+    return abs(ia - ib) <= 2
 
 
 def compare_field(target_val: Any, guess_val: Any, field_name: str) -> str:
@@ -236,7 +266,7 @@ def compare_field(target_val: Any, guess_val: Any, field_name: str) -> str:
     if field_name == "star_rating":
         return "near"
     if field_name == "version":
-        if _is_adjacent_version(target_val, guess_val):
+        if _is_near_version(target_val, guess_val):
             return "near"
         return "different"
     return "different"
@@ -332,20 +362,36 @@ def build_compare_skeleton(target: dict[str, Any], guess: dict[str, Any]):
     guess_sets = split_field(guess["set_name"])
     target_locs = split_field(target["drop_location"])
     guess_locs = split_field(guess["drop_location"])
+
+    skill_attr_items = compare_skill_attributes(target_attrs, guess_attrs, target_sets)
+    set_items = compare_sets(target_sets, guess_sets)
+    loc_items = compare_drop_locations(target_locs, guess_locs)
+
     return {
         "skill_attribute": {
-            "cell": _cell_status(target_attrs, guess_attrs),
-            "items": compare_skill_attributes(target_attrs, guess_attrs, target_sets),
+            "cell": _cell_status(
+                target_attrs, guess_attrs,
+                [it["status"] for it in skill_attr_items],
+            ),
+            "items": skill_attr_items,
         },
         "cost": compare_field_skeleton(target["cost"], guess["cost"], "cost"),
-        "is_aberration": compare_field_skeleton(target["is_aberration"], guess["is_aberration"], "is_aberration"),
+        "is_aberration": compare_field_skeleton(
+            target["is_aberration"], guess["is_aberration"], "is_aberration",
+        ),
         "set_name": {
-            "cell": _cell_status(target_sets, guess_sets),
-            "items": compare_sets(target_sets, guess_sets),
+            "cell": _cell_status(
+                target_sets, guess_sets,
+                [it["status"] for it in set_items],
+            ),
+            "items": set_items,
         },
         "drop_location": {
-            "cell": _cell_status(target_locs, guess_locs),
-            "items": compare_drop_locations(target_locs, guess_locs),
+            "cell": _cell_status(
+                target_locs, guess_locs,
+                [it["status"] for it in loc_items],
+            ),
+            "items": loc_items,
         },
     }
 
