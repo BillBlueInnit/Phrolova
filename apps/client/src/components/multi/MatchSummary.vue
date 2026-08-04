@@ -16,65 +16,85 @@ const roundLabel = computed(() => {
   }
   return `第 ${props.roomState.round} 局 / BO${props.roomState.bestOf}`;
 });
+
+const modeLabel = computed(() => {
+  const type = props.roomState.quizType === "skeleton" ? "声骸" : "共鸣者";
+  const diff = props.roomState.quizType === "skeleton"
+    ? (props.roomState.difficulty === "easy" ? "简单" : "困难")
+    : "标准";
+  return `${type} / ${diff}`;
+});
+
+const timeLabel = computed(() => `${props.roomState.timeLeft || props.roomState.countdownLeft || 0} 秒`);
 </script>
 
 <template>
   <section class="summary-band">
-    <div class="summary-band-card">
-      <span class="summary-band-label">房间号</span>
-      <strong class="summary-band-value">{{ roomState.roomCode }}</strong>
+    <div class="summary-item">
+      <span class="summary-label">房间号</span>
+      <strong class="summary-value">{{ roomState.roomCode }}</strong>
     </div>
-    <div class="summary-band-card">
-      <span class="summary-band-label">模式</span>
-      <strong class="summary-band-value">
-        {{ roomState.quizType === "skeleton" ? "声骸" : "共鸣者" }} /
-        {{ roomState.quizType === "skeleton" ? (roomState.difficulty === "easy" ? "简单" : "困难") : "标准" }}
-      </strong>
+    <span class="summary-sep" />
+    <div class="summary-item">
+      <span class="summary-label">模式</span>
+      <strong class="summary-value">{{ modeLabel }}</strong>
     </div>
-    <div class="summary-band-card">
-      <span class="summary-band-label">状态</span>
-      <strong class="summary-band-value">{{ roundLabel }}</strong>
+    <span class="summary-sep" />
+    <div class="summary-item">
+      <span class="summary-label">状态</span>
+      <strong class="summary-value">{{ roundLabel }}</strong>
     </div>
-    <div class="summary-band-card">
-      <span class="summary-band-label">剩余时间</span>
-      <strong class="summary-band-value">{{ roomState.timeLeft || roomState.countdownLeft || 0 }} 秒</strong>
+    <span class="summary-sep" />
+    <div class="summary-item">
+      <span class="summary-label">剩余时间</span>
+      <strong class="summary-value">{{ timeLabel }}</strong>
     </div>
   </section>
 </template>
 
 <style scoped>
 .summary-band {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0.35rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
 }
 
-.summary-band-card {
-  padding: 0.4rem 0.55rem;
-  border: 1px solid var(--line-soft);
-  border-radius: 6px;
-  background: linear-gradient(180deg, var(--surface-panel-strong), var(--surface-panel));
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  flex: 1;
+  min-width: 0;
 }
 
-.summary-band-label {
-  display: block;
+.summary-label {
   color: var(--text-faint);
   font-size: 0.6rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-.summary-band-value {
-  display: block;
-  margin-top: 0.15rem;
+.summary-value {
   font-size: 0.82rem;
   font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.summary-sep {
+  flex-shrink: 0;
+  width: 1px;
+  height: 1.4rem;
+  background: var(--line-soft);
 }
 
 @media (max-width: 720px) {
-  .summary-band { gap: 0.2rem; }
-  .summary-band-card { padding: 0.25rem 0.35rem; border-radius: 4px; }
-  .summary-band-label { font-size: 0.5rem; letter-spacing: 0.04em; }
-  .summary-band-value { font-size: 0.65rem; margin-top: 0.05rem; }
+  .summary-band { gap: 0.3rem; }
+  .summary-label { font-size: 0.5rem; letter-spacing: 0.04em; }
+  .summary-value { font-size: 0.65rem; }
+  .summary-sep { height: 1rem; }
 }
 </style>

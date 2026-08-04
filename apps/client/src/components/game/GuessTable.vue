@@ -12,9 +12,12 @@ const props = defineProps<{
   emptyLabel: string;
   targetVersion?: number | null;
   targetCost?: number | null;
+  hiddenKeys?: string[];
 }>();
 
-const columns = computed(() => getColumns(props.quizType));
+const columns = computed(() =>
+  getColumns(props.quizType).filter((c) => !props.hiddenKeys?.includes(c.key)),
+);
 
 function getCompareCell(compare: ResonatorCompare | SkeletonCompare, key: string) {
   return (compare as Record<string, unknown>)[key];

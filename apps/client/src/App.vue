@@ -178,7 +178,7 @@ onMounted(async () => {
       </div>
     </Teleport>
 
-    <div class="theme-controls">
+    <div v-if="isHomeRoute" class="theme-controls">
       <button class="theme-toggle" type="button" @click="toggleTheme"
         :aria-label="theme === 'phrolova-light' ? '切换到暗色模式' : '切换到亮色模式'">
         <Icon :icon="theme === 'phrolova-light' ? 'ph:moon-duotone' : 'ph:sun-duotone'" />

@@ -52,8 +52,9 @@ function handleKeydown(event: KeyboardEvent) {
   }
   if (event.key === "Enter") {
     event.preventDefault();
-    if (activeIndex.value >= 0 && suggestions.value[activeIndex.value]) {
-      selectSuggestion(suggestions.value[activeIndex.value].name);
+    const idx = activeIndex.value >= 0 ? activeIndex.value : 0;
+    if (suggestions.value[idx]) {
+      selectSuggestion(suggestions.value[idx].name);
     }
     emit("submit");
   }
@@ -98,6 +99,8 @@ function handleKeydown(event: KeyboardEvent) {
 <style scoped>
 .autocomplete-shell {
   position: relative;
+  min-width: 0;
+  flex: 1;
 }
 
 .guess-input {
