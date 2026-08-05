@@ -10,6 +10,7 @@ const MultiplayerResultPage = () => import("@/pages/MultiplayerResultPage.vue");
 const LeaderboardPage = () => import("@/pages/LeaderboardPage.vue");
 const RulesPage = () => import("@/pages/RulesPage.vue");
 const DataPage = () => import("@/pages/DataPage.vue");
+const AdminPage = () => import("@/pages/AdminPage.vue");
 
 const router = createRouter({
   history: createWebHistory(),
@@ -24,6 +25,7 @@ const router = createRouter({
     { path: "/leaderboard", name: "leaderboard", component: LeaderboardPage },
     { path: "/rules", name: "rules", component: RulesPage },
     { path: "/data", name: "data", component: DataPage },
+    { path: "/admin", name: "admin", component: AdminPage },
   ],
   scrollBehavior() {
     return { top: 0 };

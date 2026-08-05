@@ -1,0 +1,90 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   AdminPage — data sync panel with table diff
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.ad-page { display: flex; flex-direction: column; align-items: center; min-height: 100vh; width: 100%; padding: 1.2rem clamp(1rem, 3vw, 2rem) 3rem; }
+.ad-top { display: flex; align-items: center; justify-content: space-between; width: 100%; max-width: 1300px; margin-bottom: 1rem; }
+.ad-title { margin: 0; font-size: 1.3rem; font-weight: 900; }
+.ad-top-right { min-width: 60px; display: flex; justify-content: flex-end; }
+.ad-logout-btn { padding: 0.3rem 0.7rem; border: 1px solid var(--line-soft); border-radius: 6px; background: var(--surface-panel); color: var(--text-sub); font-size: 0.78rem; cursor: pointer; }
+.ad-logout-btn:hover { border-color: var(--color-error); color: var(--color-error); }
+
+.ad-card { width: 100%; max-width: 1300px; padding: 1rem 1.2rem; border: 1px solid var(--line-soft); border-radius: 12px; background: linear-gradient(180deg, var(--surface-panel-strong), var(--surface-panel)); margin-bottom: 0.8rem; }
+.ad-card-title { margin: 0 0 0.5rem; font-size: 1rem; font-weight: 800; display: flex; align-items: center; gap: 0.4rem; }
+.ad-card-icon { color: var(--gold-soft); font-size: 1.1rem; }
+.ad-btn-row { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; }
+.ad-stat-row { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
+.ad-stat-pill { padding: 0.2rem 0.6rem; border: 1px solid var(--line-soft); border-radius: 12px; background: var(--shell-bg); color: var(--text-sub); font-size: 0.74rem; font-weight: 600; }
+.ad-stat-pill--new { border-color: color-mix(in oklab, var(--color-success) 40%, transparent); background: color-mix(in oklab, var(--color-success) 8%, transparent); color: var(--color-success); }
+.ad-stat-pill--changed { border-color: color-mix(in oklab, var(--color-warning) 40%, transparent); background: color-mix(in oklab, var(--color-warning) 8%, transparent); color: var(--color-warning); }
+.ad-error { padding: 0.5rem 0.8rem; border: 1px solid var(--color-error); border-radius: 6px; background: color-mix(in oklab, var(--color-error) 10%, transparent); color: var(--color-error); font-size: 0.85rem; margin: 0.5rem 0; }
+.ad-no-diff { display: flex; align-items: center; gap: 0.35rem; padding: 0.4rem 0.6rem; border-radius: 6px; background: color-mix(in oklab, var(--color-success) 8%, transparent); color: var(--color-success); font-size: 0.82rem; font-weight: 600; }
+.ad-result-error { color: var(--color-error); font-size: 0.85rem; }
+
+/* ── Table ── */
+.ad-table-wrap { overflow-x: auto; }
+.ad-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+.ad-table th { padding: 0.5rem 0.6rem; background: var(--shell-bg); color: var(--text-sub); font-weight: 700; font-size: 0.74rem; text-align: left; white-space: nowrap; border-bottom: 2px solid var(--line-soft); position: sticky; top: 0; z-index: 1; }
+.ad-table td { padding: 0.4rem 0.55rem; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+.ad-table tbody tr { cursor: pointer; transition: background 0.15s; }
+.ad-table tbody tr:hover { background: color-mix(in oklab, var(--gold) 4%, var(--surface-panel)); }
+
+.ad-th-sel, .ad-td-sel { width: 60px; text-align: center; }
+
+/* ── Diff action buttons ── */
+.ad-act-group { display: flex; justify-content: center; }
+.ad-act-btn { padding: 0.2rem 0.5rem; border: 1px solid var(--line-soft); border-radius: 6px; background: var(--surface-panel); color: var(--text-faint); font-size: 0.7rem; font-weight: 600; cursor: pointer; transition: all 0.15s; min-width: 40px; }
+.ad-act-btn:hover { border-color: var(--gold); }
+.ad-act-btn--remote { border-color: var(--color-success); background: color-mix(in oklab, var(--color-success) 12%, transparent); color: var(--color-success); }
+.ad-act-btn--partial { border-color: var(--color-warning); background: color-mix(in oklab, var(--color-warning) 12%, transparent); color: var(--color-warning); }
+.ad-td-name { font-weight: 700; white-space: nowrap; max-width: 130px; overflow: hidden; text-overflow: ellipsis; color: var(--text-main); }
+.ad-td-val { min-width: 90px; color: var(--text-sub); position: relative; }
+.ad-td-diff { min-width: 150px; }
+
+/* ── Row states ── */
+.ad-row-new { background: color-mix(in oklab, var(--color-success) 3%, transparent); }
+.ad-row-new:hover { background: color-mix(in oklab, var(--color-success) 8%, transparent); }
+.ad-row-changed { }
+.ad-row-unchanged { opacity: 0.7; }
+.ad-row-sel { background: color-mix(in oklab, var(--gold) 8%, var(--surface-panel)) !important; }
+.ad-row-sel:hover { background: color-mix(in oklab, var(--gold) 12%, var(--surface-panel)) !important; }
+
+/* ── Selection dot ── */
+.ad-sel-dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--line-strong); margin: 0 auto; transition: all 0.2s; }
+.ad-sel-dot--on { background: var(--gold); border-color: var(--gold); box-shadow: 0 0 6px color-mix(in oklab, var(--gold) 40%, transparent); }
+
+/* ── Kind tags ── */
+.ad-td-kind span { display: inline-block; padding: 0.1rem 0.45rem; border-radius: 10px; font-size: 0.7rem; font-weight: 600; }
+.ad-kind-tag--new { color: var(--color-success); background: color-mix(in oklab, var(--color-success) 8%, transparent); border: 1px solid color-mix(in oklab, var(--color-success) 30%, transparent); }
+.ad-kind-tag--changed { color: var(--color-warning); background: color-mix(in oklab, var(--color-warning) 8%, transparent); border: 1px solid color-mix(in oklab, var(--color-warning) 30%, transparent); }
+.ad-kind-tag--none { color: var(--text-faint); }
+
+/* ── Changed values ── */
+.ad-val-compact { display: flex; align-items: center; gap: 0.3rem; }
+.ad-val-old { color: var(--color-error); text-decoration: line-through; font-size: 0.73rem; }
+.ad-val-arr { color: var(--text-faint); font-size: 0.7rem; flex-shrink: 0; }
+.ad-val-new { color: var(--color-success); font-weight: 600; }
+.ad-val-edited { color: var(--gold) !important; font-weight: 700; }
+
+/* ── Cell editing (click to edit via prompt) ── */
+.ad-td-val:hover { outline: 1px dashed var(--line-strong); outline-offset: -2px; border-radius: 3px; }
+.ad-td-edited { background: color-mix(in oklab, var(--gold) 5%, transparent); }
+
+/* ── Log viewer ── */
+.ad-logs-card { margin-top: 0; }
+.ad-logs-header { display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+.ad-logs-toggle { font-size: 1.1rem; color: var(--text-faint); }
+.ad-logs-body { margin-top: 0.5rem; max-height: 350px; overflow-y: auto; }
+.ad-logs-empty { color: var(--text-faint); font-size: 0.8rem; }
+.ad-log-entry { display: grid; grid-template-columns: 120px 50px 1fr; gap: 0.5rem; padding: 0.3rem 0; border-bottom: 1px solid var(--line-soft); font-size: 0.74rem; align-items: start; }
+.ad-log-time { color: var(--text-faint); white-space: nowrap; }
+.ad-log-level { font-weight: 700; text-transform: uppercase; font-size: 0.68rem; }
+.ad-log-error .ad-log-level { color: var(--color-error); }
+.ad-log-info .ad-log-level { color: var(--color-info); }
+.ad-log-msg { margin: 0; font-family: 'Consolas', 'Courier New', monospace; font-size: 0.7rem; color: var(--text-sub); white-space: pre-wrap; word-break: break-all; }
+
+@media (max-width: 860px) {
+  .ad-table { font-size: 0.72rem; }
+  .ad-table th, .ad-table td { padding: 0.3rem 0.35rem; }
+  .ad-val-compact { flex-direction: column; align-items: flex-start; gap: 0; }
+}
