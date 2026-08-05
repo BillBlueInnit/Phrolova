@@ -12,7 +12,7 @@ from .players import (
     ensure_stats_columns,
     set_kick_sockets_hook,
 )
-from .routes import auth_bp, game_bp, leaderboard_bp
+from .routes import auth_bp, game_bp, leaderboard_bp, admin_bp
 
 socketio = SocketIO(cors_allowed_origins="*", async_mode="gevent", path="/socket.io")
 multiplayer_manager = MultiplayerManager(socketio)
@@ -29,6 +29,7 @@ def create_app():
     app.register_blueprint(auth_bp)
     app.register_blueprint(game_bp)
     app.register_blueprint(leaderboard_bp)
+    app.register_blueprint(admin_bp)
 
     @app.route("/", methods=["GET"])
     def root():

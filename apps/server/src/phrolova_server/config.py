@@ -15,6 +15,8 @@ class Settings:
     db_charset: str
     secret_key: str
     server_port: int
+    admin_user: str
+    admin_password: str
 
 
 @lru_cache(maxsize=1)
@@ -28,4 +30,6 @@ def get_settings() -> Settings:
         db_charset=os.getenv("PHROLOVA_DB_CHARSET", "utf8mb4"),
         secret_key=os.getenv("PHROLOVA_SECRET_KEY", "phrolova-dev-secret"),
         server_port=int(os.getenv("PHROLOVA_SERVER_PORT", "5000")),
+        admin_user=os.getenv("PHROLOVA_ADMIN_USER", "admin"),
+        admin_password=os.getenv("PHROLOVA_ADMIN_PASSWORD", "phrolova2024"),
     )
