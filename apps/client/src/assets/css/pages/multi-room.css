@@ -45,3 +45,15 @@
   .mr-board-title { font-size: 0.72rem; }
   .mr-board-meta { font-size: 0.64rem; }
 }
+
+/* ── Round result popup (BO3/BO5) ── */
+.mr-round-popup { position: fixed; inset: 0; z-index: 2000; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px); cursor: pointer; }
+.mr-round-popup-card { display: grid; justify-items: center; gap: 0.5rem; padding: 2rem 2.5rem; border: 1px solid color-mix(in oklab, var(--gold) 35%, transparent); border-radius: 14px; background: var(--surface-panel-strong); text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.4); }
+.mr-round-popup-icon { font-size: 2.4rem; color: var(--gold); }
+.mr-round-popup-title { margin: 0; font-size: 1.3rem; font-weight: 900; letter-spacing: 0.06em; color: var(--gold); }
+.mr-round-popup-score { margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-main); font-family: 'Rajdhani', sans-serif; }
+.mr-round-popup-hint { margin: 0.2rem 0 0; color: var(--text-faint); font-size: 0.7rem; }
+
+.mr-round-pop-enter-active { animation: mrRoundPopIn 0.25s ease both; }
+.mr-round-pop-leave-active { animation: mrRoundPopIn 0.2s ease reverse both; }
+@keyframes mrRoundPopIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
