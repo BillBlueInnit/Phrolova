@@ -25,7 +25,12 @@
 /* ── Side-by-side boards ── */
 .mrp-round-boards { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: start; }
 .mrp-board { display: flex; flex-direction: column; min-width: 0; }
-.mrp-board-title { margin: 0 0 0.5rem; font-size: 0.85rem; font-weight: 700; color: var(--text-sub); letter-spacing: 0.04em; }
+.mrp-board-mine { border-left: 3px solid color-mix(in oklab, var(--color-info) 60%, transparent); padding-left: 0.8rem; }
+.mrp-board-opponent { border-left: 3px solid color-mix(in oklab, var(--color-warning) 60%, transparent); padding-left: 0.8rem; }
+.mrp-board-title { margin: 0 0 0.5rem; font-size: 0.85rem; font-weight: 700; color: var(--text-sub); letter-spacing: 0.04em; display: flex; align-items: center; gap: 0.35rem; }
+.mrp-board-icon--mine { color: var(--color-info); font-size: 1rem; }
+.mrp-board-icon--opponent { color: var(--color-warning); font-size: 1rem; }
+.mrp-player-id { font-weight: 400; font-size: 0.7rem; color: var(--text-faint); }
 .mrp-board :deep(.guess-table-shell) { overflow: auto; }
 
 /* ── Horizontal-scroll hint for wide tables ── */

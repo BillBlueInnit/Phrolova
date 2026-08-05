@@ -59,25 +59,12 @@ function backToLobby() {
       <section v-for="entry in roomState.roundHistory" :key="entry.round" class="mrp-round">
         <h2 class="mrp-round-label">第 {{ entry.round }} 局</h2>
         <div class="mrp-round-boards">
-          <div class="mrp-board">
-            <h3 class="mrp-board-title">{{ entry.players[0]?.player_id === myPlayerId ? '我的猜测' : '对手猜测' }}</h3>
-            <GuessTable
-              :quiz-type="roomState.quizType"
-              :rows="(entry.players[0]?.guesses as any) ?? []"
-              empty-label="-"
-              :target-version="entry.target ? ('version' in entry.target ? Number((entry.target as any).version) : null) : roomState.targetVersion"
-              :target-cost="entry.target ? ('cost' in entry.target ? Number((entry.target as any).cost) : null) : roomState.targetCost"
-            />
-          </div>
-          <div class="mrp-board">
-            <h3 class="mrp-board-title">{{ entry.players[1]?.player_id === myPlayerId ? '我的猜测' : '对手猜测' }}</h3>
-            <GuessTable
-              :quiz-type="roomState.quizType"
-              :rows="(entry.players[1]?.guesses as any) ?? []"
-              empty-label="-"
-              :target-version="entry.target ? ('version' in entry.target ? Number((entry.target as any).version) : null) : roomState.targetVersion"
-              :target-cost="entry.target ? ('cost' in entry.target ? Number((entry.target as any).cost) : null) : roomState.targetCost"
-            />
+          <div v-for="(p, pi) in entry.players" :key="pi" class="mrp-board" :class="p.player_id === myPlayerId ? 'mrp-board-mine' : 'mrp-board-opponent'">
+            <h3 class="mrp-board-title">
+              <Icon :icon="p.player_id === myPlayerId ? 'ph:user-duotone' : 'ph:users-duotone'" :class="p.player_id === myPlayerId ? 'mrp-board-icon--mine' : 'mrp-board-icon--opponent'" />
+              {{ p.player_id === myPlayerId ? '我方猜测' : `对方猜测` }} <span class="mrp-player-id">({{ p.player_id }})</span>
+            </h3>
+            <GuessTable :quiz-type="roomState.quizType" :rows="(p.guesses as any) ?? []" empty-label="-" :target-version="entry.target ? ('version' in entry.target ? Number((entry.target as any).version) : null) : roomState.targetVersion" :target-cost="entry.target ? ('cost' in entry.target ? Number((entry.target as any).cost) : null) : roomState.targetCost" />
           </div>
         </div>
       </section>
