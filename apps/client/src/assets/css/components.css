@@ -26,8 +26,18 @@
 .glass-header-btn { display: grid; place-items: center; width: 2.2rem; height: 2.2rem; border: 1px solid var(--line-strong); border-radius: 8px; background: color-mix(in oklab, var(--surface-panel) 60%, transparent); color: var(--text-sub); font-size: 1.1rem; cursor: pointer; transition: color 0.2s, border-color 0.2s; }
 .glass-header-btn:hover { color: var(--gold); border-color: var(--gold); }
 .glass-header-btn--danger:hover { color: var(--color-error); border-color: var(--color-error); }
-.glass-header-theme { color: var(--gold-soft); }
+.glass-header-theme { color: var(--gold-soft); font-size: 0.78rem; width: auto; padding: 0 0.45rem; }
 .glass-header-theme:hover { color: var(--gold); }
+
+@media (max-width: 600px) {
+  .glass-header { padding: 0.35rem 0.5rem; gap: 0.4rem; border-radius: 6px; }
+  .glass-header-left { gap: 0.4rem; }
+  .glass-header-back { width: 1.6rem; height: 1.6rem; font-size: 0.8rem; border-radius: 6px; }
+  .glass-header-kicker { font-size: 0.52rem; }
+  .glass-header-title { font-size: 0.66rem; }
+  .glass-header-btn { width: 1.6rem; height: 1.6rem; font-size: 0.8rem; }
+  .glass-header-theme { font-size: 0.64rem; padding: 0 0.35rem; }
+}
 
 /* ── TabGroup ── */
 .tab-group { display: flex; border: 1px solid var(--line-soft); border-radius: 8px; background: var(--surface-panel); overflow: hidden; }
@@ -92,9 +102,7 @@
 .gt-avatar { width: 60px; height: 60px; border-radius: 10px; object-fit: cover; flex-shrink: 0; }
 .guess-table-avatar-cell { width: 76px; text-align: center; }
 .gt-badge-row { display: flex; align-items: center; gap: 0.4rem; }
-.gt-weapon-cell { display: flex; align-items: center; gap: 0.45rem; justify-content: center; }
-.gt-weapon-icon { width: 32px; height: 32px; object-fit: contain; flex-shrink: 0; filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.5)); }
-.gt-weapon-text { font-size: 0.85rem; font-weight: 600; color: var(--text-sub); }
+.gt-weapon-text { font-size: 0.85rem; font-weight: 600; color: var(--text-sub); text-align: center; }
 .gt-name-cell { display: flex; align-items: center; gap: 0.4rem; justify-content: center; }
 .gt-name-avatar { width: 32px; height: 32px; border-radius: 6px; object-fit: cover; border: 1px solid var(--line-soft); flex-shrink: 0; }
 .guess-table-name { font-weight: 700; font-size: 0.95rem; text-align: center; }
@@ -128,16 +136,35 @@
 
 /* ── Mobile table ── */
 @media (max-width: 720px) {
-  .guess-table-shell { padding: 0.35rem; }
-  .guess-table { min-width: 540px; border-spacing: 4px 4px; }
-  .guess-table-head { padding: 0.55rem 0.45rem; font-size: 0.65rem; }
-  .guess-table-index, .guess-table-cell { padding: 0.6rem 0.45rem; }
-  .guess-table-index { width: 32px; font-size: 0.7rem; }
-  .gt-avatar { width: 46px; height: 46px; }
-  .gt-weapon-icon { width: 24px; height: 24px; }
-  .gt-weapon-text { font-size: 0.72rem; }
-  .guess-table-name { font-size: 0.82rem; }
-  .guess-table-avatar-cell { width: 62px; }
+  .guess-table-shell { padding: 0.25rem; }
+  .guess-table { min-width: 460px; border-spacing: 3px 3px; }
+  .guess-table-head { padding: 0.4rem 0.3rem; font-size: 0.52rem; }
+  .guess-table-index, .guess-table-cell { padding: 0.4rem 0.3rem; }
+  .guess-table-index { width: 28px; font-size: 0.54rem; }
+  .guess-table-name { font-size: 0.64rem; }
+  .gt-weapon-text { font-size: 0.58rem; }
+  .guess-table-avatar-cell,
+  .guess-table-head:nth-child(2) { display: none; }
+
+  .guess-table-value { font-size: 0.62rem; min-height: auto; }
+  .guess-table-stars { font-size: 0.58rem; letter-spacing: 0.08em; }
+  .guess-table-masked { font-size: 0.58rem; letter-spacing: 0.1em; }
+  .compare-token-list { gap: 0.2rem; }
+
+  .gt-badge-row { gap: 0.2rem; }
+
+  .lore-badge { gap: 0.28rem; min-height: 22px; padding: 0.12rem 0.42rem 0.12rem 0.22rem; border-radius: 5px; font-size: 0.52rem; }
+  .lore-badge-compact { min-height: 20px; padding-right: 0.36rem; font-size: 0.5rem; }
+  .lore-badge-mark { width: 1rem; height: 1rem; border-radius: 4px; font-size: 0.54rem; }
+  .lore-badge-mark img { width: 0.6rem; height: 0.6rem; }
+
+  .guess-input { min-height: 38px; padding: 0.5rem 0.7rem; font-size: 0.8rem; }
+  .autocomplete-option { padding: 0.4rem 0.5rem; font-size: 0.72rem; gap: 0.3rem; }
+  .autocomplete-panel { padding: 0.3rem; gap: 0.25rem; }
+
+  .legend-grid { gap: 0.35rem; }
+  .legend-chip { gap: 0.25rem; padding: 0.18rem 0.35rem; font-size: 0.6rem; border-radius: 4px; }
+  .legend-swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
 }
 
 /* ── SummaryBand responsive ── */
@@ -145,7 +172,7 @@
 @media (min-width: 1240px) { .summary-band { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (max-width: 720px) {
   .summary-band { gap: 0.3rem; }
-  .summary-label { font-size: 0.5rem; letter-spacing: 0.04em; }
-  .summary-value { font-size: 0.65rem; }
+  .summary-label { font-size: 0.48rem; letter-spacing: 0.04em; }
+  .summary-value { font-size: 0.6rem; }
   .summary-sep { height: 1rem; }
 }

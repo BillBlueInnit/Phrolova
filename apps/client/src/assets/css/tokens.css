@@ -22,12 +22,12 @@
   --color-neutral-content: oklch(94% 0.01 90);
   --color-info: oklch(58% 0.06 85);
   --color-info-content: oklch(15% 0.01 85);
-  --color-success: oklch(62% 0.10 145);
-  --color-success-content: oklch(14% 0.015 145);
-  --color-warning: oklch(72% 0.17 80);
-  --color-warning-content: oklch(16% 0.03 80);
-  --color-error: oklch(55% 0.18 22);
-  --color-error-content: oklch(14% 0.02 22);
+  --color-success: #22c55e;
+  --color-success-content: oklch(14% 0.02 145);
+  --color-warning: #f97316;
+  --color-warning-content: oklch(16% 0.04 80);
+  --color-error: oklch(58% 0.22 22);
+  --color-error-content: oklch(14% 0.03 22);
 
   /* Radii & sizing tokens */
   --radius-selector: 0.75rem;
@@ -76,11 +76,11 @@
   --color-neutral-content: oklch(96% 0.01 90);
   --color-info: oklch(50% 0.06 85);
   --color-info-content: oklch(95% 0.01 85);
-  --color-success: oklch(52% 0.10 145);
+  --color-success: #16a34a;
   --color-success-content: oklch(95% 0.005 145);
-  --color-warning: oklch(60% 0.17 80);
-  --color-warning-content: oklch(15% 0.02 80);
-  --color-error: oklch(48% 0.18 22);
+  --color-warning: #ea580c;
+  --color-warning-content: oklch(15% 0.03 80);
+  --color-error: oklch(46% 0.22 22);
   --color-error-content: oklch(95% 0.005 22);
 
   /* Radii & sizing (same as night) */

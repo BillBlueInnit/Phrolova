@@ -37,13 +37,13 @@
 /* ── Responsive ── */
 @media (max-width: 1040px) { .mr-boards { grid-template-rows: repeat(2, minmax(200px, 1fr)); } }
 @media (max-width: 720px) {
-  .mr-glass-chip { font-size: 0.6rem; max-width: 10rem; padding: 0.2rem 0.4rem; }
+  .mr-glass-chip { display: none; }
   .mr-info-card { flex-direction: column; align-items: stretch; gap: 0.3rem; padding: 0.3rem 0.5rem; border-left: none; border-right: none; border-radius: 0; }
   .mr-info-divider { width: 100%; height: 1px; align-self: stretch; }
   .mr-boards { gap: 0.35rem; }
   .mr-board-head { padding: 0.3rem 0.45rem; }
-  .mr-board-title { font-size: 0.72rem; }
-  .mr-board-meta { font-size: 0.64rem; }
+  .mr-board-title { font-size: 0.66rem; }
+  .mr-board-meta { font-size: 0.58rem; }
 }
 
 /* ── Round result popup (BO3/BO5) ── */

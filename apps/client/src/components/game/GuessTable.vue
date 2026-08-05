@@ -3,7 +3,7 @@ import { computed } from "vue";
 
 import LoreBadge from "@/components/shared/LoreBadge.vue";
 import type { CellStatus, CompareStatus, GuessHistoryRow, QuizType, ResonatorCompare, SkeletonCompare } from "@/types/game";
-import { formatGuessValue, getCharacterAvatar, getColumns, getSkeletonAvatar, getStatusClass, getWeaponIcon, renderGroupItem } from "@/utils/game";
+import { formatGuessValue, getCharacterAvatar, getColumns, getSkeletonAvatar, getStatusClass, renderGroupItem } from "@/utils/game";
 import { resolveBadgeCategory } from "@/utils/presentation";
 
 const props = defineProps<{
@@ -101,11 +101,8 @@ function formatCellValue(row: GuessHistoryRow, key: string) {
             </template>
 
             <template v-else-if="column.key === 'weapon'">
-              <div class="gt-weapon-cell">
-                <img v-if="row.revealed" :src="getWeaponIcon(String(row.guess.weapon))" class="gt-weapon-icon" alt="" />
-                <span v-if="row.revealed" class="gt-weapon-text">{{ row.guess.weapon }}</span>
-                <span v-else class="guess-table-masked">***</span>
-              </div>
+              <span v-if="row.revealed" class="gt-weapon-text">{{ row.guess.weapon }}</span>
+              <span v-else class="guess-table-masked">***</span>
             </template>
 
             <template v-else-if="shouldRenderBadge(column.key)">

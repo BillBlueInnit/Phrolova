@@ -40,7 +40,8 @@ export const useSingleGameStore = defineStore("singleGame", () => {
   const resultMessage = shallowRef("");
   const earnedScore = shallowRef(0);
 
-  const attemptsLimit = ref(quizType.value === "skeleton" ? 8 : 4);
+  const attemptsLimit = ref(4);
+  function _updateLimit() { attemptsLimit.value = quizType.value === "skeleton" ? 8 : 4; }
   const attemptsUsed = computed(() => guessHistory.value.length);
   const attemptsLeft = computed(() => Math.max(0, attemptsLimit.value - attemptsUsed.value));
   const canSubmit = computed(() => !gameOver.value && attemptsLeft.value > 0);
@@ -57,6 +58,7 @@ export const useSingleGameStore = defineStore("singleGame", () => {
     answerVisible.value = false;
     resultMessage.value = "";
     guessHistory.value = [];
+    _updateLimit();
     try {
       const authStore = useAuthStore();
       const data = await api.drawTarget(

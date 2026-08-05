@@ -78,6 +78,14 @@ img {
   max-width: 100%;
 }
 
+@media (max-width: 600px) {
+  html { font-size: 14px; }
+}
+
+@media (max-width: 400px) {
+  html { font-size: 13px; }
+}
+
 /* ── Custom scrollbar — visible on all platforms including mobile ── */
 ::-webkit-scrollbar {
   width: 5px;

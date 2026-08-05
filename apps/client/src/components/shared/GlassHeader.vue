@@ -20,7 +20,7 @@ const { theme, toggleTheme } = useTheme();
   <header class="glass-header">
     <div class="glass-header-left">
       <button class="glass-header-back" @click="router.push(backTo)" :aria-label="`返回${backTo}`">
-        <Icon icon="ph:arrow-left-duotone" aria-hidden="true" />
+        ←
       </button>
       <div class="glass-header-info">
         <span class="glass-header-kicker">{{ kicker }}</span>
@@ -31,10 +31,9 @@ const { theme, toggleTheme } = useTheme();
     <div class="glass-header-actions">
       <slot name="actions" />
       <button class="glass-header-btn glass-header-theme" @click="toggleTheme"
-        :title="theme === 'phrolova-light' ? '暗色模式' : '亮色模式'">
-        <Icon :icon="theme === 'phrolova-light' ? 'ph:moon-duotone' : 'ph:sun-duotone'" aria-hidden="true" />
+        :title="theme === 'phrolova-light' ? '暗色' : '亮色'">
+        {{ theme === 'phrolova-light' ? '暗' : '亮' }}
       </button>
     </div>
   </header>
 </template>
-
