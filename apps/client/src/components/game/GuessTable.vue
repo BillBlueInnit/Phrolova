@@ -106,17 +106,21 @@ function formatCellValue(row: GuessHistoryRow, key: string) {
             </template>
 
             <template v-else-if="shouldRenderBadge(column.key)">
-              <div class="gt-badge-row">
-                <LoreBadge :label="String(formatCellValue(row, column.key))"
-                  :category="resolveBadgeCategory(column.key, String(row.guess[column.key as keyof typeof row.guess]))"
-                  compact />
-              </div>
+              <template v-if="row.revealed">
+                <div class="gt-badge-row">
+                  <LoreBadge :label="String(formatCellValue(row, column.key))"
+                    :category="resolveBadgeCategory(column.key, String(row.guess[column.key as keyof typeof row.guess]))"
+                    compact />
+                </div>
+              </template>
+              <span v-else class="guess-table-masked">***</span>
             </template>
 
             <template v-else>
-              <span class="guess-table-value" :class="{ 'guess-table-stars': column.key === 'star_rating' }">
+              <span v-if="row.revealed" class="guess-table-value" :class="{ 'guess-table-stars': column.key === 'star_rating' }">
                 {{ formatCellValue(row, column.key) }}
               </span>
+              <span v-else class="guess-table-masked">***</span>
             </template>
           </td>
         </tr>

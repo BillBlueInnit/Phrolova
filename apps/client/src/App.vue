@@ -22,6 +22,8 @@ const isGameRoute = computed(() => {
   const name = route.name;
   return name === "single" || name === "single-play" || name === "multi-lobby" || name === "multi-room";
 });
+const isAdminLoginRoute = computed(() => route.name === "admin-login");
+const isAdminRoute = computed(() => isAdminLoginRoute.value || route.name === "admin-diff" || route.name === "admin-table");
 
 const ACCENTS: AccentPreset[] = [
   {
@@ -111,7 +113,7 @@ onMounted(async () => {
 
 <template>
   <div class="app-root">
-    <main class="app-main" :class="{ 'app-main-home': isHomeRoute, 'app-main-game': isGameRoute }">
+    <main class="app-main" :class="{ 'app-main-home': isHomeRoute, 'app-main-game': isGameRoute, 'app-main-admin': isAdminRoute }">
       <RouterView />
     </main>
 

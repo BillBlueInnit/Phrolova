@@ -2,10 +2,10 @@
    MultiplayerResultPage — match replay page
    ═══════════════════════════════════════════════════════════════════════════ */
 
-.mrp-screen { min-height: 100dvh; display: flex; flex-direction: column; background: var(--shell-bg); color: var(--text-main); }
+.mrp-screen { min-height: 100dvh; background: var(--shell-bg); color: var(--text-main); }
 
 /* ── Header ── */
-.mrp-header { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; padding: 2rem 1.5rem 1.5rem; border-bottom: 1px solid var(--line-soft); background: color-mix(in oklab, var(--surface-panel-strong) 60%, transparent); }
+.mrp-header { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; padding: 2rem 1.5rem 1.5rem; border-bottom: 1px solid var(--line-soft); background: color-mix(in oklab, var(--surface-panel-strong) 60%, transparent); position: sticky; top: 0; z-index: 2; }
 .mrp-header-icon { font-size: 2.6rem; color: var(--text-sub); }
 .mrp-header-icon--win { color: var(--gold); }
 .mrp-title { margin: 0; font-size: 1.8rem; font-weight: 900; letter-spacing: 0.06em; }
@@ -16,7 +16,7 @@
 .mrp-back:hover { background: color-mix(in oklab, var(--gold) 26%, var(--surface-panel-strong)); }
 
 /* ── Body ── */
-.mrp-body { flex: 1; display: flex; flex-direction: column; gap: 1.2rem; padding: 1.5rem clamp(1rem, 4vw, 3rem) 3rem; max-width: 1200px; width: 100%; margin: 0 auto; }
+.mrp-body { padding: 1.5rem clamp(1rem, 4vw, 3rem) 3rem; max-width: 1200px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 1.2rem; }
 
 /* ── Round card ── */
 .mrp-round { display: flex; flex-direction: column; gap: 0.6rem; padding: 1rem; border: 1px solid var(--line-soft); border-radius: 10px; background: color-mix(in oklab, var(--surface-panel) 50%, transparent); }
@@ -31,7 +31,7 @@
 .mrp-board-icon--mine { color: var(--color-info); font-size: 1rem; }
 .mrp-board-icon--opponent { color: var(--color-warning); font-size: 1rem; }
 .mrp-player-id { font-weight: 400; font-size: 0.7rem; color: var(--text-faint); }
-.mrp-board :deep(.guess-table-shell) { overflow: auto; }
+.mrp-board :deep(.guess-table-shell) { overflow: auto; -webkit-overflow-scrolling: touch; }
 
 /* ── Horizontal-scroll hint for wide tables ── */
 .mrp-board :deep(.guess-table) { min-width: 600px; }
@@ -43,12 +43,19 @@
 }
 
 @media (max-width: 540px) {
-  .mrp-header { padding: 1.2rem 0.8rem 1rem; }
-  .mrp-header-icon { font-size: 2rem; }
-  .mrp-title { font-size: 1.3rem; }
-  .mrp-body { padding: 0.8rem 0.4rem 2rem; gap: 0.8rem; }
+  .mrp-header { padding: 1rem 0.8rem 0.9rem; gap: 0.3rem; position: relative; }
+  .mrp-header-icon { font-size: 1.8rem; }
+  .mrp-title { font-size: 1.2rem; }
+  .mrp-score { font-size: 0.95rem; }
+  .mrp-sub { font-size: 0.72rem; }
+  .mrp-back { margin-top: 0.4rem; padding: 0.45rem 1.2rem; font-size: 0.82rem; }
+  .mrp-body { padding: 0.6rem 0.4rem 1.5rem; gap: 0.6rem; }
   .mrp-round { padding: 0.5rem; gap: 0.4rem; }
+  .mrp-round-label { font-size: 0.85rem; }
   .mrp-round-boards { gap: 0.5rem; }
+  .mrp-board-mine, .mrp-board-opponent { padding-left: 0.5rem; }
+  .mrp-board-title { font-size: 0.72rem; margin-bottom: 0.3rem; flex-wrap: wrap; }
+  .mrp-player-id { font-size: 0.64rem; }
   .mrp-board :deep(.guess-table) { min-width: 420px; border-spacing: 3px 3px; }
   .mrp-board :deep(.guess-table-head) { padding: 0.35rem 0.3rem; font-size: 0.6rem; }
   .mrp-board :deep(.guess-table-index),

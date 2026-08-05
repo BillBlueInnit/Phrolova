@@ -66,6 +66,10 @@ const opponentWins = computed(() => multiGameStore.opponent?.roundWins ?? 0);
 const targetBestOf = computed(() => multiGameStore.roomState?.bestOf ?? 1);
 const winsNeeded = computed(() => Math.ceil(targetBestOf.value / 2));
 
+const opponentGuesses = computed(() =>
+  (multiGameStore.opponent?.guesses ?? []).map((row) => ({ ...row, revealed: false })),
+);
+
 const showMatchResult = ref(false);
 const matchResultSeen = ref(false);
 const showRoundPopup = ref(false);
@@ -259,7 +263,7 @@ watch(
               </div>
               <GuessTable
                 :quiz-type="multiGameStore.roomState.quizType"
-                :rows="multiGameStore.opponent?.guesses ?? []"
+                :rows="opponentGuesses"
                 empty-label="等待对手提交第一条猜测"
                 :target-version="multiGameStore.roomState.targetVersion"
                 :target-cost="multiGameStore.roomState.targetCost"

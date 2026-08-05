@@ -41,6 +41,12 @@
   overflow-x: hidden;
 }
 
+.app-main-admin {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
 .page-shell {
   display: grid;
   gap: 1.3rem;

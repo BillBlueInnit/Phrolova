@@ -10,7 +10,9 @@ const MultiplayerResultPage = () => import("@/pages/MultiplayerResultPage.vue");
 const LeaderboardPage = () => import("@/pages/LeaderboardPage.vue");
 const RulesPage = () => import("@/pages/RulesPage.vue");
 const DataPage = () => import("@/pages/DataPage.vue");
-const AdminPage = () => import("@/pages/AdminPage.vue");
+const AdminLoginPage = () => import("@/pages/AdminLoginPage.vue");
+const AdminDiffPage = () => import("@/pages/AdminDiffPage.vue");
+const AdminTablePage = () => import("@/pages/AdminTablePage.vue");
 
 const router = createRouter({
   history: createWebHistory(),
@@ -25,11 +27,24 @@ const router = createRouter({
     { path: "/leaderboard", name: "leaderboard", component: LeaderboardPage },
     { path: "/rules", name: "rules", component: RulesPage },
     { path: "/data", name: "data", component: DataPage },
-    { path: "/admin", name: "admin", component: AdminPage },
+    { path: "/admin", name: "admin-login", component: AdminLoginPage },
+    { path: "/admin/diff", name: "admin-diff", component: AdminDiffPage, meta: { admin: true } },
+    { path: "/admin/table", name: "admin-table", component: AdminTablePage, meta: { admin: true } },
   ],
   scrollBehavior() {
     return { top: 0 };
   },
+});
+
+router.beforeEach((to, _from, next) => {
+  if (to.meta.admin) {
+    const token = localStorage.getItem("admin_token");
+    if (!token) {
+      next({ name: "admin-login", query: { redirect: to.fullPath } });
+      return;
+    }
+  }
+  next();
 });
 
 export default router;
