@@ -17,6 +17,9 @@ export const useMultiGameStore = defineStore("multiGame", () => {
   const roomState = ref<MultiplayerRoomState | null>(null);
   const kicked = shallowRef(false);
   const matchScoreDelta = ref(0);
+  const roundResult = ref<{ roundWinner: number | null; myWins: number; opponentWins: number; iWon: boolean | null } | null>(null);
+  let _prevMyWins = 0;
+  let _prevOppWins = 0;
 
   const me = computed(() => roomState.value?.players.find((player) => player.isMe) ?? null);
   const opponent = computed(() => roomState.value?.players.find((player) => !player.isMe) ?? null);
@@ -74,13 +77,30 @@ export const useMultiGameStore = defineStore("multiGame", () => {
     currentSocket.on(S2C.GUESS_RESULT, (payload) => {
       infoMessage.value = `已提交猜测，还剩 ${payload.attemptsLeft} 次机会`;
     });
-    currentSocket.on(S2C.ROUND_FINISHED, () => {
+    currentSocket.on(S2C.ROUND_FINISHED, (payload: { roundWinner: number | null; roundWins: number[]; overallWinner: number | null }) => {
       infoMessage.value = "本局已结算";
+      if (roomState.value && roomState.value.bestOf > 1 && payload.overallWinner === null) {
+        const me = roomState.value.players.find(p => p.isMe);
+        const opponent = roomState.value.players.find(p => !p.isMe);
+        const myWins = me?.roundWins ?? 0;
+        const oppWins = opponent?.roundWins ?? 0;
+        const iWon = myWins > _prevMyWins;
+        const opponentWon = oppWins > _prevOppWins;
+        roundResult.value = {
+          roundWinner: payload.roundWinner,
+          myWins,
+          opponentWins: oppWins,
+          iWon: iWon ? true : opponentWon ? false : null,
+        };
+        _prevMyWins = myWins;
+        _prevOppWins = oppWins;
+      }
     });
     currentSocket.on(S2C.ROOM_STATE, (payload: MultiplayerRoomState) => {
       roomState.value = payload;
       inQueue.value = false;
       error.value = "";
+      if (payload.roomStatus === "waiting") { _prevMyWins = 0; _prevOppWins = 0; }
     });
     currentSocket.on(S2C.MATCH_FINISHED, (payload) => {
       matchScoreDelta.value = payload.scoreDelta || 0;
@@ -205,6 +225,7 @@ export const useMultiGameStore = defineStore("multiGame", () => {
     canGuess,
     kicked,
     matchScoreDelta,
+    roundResult,
     ensureConnected,
     resumeRoom,
     createRoom,

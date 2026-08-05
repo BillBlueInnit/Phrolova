@@ -68,6 +68,23 @@ const winsNeeded = computed(() => Math.ceil(targetBestOf.value / 2));
 
 const showMatchResult = ref(false);
 const matchResultSeen = ref(false);
+const showRoundPopup = ref(false);
+let roundPopupTimer: ReturnType<typeof setTimeout> | null = null;
+
+// Show round result popup for BO3/BO5
+watch(
+  () => multiGameStore.roundResult,
+  (result) => {
+    if (result) {
+      showRoundPopup.value = true;
+      if (roundPopupTimer) clearTimeout(roundPopupTimer);
+      roundPopupTimer = setTimeout(() => {
+        showRoundPopup.value = false;
+        multiGameStore.roundResult = null;
+      }, 5000);
+    }
+  },
+);
 
 watch(
   () => multiGameStore.roomState?.roomStatus,
@@ -152,7 +169,10 @@ onMounted(async () => {
   }
 });
 
-onBeforeUnmount(() => { ctx?.revert(); });
+onBeforeUnmount(() => {
+  ctx?.revert();
+  if (roundPopupTimer) clearTimeout(roundPopupTimer);
+});
 
 watch(
   () => multiGameStore.roomState?.quizType,
@@ -241,7 +261,6 @@ watch(
                 :quiz-type="multiGameStore.roomState.quizType"
                 :rows="multiGameStore.opponent?.guesses ?? []"
                 empty-label="等待对手提交第一条猜测"
-                :hidden-keys="['version', 'star_rating']"
                 :target-version="multiGameStore.roomState.targetVersion"
                 :target-cost="multiGameStore.roomState.targetCost"
               />
@@ -276,6 +295,25 @@ watch(
         <RouterLink class="btn" to="/multi" style="display:inline-flex;text-decoration:none">返回大厅</RouterLink>
       </EmptyState>
     </div>
+
+    <Teleport to="body">
+      <Transition name="mr-round-pop">
+        <div v-if="showRoundPopup && multiGameStore.roundResult" class="mr-round-popup" @click="showRoundPopup = false; multiGameStore.roundResult = null">
+          <div class="mr-round-popup-card">
+            <div class="mr-round-popup-icon">
+              <Icon
+                :icon="multiGameStore.roundResult.roundWinner === (multiGameStore.roomState?.players.findIndex(p => p.isMe) ?? -1) ? 'ph:crown-duotone' : multiGameStore.roundResult.roundWinner === null ? 'ph:handshake-duotone' : 'ph:target-duotone'"
+              />
+            </div>
+            <p class="mr-round-popup-title">
+              {{ multiGameStore.roundResult.iWon === null ? '本局平局' : multiGameStore.roundResult.iWon ? '本局获胜' : '本局对方胜' }}
+            </p>
+            <p class="mr-round-popup-score">我方 {{ multiGameStore.roundResult.myWins }} : {{ multiGameStore.roundResult.opponentWins }} 对手</p>
+            <p class="mr-round-popup-hint">点击关闭 · 5 秒后自动关闭</p>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
 
     <ModalOverlay v-if="showMatchResult" panel-class="mr-result-modal" max-width="1100px" no-close @close="closeMatchResult">
       <div class="mr-result-header">
