@@ -143,6 +143,10 @@ export interface LeaderboardResponse extends ApiStatusResponse {
     rank?: number;
     in_top: boolean;
   } | null;
+  page: number;
+  page_size: number;
+  total: number;
+  total_pages: number;
 }
 
 export interface RoomPlayerView {

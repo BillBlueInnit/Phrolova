@@ -44,6 +44,13 @@
 .lb-row-score { font-weight: 900; color: var(--gold); font-size: 0.95rem; min-width: 4rem; text-align: right; }
 .lb-row-rate { color: var(--text-sub); font-weight: 600; font-size: 0.85rem; min-width: 3.5rem; text-align: right; }
 
+/* ── Pagination ── */
+.lb-pager { display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-top: 1.2rem; }
+.lb-pager-btn { display: grid; place-items: center; width: 2.2rem; height: 2.2rem; border-radius: 8px; border: 1px solid var(--line-soft); background: var(--surface-panel); color: var(--text-main); cursor: pointer; transition: background 0.15s, opacity 0.15s; font-size: 0.85rem; }
+.lb-pager-btn:hover:not(:disabled) { background: var(--surface-panel-strong); }
+.lb-pager-btn:disabled { opacity: 0.3; cursor: default; }
+.lb-pager-info { font-weight: 700; font-size: 0.9rem; color: var(--text-sub); min-width: 5rem; text-align: center; letter-spacing: 0.06em; }
+
 @media (max-width: 640px) {
   .lb-page { padding: 0.8rem 0.6rem 2rem; }
   .lb-top { gap: 0.5rem; }
