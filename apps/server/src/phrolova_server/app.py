@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from flask import Flask, jsonify
 from flask_socketio import SocketIO
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from .config import get_settings
 from .multiplayer import MultiplayerManager
@@ -25,6 +26,12 @@ def create_app():
     app.config["SECRET_KEY"] = settings.secret_key
     app.config["JSON_AS_ASCII"] = False
     app.json.ensure_ascii = False
+    # Serve behind the HTTPS reverse proxy: internal URL generation and secure
+    # cookies key off the real scheme/proto forwarded by OpenResty.
+    app.config["PREFERRED_URL_SCHEME"] = settings.preferred_url_scheme
+    app.config["SESSION_COOKIE_SECURE"] = bool(settings.session_cookie_secure)
+    # Trust X-Forwarded-For / X-Forwarded-Proto from the reverse proxy.
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(game_bp)
@@ -52,3 +59,4 @@ app = create_app()
 if __name__ == "__main__":
     settings = get_settings()
     socketio.run(app, host="0.0.0.0", port=settings.server_port)
+

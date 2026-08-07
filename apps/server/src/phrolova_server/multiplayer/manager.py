@@ -13,6 +13,12 @@ from flask_socketio import SocketIO, emit, join_room as socket_join_room
 
 from ..compare import all_match, build_compare_by_type, draw_target_by_type, lookup_guess_by_name
 from ..players import apply_score, authenticate_player, ensure_stats_columns, record_match
+from .room_ttl import (
+    delete_room_ttl,
+    expired_room_codes,
+    refresh_room_ttl,
+    set_room_ttl,
+)
 
 
 class MultiplayerManager:
@@ -77,6 +83,18 @@ class MultiplayerManager:
                 return
             self._resume_existing_state(player_id)
 
+        @self.socketio.on("multi:heartbeat")
+        def handle_heartbeat(payload):
+            # Application-level heartbeat that refreshes the room inactivity TTL.
+            player_id = self._player_id_from_sid()
+            if not player_id:
+                return
+            room_code = (payload or {}).get("roomCode") or ""
+            with self.lock:
+                room = self.rooms.get(room_code or "") or self._get_player_room(player_id)
+                if room:
+                    self._refresh_ttl(room)
+
         @self.socketio.on("multi:create_room")
         def handle_create_room(payload):
             player_id = self._player_id_from_sid()
@@ -89,6 +107,7 @@ class MultiplayerManager:
                 self._purge_finished_rooms_for(player_id)
                 current_room = self._get_player_room(player_id)
                 if current_room and current_room["status"] != "finished":
+                    self._refresh_ttl(current_room)
                     self._emit_room_state(current_room)
                     self._emit_to_player(
                         player_id,
@@ -130,6 +149,7 @@ class MultiplayerManager:
                     self._emit_error(player_id, "房间已开始或已结束")
                     return
                 if any(slot["player_id"] == player_id for slot in room["players"]):
+                    self._refresh_ttl(room)
                     self._emit_room_state(room)
                     return
                 if self._get_player_room(player_id):
@@ -140,6 +160,7 @@ class MultiplayerManager:
                 room["countdown_end_at"] = time.time() + self.enter_game_delay
                 room["updated_at"] = time.time()
                 self.player_to_room[player_id] = room["code"]
+                self._refresh_ttl(room)
             self._emit_to_player(player_id, "multi:room_joined", {"roomCode": room_code})
             self._emit_countdown_started(room)
             self._emit_room_state(room)
@@ -157,6 +178,7 @@ class MultiplayerManager:
                 if self._get_player_room(player_id):
                     room = self._get_player_room(player_id)
                     if room:
+                        self._refresh_ttl(room)
                         self._emit_room_state(room)
                     return
                 queued = any(item["player_id"] == player_id for item in self.match_queue)
@@ -222,6 +244,7 @@ class MultiplayerManager:
                 if not room:
                     self._emit_error(player_id, "房间不存在")
                     return
+                self._refresh_ttl(room)
                 if room["status"] != "playing" or room["round_status"] != "active":
                     self._emit_error(player_id, "当前回合不可提交猜测")
                     return
@@ -265,6 +288,8 @@ class MultiplayerManager:
                     },
                 )
 
+                # Win detection strictly precedes draw detection: a correct guess
+                # always wins the round even if it also exhausts all attempts.
                 if all_match(compare_result):
                     self._finish_round(room, player_index)
                 elif all(player["attempts"] >= self.max_attempts(room["quiz_type"]) for player in room["players"]):
@@ -291,11 +316,13 @@ class MultiplayerManager:
                     room["players"] = [slot for slot in room["players"] if slot["player_id"] != player_id]
                     self.player_to_room.pop(player_id, None)
                     self.rooms.pop(room["code"], None)
+                    delete_room_ttl(room["code"])
                     self._emit_to_player(player_id, "multi:match_finished", {"message": "已退出房间"})
                     return
                 if room["status"] == "finished":
                     self.player_to_room.pop(player_id, None)
                     self.rooms.pop(room["code"], None)
+                    delete_room_ttl(room["code"])
                     self._emit_to_player(player_id, "multi:match_finished", {"message": "房间已关闭"})
                     return
                 if room["status"] in ("countdown", "playing") and len(room["players"]) >= 2:
@@ -337,6 +364,7 @@ class MultiplayerManager:
                     slot["round_wins"] = 0
                     slot["attempts"] = 0
                     slot["guesses"] = []
+                self._refresh_ttl(room)
             self._emit_room_state(room)
 
     def max_attempts(self, quiz_type: str) -> int:
@@ -372,6 +400,12 @@ class MultiplayerManager:
     def _emit_to_room_players(self, room: dict[str, Any], event: str, payload: dict[str, Any]):
         for slot in room["players"]:
             self._emit_to_player(slot["player_id"], event, deepcopy(payload))
+
+    def _refresh_ttl(self, room: dict[str, Any] | None):
+        """Refresh the Redis inactivity TTL for an active room."""
+        if room is None:
+            return
+        refresh_room_ttl(room["code"])
 
     def _new_slot(self, player_id: str):
         return {"player_id": player_id, "guesses": [], "attempts": 0, "round_wins": 0}
@@ -411,6 +445,7 @@ class MultiplayerManager:
             "rematch_votes": set(),
         }
         self.rooms[code] = room
+        set_room_ttl(code)
         return room
 
     def _player_index(self, room: dict[str, Any], player_id: str) -> int:
@@ -439,6 +474,7 @@ class MultiplayerManager:
                 room["players"] = [slot for slot in room["players"] if slot["player_id"] != player_id]
                 if len(room["players"]) < 2:
                     self.rooms.pop(code, None)
+                    delete_room_ttl(code)
 
     def _cleanup_stale_rooms(self):
         now = time.time()
@@ -451,6 +487,33 @@ class MultiplayerManager:
             room = self.rooms.pop(code, None)
             if not room:
                 continue
+            delete_room_ttl(code)
+            for slot in room["players"]:
+                self.player_to_room.pop(slot["player_id"], None)
+
+    def _expire_inactive_rooms(self):
+        """Force-remove rooms whose Redis inactivity TTL has lapsed (30 min).
+
+        Emits ``multi:room_expired`` to every member, frees their in-memory
+        room state, and cleans up their player-to-room mappings. Uses
+        ``expired_room_codes`` so it is a safe no-op when Redis is unavailable.
+        """
+        active_codes = [
+            code
+            for code, room in self.rooms.items()
+            if room["status"] in ("waiting", "countdown", "playing")
+        ]
+        expired = expired_room_codes(active_codes)
+        for code in expired:
+            room = self.rooms.pop(code, None)
+            if not room:
+                continue
+            delete_room_ttl(code)
+            self._emit_to_room_players(
+                room,
+                "multi:room_expired",
+                {"roomCode": code, "message": "房间因长时间无活动已自动关闭"},
+            )
             for slot in room["players"]:
                 self.player_to_room.pop(slot["player_id"], None)
 
@@ -552,18 +615,29 @@ class MultiplayerManager:
                 )
                 self._emit_room_state(room)
                 break
-        self._emit_to_room_players(
-            room,
-            "multi:round_finished",
-            {
-                "roomCode": room["code"],
-                "round": room["round"],
-                "roundWinner": winner_index,
-                "roundWins": [slot["round_wins"] for slot in room["players"]],
-                "target": room["target"],
-                "overallWinner": room["overall_winner"],
-            },
-        )
+
+        # Broadcast per-player round result with an explicit win/draw/loss status
+        # derived strictly from the already-resolved winner index. This prevents
+        # the client from inferring the outcome heuristically (which used to show
+        # "draw" for an actual win).
+        base = {
+            "roomCode": room["code"],
+            "round": room["round"],
+            "roundWinner": winner_index,
+            "roundWins": [slot["round_wins"] for slot in room["players"]],
+            "target": room["target"],
+            "overallWinner": room["overall_winner"],
+        }
+        for index, slot in enumerate(room["players"]):
+            if winner_index is None:
+                result = "draw"
+            else:
+                result = "win" if index == winner_index else "loss"
+            self._emit_to_player(
+                slot["player_id"],
+                "multi:round_finished",
+                {**base, "roundResult": result},
+            )
 
     def _finish_match_by_forfeit(self, room: dict[str, Any], winner_index: int, loser_index: int):
         room["status"] = "finished"
@@ -697,6 +771,7 @@ class MultiplayerManager:
         with self.lock:
             room = self._get_player_room(player_id)
             if room:
+                self._refresh_ttl(room)
                 self._emit_room_state(room)
                 return
             queued = any(item["player_id"] == player_id for item in self.match_queue)
@@ -730,4 +805,5 @@ class MultiplayerManager:
                     if room["status"] == "finished":
                         self._emit_room_state(room)
                 self._cleanup_stale_rooms()
+                self._expire_inactive_rooms()
             self.socketio.sleep(1)

@@ -3,6 +3,7 @@ import type { Difficulty, MultiplayerRoomState, QuizType } from "@/types/game";
 // ── Client → Server event names ──
 export const C2S = {
   RESUME_ROOM: "multi:resume_room",
+  HEARTBEAT: "multi:heartbeat",
   CREATE_ROOM: "multi:create_room",
   JOIN_ROOM: "multi:join_room",
   QUEUE_JOIN: "multi:queue_join",
@@ -29,6 +30,7 @@ export const S2C = {
   ROUND_FINISHED: "multi:round_finished",
   MATCH_FINISHED: "multi:match_finished",
   OPPONENT_FORFEIT: "multi:opponent_forfeit",
+  ROOM_EXPIRED: "multi:room_expired",
   KICKED: "multi:kicked",
 } as const;
 
@@ -113,6 +115,7 @@ export interface RoundFinishedPayload {
   roundWins: number[];
   target: Record<string, unknown> | null;
   overallWinner: number | null;
+  roundResult?: "win" | "loss" | "draw";
 }
 
 export interface MatchFinishedPayload {
@@ -129,3 +132,4 @@ export interface OpponentForfeitPayload {
 }
 
 export type { MultiplayerRoomState };
+

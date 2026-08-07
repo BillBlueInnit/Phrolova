@@ -40,6 +40,9 @@ class TestAdminTokens:
             db_host="h", db_port=3306, db_name="n", db_user="u",
             db_password="", db_charset="utf8", secret_key="test-secret",
             server_port=5000, admin_user="admin", admin_password="pass",
+            redis_host="127.0.0.1", redis_port=6379, redis_db=0,
+            room_ttl=1800, preferred_url_scheme="https",
+            session_cookie_secure=True,
         )
         token = _make_token("admin")
         assert token
@@ -53,6 +56,9 @@ class TestAdminTokens:
             db_host="h", db_port=3306, db_name="n", db_user="u",
             db_password="", db_charset="utf8", secret_key="test-secret",
             server_port=5000, admin_user="admin", admin_password="pass",
+            redis_host="127.0.0.1", redis_port=6379, redis_db=0,
+            room_ttl=1800, preferred_url_scheme="https",
+            session_cookie_secure=True,
         )
         token = _make_token("admin")
         _sessions[token] = time.time() - 10

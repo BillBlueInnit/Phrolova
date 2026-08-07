@@ -17,6 +17,12 @@ class Settings:
     server_port: int
     admin_user: str
     admin_password: str
+    redis_host: str
+    redis_port: int
+    redis_db: int
+    room_ttl: int
+    preferred_url_scheme: str
+    session_cookie_secure: bool
 
 
 @lru_cache(maxsize=1)
@@ -32,4 +38,11 @@ def get_settings() -> Settings:
         server_port=int(os.getenv("PHROLOVA_SERVER_PORT", "5000")),
         admin_user=os.getenv("PHROLOVA_ADMIN_USER", "admin"),
         admin_password=os.getenv("PHROLOVA_ADMIN_PASSWORD", "phrolova2024"),
+        redis_host=os.getenv("PHROLOVA_REDIS_HOST", "127.0.0.1"),
+        redis_port=int(os.getenv("PHROLOVA_REDIS_PORT", "6379")),
+        redis_db=int(os.getenv("PHROLOVA_REDIS_DB", "0")),
+        room_ttl=int(os.getenv("PHROLOVA_ROOM_TTL", "1800")),
+        preferred_url_scheme=os.getenv("PHROLOVA_URL_SCHEME", "https" if os.getenv("PHROLOVA_USE_HTTPS") == "1" else "http"),
+        session_cookie_secure=os.getenv("PHROLOVA_USE_HTTPS", "0") == "1",
     )
+

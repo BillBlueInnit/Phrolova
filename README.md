@@ -37,6 +37,7 @@
 | 类别 | 技术 | 版本 |
 |------|------|------|
 | 数据库 | MySQL | 8.4 |
+| 缓存 | Redis | 7 |
 | 反向代理 | OpenResty（Nginx + Lua） | 1.27 |
 | 包管理 | pnpm | 9.15 |
 | 容器化 | Docker + Docker Compose | — |
@@ -143,6 +144,28 @@ cd apps/server
 pip install -r requirements.txt
 python -m phrolova_server.app
 ```
+
+## HTTP / HTTPS 反向代理
+
+- 反向代理同时监听 `80`（HTTP）与 `443`（HTTPS）。
+- **HTTP（`80`）始终可用，不需要任何证书**，默认即通过 `http://127.0.0.1/admin` 访问。
+- **HTTPS（`443`）为可选增强**：Docker 构建时会自动生成一套自签名证书，使 `https://` 立即可用；不需要用户手动提供证书（生产可用真实证书覆盖，见 `infra/openresty/TLS.md`）。
+- Flask 通过 `ProxyFix` 信任 `X-Forwarded-Proto`，并设置 `PREFERRED_URL_SCHEME` 与安全 Cookie，无论走 `http://` 还是 `https://` 都能正确生成对应协议的绝对地址。
+
+## 多人房间空闲清理与 Redis
+
+- 每个房间在 Redis 中以 `room:{code}` 记录存活 TTL（默认 30 分钟）。
+- 房间内任意 Socket 事件（创建 / 加入 / 猜测 / 心跳）会刷新 TTL；长时间无活动的房间自动过期并下发 `multi:room_expired`。
+- 新增环境变量：
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `PHROLOVA_REDIS_HOST` | `127.0.0.1` | Redis 地址 |
+| `PHROLOVA_REDIS_PORT` | `6379` | Redis 端口 |
+| `PHROLOVA_REDIS_DB` | `0` | Redis 数据库序号 |
+| `PHROLOVA_ROOM_TTL` | `1800` | 房间无活动过期秒数（秒） |
+| `PHROLOVA_USE_HTTPS` | `0` | 置为 `1` 时启用 HTTPS URL 生成与安全 Cookie |
+| `PHROLOVA_URL_SCHEME` | `http` | URL 生成使用的协议（`https` 或 `http`） |
 
 ## 数据库
 

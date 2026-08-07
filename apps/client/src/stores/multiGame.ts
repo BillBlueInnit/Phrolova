@@ -20,6 +20,7 @@ export const useMultiGameStore = defineStore("multiGame", () => {
   const roundResult = ref<{ roundWinner: number | null; myWins: number; opponentWins: number; iWon: boolean | null } | null>(null);
   let _prevMyWins = 0;
   let _prevOppWins = 0;
+  let _heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 
   const me = computed(() => roomState.value?.players.find((player) => player.isMe) ?? null);
   const opponent = computed(() => roomState.value?.players.find((player) => !player.isMe) ?? null);
@@ -70,6 +71,10 @@ export const useMultiGameStore = defineStore("multiGame", () => {
       roomState.value = payload;
       inQueue.value = false;
       error.value = "";
+      if (payload.roomStatus === "waiting") { _prevMyWins = 0; _prevOppWins = 0; }
+      if (payload.roomCode) {
+        startHeartbeat();
+      }
     });
     currentSocket.on(S2C.ROUND_STARTED, (payload) => {
       infoMessage.value = `第 ${payload.round} 局开始`;
@@ -77,30 +82,32 @@ export const useMultiGameStore = defineStore("multiGame", () => {
     currentSocket.on(S2C.GUESS_RESULT, (payload) => {
       infoMessage.value = `已提交猜测，还剩 ${payload.attemptsLeft} 次机会`;
     });
-    currentSocket.on(S2C.ROUND_FINISHED, (payload: { roundWinner: number | null; roundWins: number[]; overallWinner: number | null }) => {
+    currentSocket.on(S2C.ROUND_FINISHED, (payload: { roundWinner: number | null; roundWins: number[]; overallWinner: number | null; roundResult?: "win" | "loss" | "draw" }) => {
       infoMessage.value = "本局已结算";
       if (roomState.value && roomState.value.bestOf > 1 && payload.overallWinner === null) {
         const me = roomState.value.players.find(p => p.isMe);
         const opponent = roomState.value.players.find(p => !p.isMe);
         const myWins = me?.roundWins ?? 0;
         const oppWins = opponent?.roundWins ?? 0;
-        const iWon = myWins > _prevMyWins;
-        const opponentWon = oppWins > _prevOppWins;
+        // Prefer the server's explicit per-player status; otherwise default to null (draw).
+        let iWon: boolean | null;
+        if (payload.roundResult === "win") {
+          iWon = true;
+        } else if (payload.roundResult === "loss") {
+          iWon = false;
+        } else {
+          // "draw" (or an absent field) → treated as a draw / neutral.
+          iWon = null;
+        }
         roundResult.value = {
           roundWinner: payload.roundWinner,
           myWins,
           opponentWins: oppWins,
-          iWon: iWon ? true : opponentWon ? false : null,
+          iWon,
         };
         _prevMyWins = myWins;
         _prevOppWins = oppWins;
       }
-    });
-    currentSocket.on(S2C.ROOM_STATE, (payload: MultiplayerRoomState) => {
-      roomState.value = payload;
-      inQueue.value = false;
-      error.value = "";
-      if (payload.roomStatus === "waiting") { _prevMyWins = 0; _prevOppWins = 0; }
     });
     currentSocket.on(S2C.MATCH_FINISHED, (payload) => {
       matchScoreDelta.value = payload.scoreDelta || 0;
@@ -113,11 +120,35 @@ export const useMultiGameStore = defineStore("multiGame", () => {
       matchScoreDelta.value = payload.scoreDelta || 0;
       infoMessage.value = payload.message || "对手已退出";
     });
+    currentSocket.on(S2C.ROOM_EXPIRED, (payload) => {
+      infoMessage.value = payload?.message || "房间因长时间无活动已自动关闭";
+      roomState.value = null;
+      inQueue.value = false;
+      stopHeartbeat();
+    });
     currentSocket.on(S2C.KICKED, () => {
       if (kicked.value) return;
       disconnect();
       kicked.value = true;
     });
+  }
+
+  function startHeartbeat() {
+    stopHeartbeat();
+    _heartbeatTimer = setInterval(() => {
+      const s = socket.value;
+      const code = roomState.value?.roomCode;
+      if (s?.connected && code) {
+        s.emit(C2S.HEARTBEAT, { roomCode: code });
+      }
+    }, 60000);
+  }
+
+  function stopHeartbeat() {
+    if (_heartbeatTimer) {
+      clearInterval(_heartbeatTimer);
+      _heartbeatTimer = null;
+    }
   }
 
   async function ensureConnected() {
@@ -196,7 +227,6 @@ export const useMultiGameStore = defineStore("multiGame", () => {
     }
     roomState.value = null;
     inQueue.value = false;
-    roundHistory.value = [];
   }
 
   function restartRoom() {
@@ -205,6 +235,7 @@ export const useMultiGameStore = defineStore("multiGame", () => {
   }
 
   function disconnect() {
+    stopHeartbeat();
     socket.value?.disconnect();
     socket.value = null;
     connectionState.value = "idle";
