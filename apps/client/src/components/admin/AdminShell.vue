@@ -1,23 +1,10 @@
 <script setup lang="ts">
-import { onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
-import { Icon } from "@iconify/vue";
 import { useAdmin } from "@/composables/useAdmin";
-import { apiPath, requestJson } from "@/utils/http";
 
 const router = useRouter();
 const route = useRoute();
-const { doLogout, clearToken, adminToken } = useAdmin();
-
-onMounted(async () => {
-  if (!adminToken.value) { router.replace({ name: "admin-login" }); return; }
-  try {
-    await requestJson(apiPath("/admin/logs"), { headers: { "X-Admin-Token": adminToken.value } });
-  } catch {
-    clearToken();
-    router.replace({ name: "admin-login" });
-  }
-});
+const { doLogout } = useAdmin();
 
 const tabs = [
   { key: "diff", label: "对比同步", icon: "ph:git-diff-duotone", to: "/admin/diff" },
