@@ -57,29 +57,32 @@ def _check_rate(key: str) -> bool:
     return True
 
 
-# ── Admin session tokens ──
-_sessions: dict[str, float] = {}  # token -> expiry_ts
+# ── Stateless admin tokens (HMAC-signed, survives server restart) ──
 _SESSION_TTL = 7200  # 2 hours
 
 
 def _make_token(username: str) -> str:
     settings = get_settings()
-    payload = f"{username}:{time.time()}"
-    sig = hmac.new(
-        settings.secret_key.encode(),
-        payload.encode(),
-        hashlib.sha256,
-    ).hexdigest()[:16]
+    expiry = int(time.time() + _SESSION_TTL)
+    payload = f"{username}:{expiry}"
+    sig = hmac.new(settings.secret_key.encode(), payload.encode(), hashlib.sha256).hexdigest()
     return f"{sig}:{payload}"
 
 
 def _verify_token(token: str) -> bool:
-    if not token or token not in _sessions:
+    if not token:
         return False
-    if time.time() > _sessions[token]:
-        del _sessions[token]
+    try:
+        sig, payload = token.split(":", 1)
+        username, expiry_str = payload.split(":", 1)
+        expiry = int(expiry_str)
+        if time.time() > expiry:
+            return False
+        settings = get_settings()
+        expected = hmac.new(settings.secret_key.encode(), payload.encode(), hashlib.sha256).hexdigest()
+        return hmac.compare_digest(sig, expected)
+    except (ValueError, IndexError):
         return False
-    return True
 
 
 def _require_admin():
@@ -109,7 +112,6 @@ def admin_login():
         return jsonify({"status": "error", "message": "账号或密码错误"}), 401
 
     token = _make_token(username)
-    _sessions[token] = time.time() + _SESSION_TTL
     return jsonify({"status": "success", "token": token})
 
 
@@ -269,6 +271,4 @@ def admin_update():
 
 @admin_bp.route("/logout", methods=["POST"])
 def admin_logout():
-    token = request.headers.get("X-Admin-Token", "")
-    _sessions.pop(token, None)
     return jsonify({"status": "success"})
