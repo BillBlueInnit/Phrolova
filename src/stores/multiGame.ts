@@ -257,8 +257,16 @@ export const useMultiGameStore = defineStore("multiGame", () => {
           _pendingQueue = null;
           const roomCode = (payload.roomCode as string) || "";
           if (roomCode) {
+            // 匹配成功时：必须先设置等待标志，transitionToRoom 内部才会等待 ROOM_STATE
+            // 否则 ROOM_STATE 先到但 promise 没人等，用户会以为匹配没生效
+            _waitingForRoomState = true;
             try {
-              await transitionToRoom(roomCode, C2S.JOIN_ROOM, { roomCode });
+              await transitionToRoom(roomCode, C2S.JOIN_ROOM, {
+                roomCode,
+                quizType: (payload.quizType as QuizType) || 'resonator',
+                bestOf: Number(payload.bestOf) || 3,
+                difficulty: (payload.difficulty as Difficulty) || 'easy',
+              });
             } catch (e) {
               error.value = e instanceof Error ? e.message : "连接房间失败";
               if (_roomStateReject) {

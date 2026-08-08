@@ -266,7 +266,7 @@ export class RoomObject extends DurableObject {
         await this.handleCreateRoom(playerId, payload);
         break;
       case C2S.JOIN_ROOM:
-        await this.handleJoinRoom(playerId);
+        await this.handleJoinRoom(playerId, payload);
         break;
       case C2S.QUEUE_JOIN:
         await this.handleQueueJoin(playerId, payload);
@@ -340,10 +340,23 @@ export class RoomObject extends DurableObject {
   }
 
   // ── 加入房间 ──
-  private async handleJoinRoom(playerId: string): Promise<void> {
+  private async handleJoinRoom(playerId: string, payload: Record<string, unknown>): Promise<void> {
     if (this.roomStatus !== 'waiting') {
       this.sendToPlayer(playerId, S2C.ERROR, { message: '游戏已开始，无法加入' });
       return;
+    }
+
+    // 如果是第一个加入的玩家（随机匹配路径），使用 payload 初始化房间配置
+    // 注意：只有当 quizType 未设置（默认 resonator + 默认 bestOf=1）时才从 payload 读取
+    // 避免后加入的玩家覆盖房主已设置的配置（createRoom 路径）
+    const needInit = this.players.length === 0 ||
+      (this.quizType === 'resonator' && this.bestOf === 1 && this.difficulty === 'easy' && this.creator === '');
+    if (needInit) {
+      this.quizType = (payload.quizType as QuizType) || this.quizType;
+      this.difficulty = (payload.difficulty as Difficulty) || this.difficulty;
+      const bo = Number(payload.bestOf);
+      if (bo === 1 || bo === 3 || bo === 5) this.bestOf = bo;
+      this.creator = this.creator || playerId;
     }
 
     // 检查是否已被 handleConnection 自动添加
@@ -570,6 +583,11 @@ export class RoomObject extends DurableObject {
       this.roundWins[winnerIndex]++;
     }
 
+    // 同步 class-level roundWins 到每个玩家对象（buildState 从 p.roundWins 读取）
+    for (let i = 0; i < this.players.length; i++) {
+      this.players[i].roundWins = this.roundWins[i] ?? 0;
+    }
+
     // 判断整场胜负
     const winsNeeded = Math.ceil(this.bestOf / 2);
     if (this.roundWins[0] >= winsNeeded || this.roundWins[1] >= winsNeeded) {
@@ -608,6 +626,11 @@ export class RoomObject extends DurableObject {
   private async endMatch(): Promise<void> {
     if (this.gameTimer !== null) {
       this.clearGameTimer();
+    }
+
+    // 同步 class-level roundWins 到每个玩家对象（防止弃权路径绕过 resolveRound 的同步）
+    for (let i = 0; i < this.players.length; i++) {
+      this.players[i].roundWins = this.roundWins[i] ?? 0;
     }
 
     // 处理对手弃权（整体胜负未设置）

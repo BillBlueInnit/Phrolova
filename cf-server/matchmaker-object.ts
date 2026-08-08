@@ -47,15 +47,21 @@ export class MatchmakerObject extends DurableObject {
           const data = JSON.parse(saved) as Record<string, unknown>;
           if (Array.isArray(data.queue)) {
             // 恢复时：所有 ws 必须置为 null（无法跨 DO 重启），connected 默认 false
-            this.queue = (data.queue as Array<Omit<QueueEntry, 'ws' | 'connected'> & { connected?: boolean }>).map(e => ({
-              playerId: e.playerId,
-              ws: null as unknown as WebSocket,
-              quizType: (e.quizType as QuizType) || 'resonator',
-              difficulty: (e.difficulty as Difficulty) || 'easy',
-              bestOf: Number(e.bestOf) || 1,
-              joinedAt: Number(e.joinedAt) || Date.now(),
-              connected: false, // 恢复后必须由玩家重连时显式标记 true
-            }));
+            // 注意：恢复时 difficulty 和 bestOf 使用当前协议的默认值（强制 bestOf=3）
+            //   避免老数据（bestOf=1/difficulty=hard 但 quizType=resonator）卡死匹配
+            const now = Date.now();
+            this.queue = (data.queue as Array<Omit<QueueEntry, 'ws' | 'connected'> & { connected?: boolean }>).map(e => {
+              const qt = (e.quizType as QuizType) || 'resonator';
+              return {
+                playerId: e.playerId,
+                ws: null as unknown as WebSocket,
+                quizType: qt,
+                difficulty: qt === 'skeleton' ? ((e.difficulty as Difficulty) || 'easy') : 'easy',
+                bestOf: 3, // 随机匹配固定 BO3
+                joinedAt: now, // 恢复时重置加入时间，避免立即被僵尸检测清理
+                connected: false, // 恢复后必须由玩家重连时显式标记 true
+              };
+            });
             console.log('[MatchmakerDO] restored queue:', this.queue.map(e => `${e.playerId}(${e.quizType}/${e.difficulty}/BO${e.bestOf}) connected=${e.connected}`).join(', '));
           }
         } catch (e) { console.warn('[MatchmakerDO] restore failed:', e); }
@@ -124,6 +130,11 @@ export class MatchmakerObject extends DurableObject {
         if (existingEntry) {
           existingEntry.ws = server;
           existingEntry.connected = true;
+          // 重连时强制归一化：bestOf=3，resonator 模式 difficulty=easy
+          // 避免持久化脏数据导致 bestOf/difficulty 不匹配
+          existingEntry.bestOf = 3;
+          existingEntry.difficulty = existingEntry.quizType === 'skeleton' ? existingEntry.difficulty : 'easy';
+          existingEntry.joinedAt = Date.now(); // 重连不视为僵尸
           sendJson(server, S2C.MATCHING, {
             message: '已重新连接，继续匹配中...',
             inQueue: true,
@@ -318,6 +329,7 @@ export class MatchmakerObject extends DurableObject {
       existing.quizType = quizType;
       existing.difficulty = difficulty;
       existing.bestOf = bestOf;
+      existing.joinedAt = Date.now(); // 重连重置计时，避免 30 秒僵尸检测误删
       this.sendToPlayer(playerId, S2C.MATCHING, {
         message: '已重新加入匹配队列，继续等待对手...',
         inQueue: true,
