@@ -3,6 +3,7 @@ import { defineStore } from "pinia";
 
 import type { Difficulty, MultiplayerRoomState, QuizType } from "@/types/game";
 import { C2S, S2C } from "@/api";
+import { generateRoomCode } from "@/multiplayer/protocol";
 import { useAuthStore } from "./auth";
 
 type ConnectionState = "idle" | "connecting" | "connected" | "error";
@@ -39,15 +40,29 @@ class GameWebSocket {
       this.intentionalClose = false;
       const fullUrl = this.buildUrl(path);
       let didOpen = false;
+      let settled = false;
+
+      // 连接超时保护：10 秒未建立连接则中止
+      const timeoutId = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          this.intentionalClose = true;
+          try { this.ws?.close(); } catch { /* ignore */ }
+          reject(new Error("连接超时，请重试"));
+        }
+      }, 10000);
 
       try {
         this.ws = new WebSocket(fullUrl);
       } catch (e) {
+        clearTimeout(timeoutId);
         reject(e);
         return;
       }
 
       this.ws.onopen = () => {
+        if (settled) return;
+        clearTimeout(timeoutId);
         didOpen = true;
         this.reconnectAttempts = 0;
         this.onOpen?.();
@@ -72,11 +87,15 @@ class GameWebSocket {
       };
 
       this.ws.onclose = () => {
+        clearTimeout(timeoutId);
         this.onClose?.();
 
         // 如果连接从未成功打开，报告连接错误
         if (!didOpen) {
-          reject(new Error("WebSocket 连接失败，请检查网络或服务状态"));
+          if (!settled) {
+            settled = true;
+            reject(new Error("WebSocket 连接失败，请检查网络或服务状态"));
+          }
           return;
         }
 
@@ -609,10 +628,20 @@ export const useMultiGameStore = defineStore("multiGame", () => {
   }
 
   async function createRoom(quizType: QuizType, bestOf: number, difficulty: Difficulty): Promise<void> {
+    // 优化：前端直接生成 roomCode 并连接 RoomDO，跳过 MatchmakerDO 中转
+    // 省掉一次 WS 连接 + D1 鉴权 + 往返延迟
     _waitingForRoomState = true;
-    const ws = await ensureConnected("/ws");
-    ws.send(C2S.CREATE_ROOM, { quizType, bestOf, difficulty });
-    await waitForRoomState();
+    _isTransitioning = true; // 阻止 ROOM_CREATED 处理器再次触发 transitionToRoom
+    try {
+      const roomCode = generateRoomCode();
+      const ws = await ensureConnected(`/ws/room/${roomCode}`);
+      ws.send(C2S.CREATE_ROOM, { roomCode, quizType, bestOf, difficulty });
+      await waitForRoomState();
+    } catch (e) {
+      _waitingForRoomState = false;
+      _isTransitioning = false;
+      throw e;
+    }
   }
 
   async function joinRoom(roomCode: string): Promise<void> {

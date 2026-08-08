@@ -223,9 +223,9 @@ export class RoomObject extends DurableObject {
       }
     }
 
-    // 发送当前房间状态
-    this.broadcastState();
-    await this.persistState();
+    // 注意：不在此处 broadcastState / persistState
+    // 房间状态广播和持久化由 CREATE_ROOM / JOIN_ROOM / RESUME_ROOM 等消息处理器负责
+    // 这样可以避免发送配置不正确的冗余 ROOM_STATE，也避免 DO storage 写入阻塞 101 响应
   }
 
   // ── 断开处理 ──
@@ -311,7 +311,7 @@ export class RoomObject extends DurableObject {
         difficulty: this.difficulty,
       });
       this.broadcastState();
-      await this.persistState();
+      this.persistState(); // fire-and-forget：不阻塞消息发送
       return;
     }
 
@@ -336,7 +336,7 @@ export class RoomObject extends DurableObject {
     });
 
     this.broadcastState();
-    await this.persistState();
+    this.persistState(); // fire-and-forget
   }
 
   // ── 加入房间 ──
@@ -378,7 +378,7 @@ export class RoomObject extends DurableObject {
       this.opponentId = this.players.find(p => p.playerId !== playerId)?.playerId || '';
       this.startCountdown();
     }
-    await this.persistState();
+    this.persistState(); // fire-and-forget
   }
 
   // ── 匹配队列加入 ──
