@@ -142,23 +142,23 @@ function compareSets(
   targetSets: string[],
   guessSets: string[],
 ): Array<{ set: string; status: TokenStatus; has_image: boolean; whiten: boolean }> {
-  const targetGroups = new Set(
-    targetSets
-      .filter(n => setHasImage(n))
-      .map(n => _COLOR_GROUPS[setColorFamily(n)] ?? 'neutral')
-  );
+  // 按 divide-data.ts 属性分组判断 near（而非颜色分组）
+  const memberGroups = buildDivideMemberGroups();
+  const targetGroups = new Set<string>();
+  for (const s of targetSets) {
+    for (const g of memberGroups[s] ?? []) targetGroups.add(g);
+  }
+
   const result: Array<{ set: string; status: TokenStatus; has_image: boolean; whiten: boolean }> = [];
   for (const setName of guessSets) {
     let status: TokenStatus = 'different';
     if (targetSets.includes(setName)) status = 'match';
-    else if (setHasImage(setName) && targetGroups.has(_COLOR_GROUPS[setColorFamily(setName)] ?? 'neutral')) {
-      status = 'near';
-    }
+    else if ([...(memberGroups[setName] ?? [])].some(g => targetGroups.has(g))) status = 'near';
     result.push({
       set: setName,
       status,
-      has_image: setHasImage(setName),
-      whiten: needWhiten(setName, status),
+      has_image: true,
+      whiten: false,
     });
   }
   return result;

@@ -23,7 +23,11 @@
 
 /* ── Round card ── */
 .mrp-round { display: flex; flex-direction: column; gap: 0.6rem; padding: 1rem; border: 1px solid var(--line-soft); border-radius: 10px; background: color-mix(in oklab, var(--surface-panel) 50%, transparent); }
+.mrp-round-head { display: flex; justify-content: space-between; align-items: center; gap: 0.8rem; flex-wrap: wrap; }
 .mrp-round-label { margin: 0; font-size: 1rem; font-weight: 800; color: var(--gold); letter-spacing: 0.06em; }
+.mrp-round-answer { margin: 0; display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.7rem; border: 1px solid var(--line-soft); border-radius: 6px; background: color-mix(in oklab, var(--surface-panel-strong) 70%, transparent); }
+.mrp-round-answer-label { color: var(--text-sub); font-size: 0.65rem; letter-spacing: 0.16em; text-transform: uppercase; }
+.mrp-round-answer-value { color: var(--gold); font-size: 1rem; font-weight: 800; letter-spacing: 0.04em; }
 
 /* ── Side-by-side boards ── */
 .mrp-round-boards { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: start; }

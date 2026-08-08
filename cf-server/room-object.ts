@@ -303,6 +303,9 @@ export class RoomObject extends DurableObject {
       this.bestOf = Number(payload.bestOf) || 1;
       this.creator = playerId;
       this.roomStatus = 'waiting';
+      // 同步已有玩家的 attemptsLimit（handleConnection 先添加时 quizType 还是默认 resonator）
+      const limit = this.quizType === 'resonator' ? 4 : 8;
+      for (const p of this.players) p.attemptsLimit = limit;
 
       this.sendToPlayer(playerId, S2C.ROOM_CREATED, {
         roomCode: this.roomCode,
@@ -357,6 +360,9 @@ export class RoomObject extends DurableObject {
       const bo = Number(payload.bestOf);
       if (bo === 1 || bo === 3 || bo === 5) this.bestOf = bo;
       this.creator = this.creator || playerId;
+      // 同步已有玩家的 attemptsLimit（handleConnection 先添加时 quizType 还是默认 resonator）
+      const limit = this.quizType === 'resonator' ? 4 : 8;
+      for (const p of this.players) p.attemptsLimit = limit;
     }
 
     // 检查是否已被 handleConnection 自动添加
@@ -466,8 +472,10 @@ export class RoomObject extends DurableObject {
     this.target = await drawTarget(this.env.DB, this.quizType, this.difficulty);
 
     // 重置每个玩家的猜测
+    const limit = this.quizType === 'resonator' ? 4 : 8;
     for (const player of this.players) {
       player.attemptsUsed = 0;
+      player.attemptsLimit = limit;
       player.guesses = [];
     }
 
@@ -765,8 +773,10 @@ export class RoomObject extends DurableObject {
       this.roundStatus = 'idle';
       this.target = null;
 
+      const limit = this.quizType === 'resonator' ? 4 : 8;
       for (const player of this.players) {
         player.attemptsUsed = 0;
+        player.attemptsLimit = limit;
         player.guesses = [];
         player.roundWins = 0;
       }
@@ -832,6 +842,13 @@ export class RoomObject extends DurableObject {
   }
 
   private buildState(): RoomState {
+    // 当轮次已结算或比赛结束时，所有玩家的猜测全部标记为已揭晓
+    // 防止平局（无玩家猜中）下 p.guesses[x].revealed 都是 false，导致前端遮罩打码
+    const shouldRevealAll = this.roundStatus === 'resolved' || this.roomStatus === 'finished';
+    // 只有揭晓阶段（resolved/finished）才把正确答案（target）下发给前端
+    // 否则 playing/active/waiting/countdown 阶段 target 置 null，
+    // 避免"下一回合先显示正确答案再消失"的泄漏竞态
+    const safeTarget = shouldRevealAll ? this.target : null;
     return {
       roomCode: this.roomCode,
       quizType: this.quizType,
@@ -846,9 +863,9 @@ export class RoomObject extends DurableObject {
       timeLeft: this.timeLeft,
       timeLimit: this.timeLimit,
       countdownLeft: this.countdownLeft,
-      target: this.target,
-      targetVersion: this.target && "version" in this.target ? Number(this.target.version) : null,
-      targetCost: this.target && "cost" in this.target ? Number(this.target.cost) : null,
+      target: safeTarget,
+      targetVersion: safeTarget && "version" in safeTarget ? Number(safeTarget.version) : null,
+      targetCost: safeTarget && "cost" in safeTarget ? Number(safeTarget.cost) : null,
       overallWinner: this.overallWinner,
       forfeitBy: this.forfeitBy,
       creator: this.creator,
@@ -858,7 +875,9 @@ export class RoomObject extends DurableObject {
         roundWins: p.roundWins,
         attemptsUsed: p.attemptsUsed,
         attemptsLimit: p.attemptsLimit,
-        guesses: p.guesses,
+        guesses: shouldRevealAll
+          ? p.guesses.map(g => ({ ...g, revealed: true }))
+          : p.guesses,
       })),
       opponentId: this.opponentId,
       roundHistory: this.roundHistory,

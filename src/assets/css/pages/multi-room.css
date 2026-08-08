@@ -10,7 +10,8 @@
 
 .mr-boards { min-height: 0; display: grid; grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 0.8rem; overflow: hidden; }
 .mr-board-panel { display: flex; flex-direction: column; min-height: 0; border: 1px solid var(--line-soft); border-radius: 8px; background: var(--surface-panel); overflow: hidden; }
-.mr-board-head { display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; padding: 0.6rem 0.85rem; border-bottom: 1px solid var(--line-soft); }
+.mr-board-head { display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; padding: 0.6rem 0.85rem; border-bottom: 1px solid var(--line-soft); flex-shrink: 0; }
+.mr-board-body { min-height: 0; flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; }
 .mr-board-title { margin: 0; font-size: 0.9rem; font-weight: 900; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.35rem; }
 .mr-board-head-icon { font-size: 1rem; color: var(--gold-soft); }
 .mr-board-meta { color: var(--text-faint); font-size: 0.74rem; }
@@ -53,6 +54,9 @@
 .mr-round-popup-title { margin: 0; font-size: 1.3rem; font-weight: 900; letter-spacing: 0.06em; color: var(--gold); }
 .mr-round-popup-score { margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-main); font-family: 'Rajdhani', sans-serif; }
 .mr-round-popup-hint { margin: 0.2rem 0 0; color: var(--text-faint); font-size: 0.7rem; }
+.mr-round-popup-answer { display: flex; flex-direction: column; align-items: center; gap: 0.15rem; margin-top: 0.3rem; padding: 0.5rem 1rem; border: 1px solid var(--line-soft); border-radius: 8px; background: color-mix(in oklab, var(--surface-panel) 60%, transparent); min-width: 200px; }
+.mr-round-popup-answer-label { color: var(--text-sub); font-size: 0.62rem; letter-spacing: 0.16em; text-transform: uppercase; }
+.mr-round-popup-answer-value { color: var(--gold); font-size: 1.1rem; font-weight: 800; letter-spacing: 0.04em; }
 
 .mr-round-pop-enter-active { animation: mrRoundPopIn 0.25s ease both; }
 .mr-round-pop-leave-active { animation: mrRoundPopIn 0.2s ease reverse both; }

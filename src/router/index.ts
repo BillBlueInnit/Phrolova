@@ -11,9 +11,11 @@ const MultiplayerResultPage = () => import("@/pages/MultiplayerResultPage.vue");
 const LeaderboardPage = () => import("@/pages/LeaderboardPage.vue");
 const RulesPage = () => import("@/pages/RulesPage.vue");
 const DataPage = () => import("@/pages/DataPage.vue");
+const AcknowledgementsPage = () => import("@/pages/AcknowledgementsPage.vue");
 const AdminLoginPage = () => import("@/pages/AdminLoginPage.vue");
 const AdminDiffPage = () => import("@/pages/AdminDiffPage.vue");
 const AdminTablePage = () => import("@/pages/AdminTablePage.vue");
+const AdminAcknowledgementsPage = () => import("@/pages/AdminAcknowledgementsPage.vue");
 
 const router = createRouter({
   history: createWebHistory(),
@@ -28,9 +30,11 @@ const router = createRouter({
     { path: "/leaderboard", name: "leaderboard", component: LeaderboardPage },
     { path: "/rules", name: "rules", component: RulesPage },
     { path: "/data", name: "data", component: DataPage },
+    { path: "/acknowledgements", name: "acknowledgements", component: AcknowledgementsPage },
     { path: "/admin", name: "admin-login", component: AdminLoginPage },
     { path: "/admin/diff", name: "admin-diff", component: AdminDiffPage, meta: { admin: true } },
     { path: "/admin/table", name: "admin-table", component: AdminTablePage, meta: { admin: true } },
+    { path: "/admin/acknowledgements", name: "admin-acknowledgements", component: AdminAcknowledgementsPage, meta: { admin: true } },
   ],
   scrollBehavior() {
     return { top: 0 };

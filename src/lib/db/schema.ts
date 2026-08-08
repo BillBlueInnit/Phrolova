@@ -74,3 +74,16 @@ export const adminLogs = sqliteTable('admin_logs', {
 
 export type AdminLog = typeof adminLogs.$inferSelect;
 export type NewAdminLog = typeof adminLogs.$inferInsert;
+
+// ── 致谢名单表 ──────────────────────────────────────────
+export const acknowledgements = sqliteTable('acknowledgements', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  playerId: text('player_id').notNull(),
+  category: text('category').notNull().default('bug'), // 'bug' | 'feature' | 'support' | 'other'
+  description: text('description').notNull().default(''),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
+});
+
+export type Acknowledgement = typeof acknowledgements.$inferSelect;
+export type NewAcknowledgement = typeof acknowledgements.$inferInsert;

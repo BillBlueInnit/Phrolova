@@ -12,6 +12,7 @@ const { doLogout, adminHeaders, adminUsername } = useAdmin();
 const tabs = [
   { key: "diff", label: "对比同步", icon: "ph:git-diff-duotone", to: "/admin/diff" },
   { key: "table", label: "数据表格", icon: "ph:table-duotone", to: "/admin/table" },
+  { key: "ack", label: "致谢名单", icon: "ph:hand-heart-duotone", to: "/admin/acknowledgements" },
 ];
 
 const logs = ref<Array<{ time: string; level: string; message: string }>>([]);

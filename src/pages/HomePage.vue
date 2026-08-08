@@ -122,6 +122,7 @@ const menuItems = [
   { cn: "数据图鉴", en: "Database", to: "/data", icon: "ph:database-duotone" },
   { cn: "机制规则", en: "Game Rules", to: "/rules", icon: "ph:book-open-text-duotone" },
   { cn: "共鸣榜", en: "Leaderboard", to: "/leaderboard", icon: "ph:trophy-duotone" },
+  { cn: "致谢名单", en: "Acknowledgements", to: "/acknowledgements", icon: "ph:hand-heart-duotone" },
 ] as const;
 
 async function loadCaptcha() {

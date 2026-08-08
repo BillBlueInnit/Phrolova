@@ -71,14 +71,42 @@ const myGuesses = computed(() =>
   (multiGameStore.me?.guesses ?? []).map((row) => ({ ...row, revealed: true })),
 );
 
-const opponentGuesses = computed(() =>
-  (multiGameStore.opponent?.guesses ?? []).map((row) => ({ ...row, revealed: false })),
-);
+// 平局后对手猜测也要能看到答案：roundStatus 为 resolved/finished 时强制 revealed=true
+// 否则保留原有 revealed 字段（仅在对手猜中时 revealed=true）
+const opponentGuesses = computed(() => {
+  const rs = multiGameStore.roomState;
+  const revealAll = rs?.roundStatus === "resolved" || rs?.roundStatus === "finished";
+  return (multiGameStore.opponent?.guesses ?? []).map((row) => ({
+    ...row,
+    revealed: revealAll ? true : Boolean(row.revealed),
+  }));
+});
 
 const showMatchResult = ref(false);
 const matchResultSeen = ref(false);
 const showRoundPopup = ref(false);
 let roundPopupTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** 我方猜测滚动容器（每块 panel 内独立滚动，避免整页被顶下去手动划） */
+const myBoardBody = ref<HTMLElement | null>(null);
+/** 只在我方提交新猜测时滚到底部，对手新条目触发 opponentGuesses 变化时不动 */
+let _lastMyGuessesLength = 0;
+watch(
+  () => myGuesses.value.length,
+  async (len) => {
+    if (len > _lastMyGuessesLength) {
+      await nextTick();
+      const el = myBoardBody.value;
+      if (el) el.scrollTop = el.scrollHeight;
+    }
+    _lastMyGuessesLength = len;
+  },
+);
+// 新 round 开始时清零计数（防止 round 切换后 len 从大变小再变大时误滚）
+watch(
+  () => multiGameStore.roomState?.round,
+  () => { _lastMyGuessesLength = 0; },
+);
 
 // Show round result popup for BO3/BO5
 watch(
@@ -318,13 +346,15 @@ watch(
                 <h3 class="mr-board-title"><Icon icon="ph:user-duotone" class="mr-board-head-icon" /> 我的猜测</h3>
                 <span class="mr-board-meta">{{ multiGameStore.me?.attemptsUsed ?? 0 }} / {{ multiGameStore.me?.attemptsLimit ?? 0 }}</span>
               </div>
-              <GuessTable
-                :quiz-type="multiGameStore.roomState.quizType"
-                :rows="myGuesses"
-                empty-label="等待我方提交第一条猜测"
-                :target-version="multiGameStore.roomState.targetVersion"
-                :target-cost="multiGameStore.roomState.targetCost"
-              />
+              <div ref="myBoardBody" class="mr-board-body">
+                <GuessTable
+                  :quiz-type="multiGameStore.roomState.quizType"
+                  :rows="myGuesses"
+                  empty-label="等待我方提交第一条猜测"
+                  :target-version="multiGameStore.roomState.targetVersion"
+                  :target-cost="multiGameStore.roomState.targetCost"
+                />
+              </div>
             </div>
 
             <div class="mr-board-panel">
@@ -332,13 +362,15 @@ watch(
                 <h3 class="mr-board-title"><Icon icon="ph:user-circle-duotone" class="mr-board-head-icon" /> 对手猜测</h3>
                 <span class="mr-board-meta">{{ multiGameStore.roomState.opponentId || "等待加入" }}</span>
               </div>
-              <GuessTable
-                :quiz-type="multiGameStore.roomState.quizType"
-                :rows="opponentGuesses"
-                empty-label="等待对手提交第一条猜测"
-                :target-version="multiGameStore.roomState.targetVersion"
-                :target-cost="multiGameStore.roomState.targetCost"
-              />
+              <div class="mr-board-body">
+                <GuessTable
+                  :quiz-type="multiGameStore.roomState.quizType"
+                  :rows="opponentGuesses"
+                  empty-label="等待对手提交第一条猜测"
+                  :target-version="multiGameStore.roomState.targetVersion"
+                  :target-cost="multiGameStore.roomState.targetCost"
+                />
+              </div>
             </div>
           </div>
         </section>
@@ -375,7 +407,7 @@ watch(
     <Teleport to="body">
       <Transition name="mr-round-pop">
         <div v-if="showRoundPopup && multiGameStore.roundResult" class="mr-round-popup" @click="showRoundPopup = false; multiGameStore.roundResult = null">
-          <div class="mr-round-popup-card">
+          <div class="mr-round-popup-card" @click.stop>
             <div class="mr-round-popup-icon">
               <Icon
                 :icon="multiGameStore.roundResult.roundWinner === (multiGameStore.roomState?.players.findIndex(p => p.isMe) ?? -1) ? 'ph:crown-duotone' : multiGameStore.roundResult.roundWinner === null ? 'ph:handshake-duotone' : 'ph:target-duotone'"
@@ -385,6 +417,10 @@ watch(
               {{ multiGameStore.roundResult.iWon === null ? '本局平局' : multiGameStore.roundResult.iWon ? '本局获胜' : '本局对方胜' }}
             </p>
             <p class="mr-round-popup-score">我方 {{ multiGameStore.roundResult.myWins }} : {{ multiGameStore.roundResult.opponentWins }} 对手</p>
+            <p v-if="multiGameStore.roundResult.answerText" class="mr-round-popup-answer">
+              <span class="mr-round-popup-answer-label">正确答案</span>
+              <span class="mr-round-popup-answer-value">{{ multiGameStore.roundResult.answerText }}</span>
+            </p>
             <p class="mr-round-popup-hint">点击关闭 · 5 秒后自动关闭</p>
           </div>
         </div>

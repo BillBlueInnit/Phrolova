@@ -21,6 +21,15 @@ export {
 
 export { fetchLeaderboard } from "./leaderboard";
 
+export {
+  fetchAcknowledgements,
+  adminFetchAcknowledgements,
+  adminAddAcknowledgement,
+  adminUpdateAcknowledgement,
+  adminDeleteAcknowledgement,
+} from "./acknowledgements";
+export type { AcknowledgementItem, AcknowledgementsResponse } from "./acknowledgements";
+
 export { C2S, S2C } from "./multiplayer";
 export type {
   CreateRoomPayload,

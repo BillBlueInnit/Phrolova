@@ -160,7 +160,7 @@ export const useMultiGameStore = defineStore("multiGame", () => {
   const roomState = ref<MultiplayerRoomState | null>(null);
   const kicked = shallowRef(false);
   const matchScoreDelta = ref(0);
-  const roundResult = ref<{ roundWinner: number | null; myWins: number; opponentWins: number; iWon: boolean | null } | null>(null);
+  const roundResult = ref<{ roundWinner: number | null; myWins: number; opponentWins: number; iWon: boolean | null; answerText: string | null } | null>(null);
   // MATCH_FINISHED 消息到达计数器（响应式信号，让页面能直接监听该事件）
   const matchFinishedTrigger = ref(0);
   let _heartbeatTimer: ReturnType<typeof setInterval> | null = null;
@@ -380,6 +380,9 @@ export const useMultiGameStore = defineStore("multiGame", () => {
                 myWins,
                 opponentWins: oppWins,
                 iWon,
+                answerText: (payload.target && typeof payload.target === 'object' && 'name' in payload.target)
+                  ? String((payload.target as Record<string, unknown>).name)
+                  : null,
               };
             }
           }

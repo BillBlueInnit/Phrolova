@@ -440,3 +440,101 @@
   .ad-login-form .form-input { min-height: 38px; font-size: 0.8rem; }
   .ad-login-btn { padding: 0.6rem 1rem; font-size: 0.8rem; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Acknowledgements admin — 新增表单、TD样式扩展
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.ad-sub-hint { color: var(--text-faint); font-weight: 500; font-size: 0.72rem; margin-left: 0.5rem; }
+
+.ad-empty {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 0.85rem;
+}
+
+.ad-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.7rem 1rem;
+  margin-bottom: 0.8rem;
+}
+.ad-form-field--w100 { grid-column: 1 / -1; }
+
+.ad-form-field { display: flex; flex-direction: column; gap: 0.25rem; }
+.ad-form-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-sub);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.ad-form-label em {
+  color: var(--color-error);
+  font-style: normal;
+  margin-left: 2px;
+}
+
+.ad-form-input {
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  background: var(--shell-bg);
+  color: var(--text-main);
+  font-size: 0.85rem;
+  font-family: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  outline: none;
+}
+.ad-form-input:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--gold) 25%, transparent);
+}
+
+.btn-accent {
+  border-color: color-mix(in oklab, var(--gold) 40%, var(--line-soft));
+  background: color-mix(in oklab, var(--gold) 18%, var(--surface-panel));
+  color: var(--gold);
+}
+.btn-accent:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--gold) 28%, var(--surface-panel-strong));
+}
+
+.ad-td-mono { font-family: 'Consolas', 'Courier New', monospace; color: var(--text-faint); font-size: 0.72rem; }
+.ad-td-num { min-width: 60px !important; text-align: center; }
+.ad-td-desc { max-width: 280px; }
+.ad-td-empty { color: var(--text-faint); }
+
+.ad-td-actions {
+  width: 60px;
+  text-align: center;
+  cursor: default;
+}
+.ad-td-actions:hover { outline: none !important; }
+
+.ad-del-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in oklab, var(--color-error) 35%, transparent);
+  background: color-mix(in oklab, var(--color-error) 8%, transparent);
+  color: var(--color-error);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.ad-del-btn:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--color-error) 20%, transparent);
+  border-color: var(--color-error);
+}
+.ad-del-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.ad-edit-input--num { min-width: 60px; text-align: center; }
+
+@media (max-width: 860px) {
+  .ad-form-grid { grid-template-columns: 1fr; gap: 0.5rem; }
+  .ad-td-desc { max-width: 140px; }
+}

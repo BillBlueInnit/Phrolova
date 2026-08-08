@@ -6,7 +6,7 @@ import { logger } from 'hono/logger';
 import { HTTPException } from 'hono/http-exception';
 import { desc, eq, and, gt, lt, sql, lte } from 'drizzle-orm';
 
-import { createDb, characters, soundSkeletons, players, adminLogs } from '../../src/lib/db';
+import { createDb, characters, soundSkeletons, players, adminLogs, acknowledgements } from '../../src/lib/db';
 import {
   buildCompareByType, allMatch, normalizeRow, toFrontendRow,
   type QuizType, type CompareResult,
@@ -742,6 +742,86 @@ app.post('/api/admin/sync', async (c) => {
   await c.env.KV.put(SYNC_STATE_KEY, JSON.stringify({ status: 'idle', result: stubResult }));
   await appendLog(db, 'INFO', `sync ${syncType} completed (stub)`);
   return c.json({ status: 'started', message: '同步任务已启动（TS版本占位，若需真实爬虫请扩展Queue Worker）' });
+});
+
+// ── 致谢名单（公开） ──────────────────────────────────────────────
+app.get('/api/acknowledgements', async (c) => {
+  const db = c.get('db');
+  const rows = await db.select({
+    id: acknowledgements.id,
+    player_id: acknowledgements.playerId,
+    category: acknowledgements.category,
+    description: acknowledgements.description,
+    sort_order: acknowledgements.sortOrder,
+    created_at: acknowledgements.createdAt,
+  }).from(acknowledgements).orderBy(acknowledgements.sortOrder, acknowledgements.id);
+  return c.json(success({ list: rows }));
+});
+
+// ── 致谢名单（管理后台） ──────────────────────────────────────────
+app.get('/api/admin/acknowledgements', async (c) => {
+  const denied = await requireAdmin(c);
+  if (denied) return denied;
+  const db = c.get('db');
+  const rows = await db.select({
+    id: acknowledgements.id,
+    player_id: acknowledgements.playerId,
+    category: acknowledgements.category,
+    description: acknowledgements.description,
+    sort_order: acknowledgements.sortOrder,
+    created_at: acknowledgements.createdAt,
+  }).from(acknowledgements).orderBy(acknowledgements.sortOrder, acknowledgements.id);
+  return c.json(success({ list: rows }));
+});
+
+app.post('/api/admin/acknowledgements', async (c) => {
+  const denied = await requireAdmin(c);
+  if (denied) return denied;
+  const db = c.get('db');
+  const body = await readJson(c);
+  const playerId = String(body.player_id ?? '').trim();
+  const category = String(body.category ?? 'bug').trim();
+  const description = String(body.description ?? '').trim();
+  const sortOrder = Number(body.sort_order ?? 0);
+  if (!playerId) return error('缺少玩家ID');
+  const result = await db.insert(acknowledgements).values({
+    playerId, category, description, sortOrder,
+  }).returning({ id: acknowledgements.id });
+  await appendLog(db, 'INFO', `ack add: ${playerId} (${category})`);
+  return c.json(success({ id: result[0]?.id }));
+});
+
+app.put('/api/admin/acknowledgements/:id', async (c) => {
+  const denied = await requireAdmin(c);
+  if (denied) return denied;
+  const db = c.get('db');
+  const id = Number(c.req.param('id'));
+  if (!id) return error('无效的ID');
+  const body = await readJson(c);
+  const sets: Record<string, unknown> = {};
+  if ('player_id' in body) sets.playerId = String(body.player_id ?? '').trim();
+  if ('category' in body) sets.category = String(body.category ?? 'bug').trim();
+  if ('description' in body) sets.description = String(body.description ?? '').trim();
+  if ('sort_order' in body) sets.sortOrder = Number(body.sort_order ?? 0);
+  if (Object.keys(sets).length === 0) return error('无更新字段');
+  const exists = await db.select({ id: acknowledgements.id }).from(acknowledgements).where(eq(acknowledgements.id, id)).limit(1);
+  if (!exists.length) return error('记录不存在', 404);
+  await db.update(acknowledgements).set(sets as any).where(eq(acknowledgements.id, id));
+  await appendLog(db, 'INFO', `ack update #${id}`);
+  return c.json(success({}));
+});
+
+app.delete('/api/admin/acknowledgements/:id', async (c) => {
+  const denied = await requireAdmin(c);
+  if (denied) return denied;
+  const db = c.get('db');
+  const id = Number(c.req.param('id'));
+  if (!id) return error('无效的ID');
+  const exists = await db.select({ id: acknowledgements.id }).from(acknowledgements).where(eq(acknowledgements.id, id)).limit(1);
+  if (!exists.length) return error('记录不存在', 404);
+  await db.delete(acknowledgements).where(eq(acknowledgements.id, id));
+  await appendLog(db, 'INFO', `ack delete #${id}`);
+  return c.json(success({}));
 });
 
 // ── Error handler ──────────────────────────────────────────────────

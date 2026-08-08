@@ -82,7 +82,13 @@ function backToLobby() {
 
     <main class="mrp-body">
       <section v-for="entry in roomState.roundHistory" :key="entry.round" class="mrp-round">
-        <h2 class="mrp-round-label">第 {{ entry.round }} 局</h2>
+        <div class="mrp-round-head">
+          <h2 class="mrp-round-label">第 {{ entry.round }} 局</h2>
+          <p v-if="entry.target && (entry.target as any).name" class="mrp-round-answer">
+            <span class="mrp-round-answer-label">正确答案</span>
+            <span class="mrp-round-answer-value">{{ (entry.target as any).name }}</span>
+          </p>
+        </div>
         <div class="mrp-round-boards">
           <div v-for="(p, pi) in entry.players" :key="pi" class="mrp-board" :class="p.player_id === myPlayerId ? 'mrp-board-mine' : 'mrp-board-opponent'">
             <h3 class="mrp-board-title">
