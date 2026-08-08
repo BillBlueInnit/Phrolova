@@ -73,7 +73,11 @@ const _VERSION_INDEX: Record<string, number> = Object.fromEntries(
 
 function normalizeVersion(v: unknown): string {
   try {
-    return `${parseFloat(String(v).trim())}`;
+    const str = String(v).trim();
+    const num = parseFloat(str);
+    if (!isFinite(num)) return str;
+    // 保留 1 位小数，确保 "1.0" 不会变成 "1" 导致在 _VERSION_INDEX 中查不到
+    return Number(num).toFixed(1);
   } catch {
     return String(v).trim();
   }

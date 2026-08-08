@@ -87,16 +87,29 @@ async function restartGame() {
   }
 }
 
-async function submitGuess() {
-  if (!guessName.value.trim()) return;
+async function submitGuess(finalName?: string) {
+  const name = (finalName ?? guessName.value).trim();
+  if (!name) return;
   try {
-    await singleGameStore.submitGuess(guessName.value.trim());
+    await singleGameStore.submitGuess(name);
     guessName.value = "";
     nextTick(() => guessInputRef.value?.focus());
   } catch {
     guessInputRef.value?.focus();
     return;
   }
+}
+
+/** 点击提交按钮：自动补全到第一个匹配项再提交，与按 Enter 键效果一致。 */
+function handleClickSubmit() {
+  const keyword = guessName.value.trim().toLowerCase();
+  if (keyword) {
+    const match = currentNames.value.find((n) => n.name.toLowerCase().includes(keyword));
+    if (match) {
+      guessName.value = match.name;
+    }
+  }
+  submitGuess(guessName.value);
 }
 
 onMounted(async () => {
@@ -188,7 +201,7 @@ onMounted(async () => {
             :placeholder="singleGameStore.quizType === 'skeleton' ? '输入声骸名称' : '输入角色昵称'"
             @submit="submitGuess"
           />
-          <button class="btn btn-submit" :disabled="!singleGameStore.canSubmit || singleGameStore.loading" @click="submitGuess">
+          <button class="btn btn-submit" :disabled="!singleGameStore.canSubmit || singleGameStore.loading" @click="handleClickSubmit">
             <Icon icon="ph:paper-plane-right-duotone" class="btn-icon" aria-hidden="true" /> 提交
           </button>
         </div>

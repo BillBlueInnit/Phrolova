@@ -23,9 +23,26 @@ onMounted(() => {
 });
 
 const matchResultText = computed(() => {
-  if (matchDelta.value > 0) return "胜利";
-  if (matchDelta.value < 0) return "失败";
-  return "平局";
+  const rs = roomState.value;
+  if (!rs) return "未知结果";
+
+  // 弃权场景优先判断
+  const forfeitBy = rs.forfeitBy;
+  if (forfeitBy) {
+    if (forfeitBy === myPlayerId.value) {
+      return "失败（已弃权）";
+    } else {
+      return "胜利（对手弃权）";
+    }
+  }
+
+  // 基于 overallWinner 判定
+  if (rs.overallWinner === null || rs.overallWinner === undefined) {
+    return "平局";
+  }
+  // 在房间里 players 数组中找我的索引
+  const myIdx = rs.players.findIndex(p => p.playerId === myPlayerId.value);
+  return rs.overallWinner === myIdx ? "胜利" : "失败";
 });
 
 const matchScoreText = computed(() => {
@@ -38,6 +55,11 @@ const resultIcon = computed(() => {
   if (matchResultText.value === "平局") return "ph:handshake-duotone";
   return "ph:hand-waving-duotone";
 });
+
+function backToRoom() {
+  removeLocalStorage("phrolova_match_result");
+  router.push({ name: "multi-room" });
+}
 
 function backToLobby() {
   removeLocalStorage("phrolova_match_result");
@@ -52,7 +74,10 @@ function backToLobby() {
       <h1 class="mrp-title" :class="{ 'mrp-title--win': matchResultText === '胜利' }">{{ matchResultText }}</h1>
       <p v-if="matchScoreText" class="mrp-score">{{ matchScoreText }}</p>
       <p class="mrp-sub">第 {{ roomState.round }} 局 · {{ roomState.quizType === "skeleton" ? "声骸" : "共鸣者" }}模式</p>
-      <button class="mrp-back" @click="backToLobby">返回大厅</button>
+      <div class="mrp-back-row">
+        <button class="mrp-back" @click="backToRoom">返回房间</button>
+        <button class="mrp-back mrp-back--ghost" @click="backToLobby">返回大厅</button>
+      </div>
     </header>
 
     <main class="mrp-body">
@@ -64,7 +89,7 @@ function backToLobby() {
               <Icon :icon="p.player_id === myPlayerId ? 'ph:user-duotone' : 'ph:users-duotone'" :class="p.player_id === myPlayerId ? 'mrp-board-icon--mine' : 'mrp-board-icon--opponent'" />
               {{ p.player_id === myPlayerId ? '我方猜测' : `对方猜测` }} <span class="mrp-player-id">({{ p.player_id }})</span>
             </h3>
-            <GuessTable :quiz-type="roomState.quizType" :rows="(p.guesses as any) ?? []" empty-label="-" :target-version="entry.target ? ('version' in entry.target ? Number((entry.target as any).version) : null) : roomState.targetVersion" :target-cost="entry.target ? ('cost' in entry.target ? Number((entry.target as any).cost) : null) : roomState.targetCost" />
+            <GuessTable :quiz-type="roomState.quizType" :rows="(p.guesses as any) ?? []" empty-label="-" :target-version="entry.target ? ('version' in entry.target ? Number((entry.target as any).version) : null) : roomState.targetVersion" :target-cost="entry.target ? ('cost' in entry.target ? Number((entry.target as any).cost) : null) : roomState.targetCost" force-reveal />
           </div>
         </div>
       </section>

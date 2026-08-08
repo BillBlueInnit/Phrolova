@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from "vue";
 import { useRouter, onBeforeRouteLeave } from "vue-router";
 import gsap from "gsap";
 
@@ -22,6 +22,7 @@ const dictionaryStore = useDictionaryStore();
 const multiGameStore = useMultiGameStore();
 const router = useRouter();
 const guessName = shallowRef("");
+const guessInputRef = useTemplateRef<{ focus: () => void }>("guessInput");
 
 const names = computed(() =>
   multiGameStore.roomState?.quizType === "skeleton" ? dictionaryStore.skeletonNames : dictionaryStore.resonatorNames,
@@ -94,6 +95,7 @@ watch(
   },
 );
 
+// 双保险：监听 roomStatus 变为 finished 触发弹窗
 watch(
   () => multiGameStore.roomState?.roomStatus,
   (status) => {
@@ -107,11 +109,59 @@ watch(
   },
 );
 
+// 双保险：监听 matchScoreDelta 非 0 或 overallWinner 有值时触发弹窗（处理 MATCH_FINISHED 先于 ROOM_STATE 到达的情况）
+watch(
+  [
+    () => multiGameStore.matchScoreDelta,
+    () => multiGameStore.roomState?.overallWinner,
+  ],
+  ([delta, overallWinner]) => {
+    const rs = multiGameStore.roomState;
+    const isFinished = rs?.roomStatus === "finished";
+    const hasResult = (delta !== 0) || (overallWinner !== null && overallWinner !== undefined);
+    if (isFinished && hasResult && !matchResultSeen.value) {
+      showMatchResult.value = true;
+      matchResultSeen.value = true;
+    }
+  },
+);
+
+// 第三道保险：直接监听 MATCH_FINISHED 事件到达信号（最可靠的触发方式）
+watch(
+  () => multiGameStore.matchFinishedTrigger,
+  (trigger) => {
+    if (trigger > 0 && !matchResultSeen.value) {
+      // 延迟一帧，确保 roomState 更新完成后再判断
+      nextTick(() => {
+        if (!matchResultSeen.value) {
+          showMatchResult.value = true;
+          matchResultSeen.value = true;
+        }
+      });
+    }
+  },
+);
+
 const matchResultText = computed(() => {
-  const d = multiGameStore.matchScoreDelta;
-  if (d > 0) return "胜利";
-  if (d < 0) return "失败";
-  return "平局";
+  const rs = multiGameStore.roomState;
+  if (!rs) return "未知结果";
+
+  // 优先判断弃权场景
+  const forfeitBy = rs.forfeitBy;
+  if (forfeitBy) {
+    if (forfeitBy === authStore.playerId) {
+      return "失败（已弃权）";
+    } else {
+      return "胜利（对手弃权）";
+    }
+  }
+
+  // 正常胜负判定：基于 overallWinner
+  if (rs.overallWinner === null || rs.overallWinner === undefined) {
+    return "平局";
+  }
+  const myIdx = rs.players.findIndex(p => p.isMe);
+  return rs.overallWinner === myIdx ? "胜利" : "失败";
 });
 
 const matchScoreText = computed(() => {
@@ -124,16 +174,6 @@ const isCreator = computed(() =>
   multiGameStore.roomState?.creator === authStore.playerId,
 );
 
-const hasVotedRematch = computed(() =>
-  multiGameStore.roomState?.rematchVotes?.includes(authStore.playerId) ?? false,
-);
-
-const allVotedRematch = computed(() => {
-  const room = multiGameStore.roomState;
-  if (!room) return false;
-  return room.rematchVotes.length >= room.players.length;
-});
-
 function closeMatchResult() { showMatchResult.value = false; }
 
 function openFullResultPage() {
@@ -143,17 +183,30 @@ function openFullResultPage() {
     scoreDelta: multiGameStore.matchScoreDelta,
     myPlayerId: authStore.playerId,
   });
-  const url = router.resolve({ name: "multi-result" }).href;
-  window.open(url, "_blank");
+  showMatchResult.value = false;
+  router.push({ name: "multi-result" });
 }
 
-async function submitGuess() {
-  if (!guessName.value.trim()) return;
+async function submitGuess(finalName?: string) {
+  const name = (finalName ?? guessName.value).trim();
+  if (!name) return;
   try {
-    await multiGameStore.submitGuess(guessName.value.trim());
+    await multiGameStore.submitGuess(name);
     guessName.value = "";
     await nextTick();
   } catch { /* ignore */ }
+}
+
+/** 点击提交按钮：自动补全到第一个匹配项再提交，与按 Enter 键效果一致。 */
+function handleClickSubmit() {
+  const keyword = guessName.value.trim().toLowerCase();
+  if (keyword) {
+    const match = names.value.find((n) => n.name.toLowerCase().includes(keyword));
+    if (match) {
+      guessName.value = match.name;
+    }
+  }
+  submitGuess(guessName.value);
 }
 
 async function leaveRoom() {
@@ -184,7 +237,12 @@ onBeforeUnmount(() => {
 
 // 任何方式离开 Room 页面（返回按钮、关闭标签、router.push）都先清理房间状态
 // 这样 localStorage 中不会残留 roomCode，避免刷新后误重连
-onBeforeRouteLeave(async (_to, _from, next) => {
+// 例外：导航到对局回放页面时保留房间状态，允许用户返回继续操作
+onBeforeRouteLeave(async (to, _from, next) => {
+  if (to.name === "multi-result") {
+    next();
+    return;
+  }
   try {
     await multiGameStore.leaveRoom();
   } catch { /* ignore */ }
@@ -292,6 +350,7 @@ watch(
           </div>
           <div class="dock-input-row">
             <NameAutocompleteInput
+              ref="guessInput"
               v-model="guessName"
               :disabled="!multiGameStore.canGuess"
               :names="names"
@@ -299,7 +358,7 @@ watch(
               :placeholder="multiGameStore.roomState?.quizType === 'skeleton' ? '输入声骸名称' : '输入角色昵称'"
               @submit="submitGuess"
             />
-            <button class="btn btn-submit" :disabled="!multiGameStore.canGuess" @click="submitGuess">
+            <button class="btn btn-submit" :disabled="!multiGameStore.canGuess" @click="handleClickSubmit">
               <Icon icon="ph:paper-plane-right-duotone" class="btn-icon" /> 提交
             </button>
           </div>
@@ -347,9 +406,6 @@ watch(
         </div>
       </div>
       <div class="mr-result-actions">
-        <button class="btn" :disabled="hasVotedRematch" @click="multiGameStore.restartRoom()">
-          {{ hasVotedRematch ? '已投票，等待对手...' : '再来一局' }}
-        </button>
         <button class="btn-ghost" @click="openFullResultPage">查看完整对局</button>
         <button v-if="isCreator" class="btn-ghost" @click="closeMatchResult(); leaveRoom();">关闭房间</button>
       </div>

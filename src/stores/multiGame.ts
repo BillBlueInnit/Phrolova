@@ -142,6 +142,8 @@ export const useMultiGameStore = defineStore("multiGame", () => {
   const kicked = shallowRef(false);
   const matchScoreDelta = ref(0);
   const roundResult = ref<{ roundWinner: number | null; myWins: number; opponentWins: number; iWon: boolean | null } | null>(null);
+  // MATCH_FINISHED 消息到达计数器（响应式信号，让页面能直接监听该事件）
+  const matchFinishedTrigger = ref(0);
   let _heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   let _pendingQueue: { quizType: string; difficulty: string; bestOf: number } | null = null;
 
@@ -317,21 +319,37 @@ export const useMultiGameStore = defineStore("multiGame", () => {
           {
             const rs = roomState.value;
             if (rs && rs.bestOf > 1 && (payload.overallWinner === null || payload.overallWinner === undefined)) {
-              const me = rs.players.find(p => p.isMe);
-              const opponent = rs.players.find(p => !p.isMe);
-              const myWins = me?.roundWins ?? 0;
-              const oppWins = opponent?.roundWins ?? 0;
-              let iWon: boolean | null;
-              const resultStr = (payload.roundResult as string) ?? "";
-              if (resultStr === "win") {
-                iWon = true;
-              } else if (resultStr === "loss") {
-                iWon = false;
+              const myIdx = rs.players.findIndex(p => p.isMe);
+              const winnerIdx = payload.roundWinner as number | null | undefined;
+
+              // 基于 roundWinner 索引直接判定胜负（最可靠）
+              let iWon: boolean | null = null;
+              if (winnerIdx === null || winnerIdx === undefined) {
+                iWon = null; // 平局
+              } else if (myIdx < 0) {
+                // 找不到自己位置，回退用 roundResult 字符串（players[0] 视角）
+                const resultStr = (payload.roundResult as string) ?? "";
+                if (resultStr === "win") iWon = true;
+                else if (resultStr === "loss") iWon = false;
+                else iWon = null;
               } else {
-                iWon = null;
+                iWon = winnerIdx === myIdx;
               }
+
+              // 从 payload.roundWins 取最新的胜负场计数（后端先 ++ 再广播），并映射到我方/对方视角
+              const newRoundWins = (payload.roundWins as number[]) ?? [0, 0];
+              let myWins: number;
+              let oppWins: number;
+              if (myIdx < 0) {
+                myWins = newRoundWins[0] ?? 0;
+                oppWins = newRoundWins[1] ?? 0;
+              } else {
+                myWins = newRoundWins[myIdx] ?? 0;
+                oppWins = newRoundWins[1 - myIdx] ?? 0;
+              }
+
               roundResult.value = {
-                roundWinner: payload.roundWinner as number | null,
+                roundWinner: winnerIdx ?? null,
                 myWins,
                 opponentWins: oppWins,
                 iWon,
@@ -340,18 +358,58 @@ export const useMultiGameStore = defineStore("multiGame", () => {
           }
           break;
 
-        case S2C.MATCH_FINISHED:
-          matchScoreDelta.value = (payload.scoreDelta as number) || 0;
+        case S2C.MATCH_FINISHED: {
+          const rawDelta = (payload.scoreDelta as number) || 0;
+          const winner = payload.overallWinner as number | null | undefined;
+          const forfeitPid = (payload.forfeitPlayerId as string | null | undefined) ?? null;
+          // 后端发送的是 players[0] 视角的差值；前端修正为“我”的视角
+          const rs = roomState.value;
+          const myIdx = rs ? rs.players.findIndex(p => p.isMe) : 0;
+          const isViewpoint0 = myIdx === 0 || myIdx < 0;
+          // overallWinner === 0 → players[0] 胜，所以非0玩家时scoreDelta必须取反
+          let myDelta = isViewpoint0 ? rawDelta : -rawDelta;
+          if (winner === null) myDelta = 0;
+          matchScoreDelta.value = myDelta;
+
+          // 把 forfeitBy / overallWinner 同步到 roomState；MATCH_FINISHED 可能先于 ROOM_STATE 到达
+          if (roomState.value) {
+            const s = roomState.value;
+            if (forfeitPid) {
+              s.forfeitBy = forfeitPid;
+            }
+            if (winner !== undefined) {
+              s.overallWinner = winner;
+            }
+            // 强制触发响应式更新
+            roomState.value = { ...s };
+          }
+          // 触发 MATCH_FINISHED 到达信号（供页面 watch 弹窗）
+          matchFinishedTrigger.value++;
+
           infoMessage.value =
-            (payload.scoreDelta as number) >= 0
-              ? `整场获胜，积分 +${payload.scoreDelta}`
-              : `整场结束，积分 ${payload.scoreDelta}`;
+            myDelta > 0
+              ? `整场获胜，积分 +${myDelta}`
+              : myDelta < 0
+                ? `整场结束，积分 ${myDelta}`
+                : `整场结束`;
           stopHeartbeat();
-          clearLastRoomCode(); // 比赛结束后无需恢复房间
+          clearLastRoomCode();
           break;
+        }
 
         case S2C.OPPONENT_FORFEIT:
           matchScoreDelta.value = (payload.scoreDelta as number) || 0;
+          // 兼容旧协议：OPPONENT_FORFEIT 效果等同于对手弃权的对局结束
+          if (roomState.value) {
+            const s = roomState.value;
+            const me = s.players.find(p => p.isMe);
+            const opponent = s.players.find(p => !p.isMe);
+            s.forfeitBy = opponent?.playerId ?? null;
+            s.overallWinner = me ? s.players.indexOf(me) : 0;
+            s.roomStatus = "finished";
+            roomState.value = { ...s };
+          }
+          matchFinishedTrigger.value++;
           infoMessage.value = (payload.message as string) || "对手已退出";
           stopHeartbeat();
           clearLastRoomCode();
@@ -630,6 +688,7 @@ export const useMultiGameStore = defineStore("multiGame", () => {
     kicked,
     matchScoreDelta,
     roundResult,
+    matchFinishedTrigger,
     ensureConnected,
     resumeRoom,
     createRoom,

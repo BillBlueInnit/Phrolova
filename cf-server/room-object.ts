@@ -556,13 +556,13 @@ export class RoomObject extends DurableObject {
     this.roundStatus = 'resolved';
     this.roundWinner = winnerIndex;
 
-    // 记录历史
+    // 记录历史（把所有猜测标记为已展示，避免回放时仍被打码遮罩）
     this.roundHistory.push({
       round: this.round,
       target: this.target,
       players: this.players.map(p => ({
         player_id: p.playerId,
-        guesses: p.guesses,
+        guesses: p.guesses.map(g => ({ ...g, revealed: true })),
       })),
     });
 
@@ -578,12 +578,16 @@ export class RoomObject extends DurableObject {
       return;
     }
 
-    // 继续下一轮
+    // 继续下一轮（roundResult 为 players[0] 视角的单局结果：win/loss/draw）
+    let roundResult: 'win' | 'loss' | 'draw' = 'draw';
+    if (winnerIndex === 0) roundResult = 'win';
+    else if (winnerIndex === 1) roundResult = 'loss';
     this.broadcast(S2C.ROUND_FINISHED, {
       roomCode: this.roomCode,
       round: this.round,
       roundWinner: winnerIndex,
       roundWins: [...this.roundWins],
+      roundResult,
       target: this.target,
       overallWinner: null,
     });
@@ -606,9 +610,30 @@ export class RoomObject extends DurableObject {
       this.clearGameTimer();
     }
 
+    // 处理对手弃权（整体胜负未设置）
+    if (this.overallWinner === null && this.forfeitBy) {
+      const winnerIndex = this.players.findIndex(p => p.playerId !== this.forfeitBy);
+      if (winnerIndex >= 0) {
+        this.overallWinner = winnerIndex;
+      }
+    }
+
+    // 如果比赛过程中还有未写入 roundHistory 的当前轮次，补写入（例如对手中途弃权）
+    const hasCurrentRound = this.roundHistory.some(r => r.round === this.round);
+    if (!hasCurrentRound && this.round > 0 && this.target !== null) {
+      this.roundHistory.push({
+        round: this.round,
+        target: this.target,
+        players: this.players.map(p => ({
+          player_id: p.playerId,
+          guesses: p.guesses.map(g => ({ ...g, revealed: true })),
+        })),
+      });
+    }
+
     this.roomStatus = 'finished';
 
-    let scoreDelta = 0;
+    const localScoreDelta = 0;
     let forfeit = false;
 
     if (this.overallWinner !== null) {
@@ -619,42 +644,58 @@ export class RoomObject extends DurableObject {
       //   共鸣者:        BO1 10, BO3 30, BO5 50
       //   声骸·简单:     BO1 5,  BO3 10, BO5 15
       //   声骸·困难:     BO1 30, BO3 50, BO5 70
+      let delta = 0;
       if (this.quizType === 'resonator') {
-        if (this.bestOf === 1) scoreDelta = 10;
-        else if (this.bestOf === 3) scoreDelta = 30;
-        else if (this.bestOf === 5) scoreDelta = 50;
+        if (this.bestOf === 1) delta = 10;
+        else if (this.bestOf === 3) delta = 30;
+        else if (this.bestOf === 5) delta = 50;
       } else {
-        // skeleton
         if (this.difficulty === 'easy') {
-          if (this.bestOf === 1) scoreDelta = 5;
-          else if (this.bestOf === 3) scoreDelta = 10;
-          else if (this.bestOf === 5) scoreDelta = 15;
+          if (this.bestOf === 1) delta = 5;
+          else if (this.bestOf === 3) delta = 10;
+          else if (this.bestOf === 5) delta = 15;
         } else {
-          // hard
-          if (this.bestOf === 1) scoreDelta = 30;
-          else if (this.bestOf === 3) scoreDelta = 50;
-          else if (this.bestOf === 5) scoreDelta = 70;
+          if (this.bestOf === 1) delta = 30;
+          else if (this.bestOf === 3) delta = 50;
+          else if (this.bestOf === 5) delta = 70;
         }
       }
 
       if (this.forfeitBy) {
         forfeit = true;
-        // 处理对手弃权
         const winnerId = winner?.playerId || '';
         const loserId = loser?.playerId || this.forfeitBy;
-        await this.updateMatchScore(winnerId, loserId, scoreDelta);
+        if (winnerId && loserId && winnerId !== loserId) {
+          await this.updateMatchScore(winnerId, loserId, delta);
+        }
       } else {
-        // 正常结算
         const winnerId = winner?.playerId || '';
         const loserId = loser?.playerId || '';
-        await this.updateMatchScore(winnerId, loserId, scoreDelta);
+        if (winnerId && loserId) {
+          await this.updateMatchScore(winnerId, loserId, delta);
+        }
       }
     }
+
+    // MATCH_FINISHED 统一按“当前玩家（players[0]）视角”的积分差值发送
+    // 前端再根据我是否为 players[0] 决定取反
+    const meWon = this.overallWinner === 0;
+    let myDelta = localScoreDelta;
+    if (this.overallWinner !== null) {
+      const scoreTable = this.quizType === 'resonator'
+        ? [10, 30, 50]
+        : this.difficulty === 'easy' ? [5, 10, 15] : [30, 50, 70];
+      const bestOfIdx = this.bestOf === 1 ? 0 : this.bestOf === 3 ? 1 : 2;
+      const rawDelta = scoreTable[bestOfIdx] ?? 0;
+      myDelta = meWon ? rawDelta : -rawDelta;
+    }
+    this.scoreDelta = myDelta; // 同步写入成员，供 buildState（broadcastState）使用
 
     this.broadcast(S2C.MATCH_FINISHED, {
       roomCode: this.roomCode,
       overallWinner: this.overallWinner,
-      scoreDelta,
+      scoreDelta: this.scoreDelta,
+      forfeitPlayerId: this.forfeitBy,
       target: this.target,
       forfeit,
     });
@@ -746,7 +787,7 @@ export class RoomObject extends DurableObject {
 
   private async updateMatchScore(winnerId: string, loserId: string, delta: number): Promise<void> {
     try {
-      await applyMultiScore(this.env.DB, winnerId, delta, loserId);
+      await applyMultiScore(this.env.DB, winnerId, loserId, delta);
     } catch { /* ignore */ }
   }
 
@@ -783,8 +824,8 @@ export class RoomObject extends DurableObject {
       timeLimit: this.timeLimit,
       countdownLeft: this.countdownLeft,
       target: this.target,
-      targetVersion: null,
-      targetCost: null,
+      targetVersion: this.target && "version" in this.target ? Number(this.target.version) : null,
+      targetCost: this.target && "cost" in this.target ? Number(this.target.cost) : null,
       overallWinner: this.overallWinner,
       forfeitBy: this.forfeitBy,
       creator: this.creator,

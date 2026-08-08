@@ -153,3 +153,23 @@
 @media (prefers-reduced-motion: reduce) {
   .menu-item:hover .menu-icon { transform: none; }
 }
+
+/* ── 公告弹窗 ── */
+.announce-modal { position: relative; width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; padding: 2rem 1.8rem; border: 1px solid var(--line-soft); border-radius: 8px; background: var(--shell-bg-deep); animation: homeSlideUp 0.25s ease; }
+.announce-content { text-align: center; }
+.announce-icon { font-size: 2.4rem; color: var(--gold); margin-bottom: 0.4rem; display: flex; justify-content: center; }
+.announce-title { margin: 0 0 1rem; font-size: 1.3rem; font-weight: 700; color: var(--gold); }
+.announce-body { text-align: left; display: flex; flex-direction: column; gap: 0.8rem; margin-bottom: 1.2rem; }
+.announce-body > p:first-child { margin: 0; color: var(--text-sub); font-size: 0.88rem; line-height: 1.6; }
+.announce-section { padding: 0.7rem 0.8rem; border: 1px solid var(--line-soft); border-radius: 6px; background: color-mix(in oklab, var(--gold) 4%, var(--surface-panel)); }
+.announce-section-title { margin: 0 0 0.3rem; font-size: 0.85rem; font-weight: 600; color: var(--text-main); display: flex; align-items: center; gap: 0.35rem; }
+.announce-section-title svg { color: var(--gold); font-size: 1rem; }
+.announce-section p:last-child { margin: 0; font-size: 0.82rem; color: var(--text-sub); line-height: 1.5; }
+.announce-section strong { color: var(--gold); }
+.announce-btn { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.6rem 1.6rem; border: 1px solid color-mix(in oklab, var(--gold) 50%, transparent); border-radius: 8px; background: linear-gradient(135deg, color-mix(in oklab, var(--gold) 22%, var(--surface-panel-strong)), color-mix(in oklab, var(--gold) 12%, var(--surface-panel))); color: var(--gold); font-size: 0.92rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
+.announce-btn:hover { background: linear-gradient(135deg, color-mix(in oklab, var(--gold) 32%, var(--surface-panel-strong)), color-mix(in oklab, var(--gold) 18%, var(--surface-panel))); transform: translateY(-1px); }
+
+@media (max-width: 540px) {
+  .announce-modal { max-width: 94vw; padding: 1.2rem 1rem; }
+  .announce-title { font-size: 1.1rem; }
+}

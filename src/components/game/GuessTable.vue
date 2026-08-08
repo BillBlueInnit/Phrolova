@@ -13,11 +13,17 @@ const props = defineProps<{
   targetVersion?: number | null;
   targetCost?: number | null;
   hiddenKeys?: string[];
+  /** 强制展示所有条目（不根据 revealed 遮罩，用于对局回放）。 */
+  forceReveal?: boolean;
 }>();
 
 const columns = computed(() =>
   getColumns(props.quizType).filter((c) => !props.hiddenKeys?.includes(c.key)),
 );
+
+function isRevealed(row: GuessHistoryRow): boolean {
+  return props.forceReveal ? true : Boolean(row.revealed);
+}
 
 function getCompareCell(compare: ResonatorCompare | SkeletonCompare, key: string) {
   return (compare as Record<string, unknown>)[key];
@@ -79,7 +85,7 @@ function formatCellValue(row: GuessHistoryRow, key: string) {
         <tr v-for="(row, index) in rows" :key="`${index}-${row.guess.name}`">
           <td class="guess-table-index">{{ index + 1 }}</td>
           <td class="guess-table-cell guess-table-avatar-cell">
-            <img v-if="row.revealed"
+            <img v-if="isRevealed(row)"
               :src="quizType === 'resonator' ? getCharacterAvatar(String(row.guess.name)) : getSkeletonAvatar(String(row.guess.name))"
               class="gt-avatar" alt="" />
           </td>
@@ -87,12 +93,12 @@ function formatCellValue(row: GuessHistoryRow, key: string) {
             :class="getCellClass(row, column.key)">
             <template v-if="column.key === 'name'">
               <div class="gt-name-cell">
-                <span class="guess-table-name">{{ row.revealed ? row.guess.name : "***" }}</span>
+                <span class="guess-table-name">{{ isRevealed(row) ? row.guess.name : "***" }}</span>
               </div>
             </template>
 
             <template v-else-if="isGroupField(row, column.key)">
-              <span v-if="!row.revealed" class="guess-table-masked">***</span>
+              <span v-if="!isRevealed(row)" class="guess-table-masked">***</span>
               <div v-else class="compare-token-list">
                 <LoreBadge v-for="item in getGroupItems(row, column.key)" :key="renderGroupItem(item)"
                   :category="resolveBadgeCategory(column.key, renderGroupItem(item))"
@@ -101,12 +107,12 @@ function formatCellValue(row: GuessHistoryRow, key: string) {
             </template>
 
             <template v-else-if="column.key === 'weapon'">
-              <span v-if="row.revealed" class="gt-weapon-text">{{ row.guess.weapon }}</span>
+              <span v-if="isRevealed(row)" class="gt-weapon-text">{{ row.guess.weapon }}</span>
               <span v-else class="guess-table-masked">***</span>
             </template>
 
             <template v-else-if="shouldRenderBadge(column.key)">
-              <template v-if="row.revealed">
+              <template v-if="isRevealed(row)">
                 <div class="gt-badge-row">
                   <LoreBadge :label="String(formatCellValue(row, column.key))"
                     :category="resolveBadgeCategory(column.key, String(getRowValue(row.guess, column.key)))"
@@ -117,7 +123,7 @@ function formatCellValue(row: GuessHistoryRow, key: string) {
             </template>
 
             <template v-else>
-              <span v-if="row.revealed" class="guess-table-value" :class="{ 'guess-table-stars': column.key === 'star_rating' }">
+              <span v-if="isRevealed(row)" class="guess-table-value" :class="{ 'guess-table-stars': column.key === 'star_rating' }">
                 {{ formatCellValue(row, column.key) }}
               </span>
               <span v-else class="guess-table-masked">***</span>

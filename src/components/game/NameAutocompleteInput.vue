@@ -12,7 +12,7 @@ const props = defineProps<{
 
 const model = defineModel<string>({ default: "" });
 const emit = defineEmits<{
-  submit: [];
+  submit: [finalName: string];
 }>();
 
 const inputRef = useTemplateRef<HTMLInputElement>("inputRef");
@@ -25,6 +25,20 @@ const suggestions = computed(() => {
     .filter((item) => item.name.toLowerCase().includes(keyword));
 });
 
+/** 根据当前输入计算最终要提交的名称：优先用激活项，否则用第一个补全，否则直接用输入内容。 */
+function resolveFinalName(): string {
+  if (suggestions.value.length) {
+    const idx = activeIndex.value >= 0 ? activeIndex.value : 0;
+    if (suggestions.value[idx]) {
+      const final = suggestions.value[idx].name;
+      model.value = final;
+      activeIndex.value = -1;
+      return final;
+    }
+  }
+  return model.value;
+}
+
 function selectSuggestion(name: string) {
   model.value = name;
   activeIndex.value = -1;
@@ -35,7 +49,7 @@ function handleKeydown(event: KeyboardEvent) {
   if (!suggestions.value.length) {
     if (event.key === "Enter") {
       event.preventDefault();
-      emit("submit");
+      emit("submit", resolveFinalName());
     }
     return;
   }
@@ -51,11 +65,7 @@ function handleKeydown(event: KeyboardEvent) {
   }
   if (event.key === "Enter") {
     event.preventDefault();
-    const idx = activeIndex.value >= 0 ? activeIndex.value : 0;
-    if (suggestions.value[idx]) {
-      selectSuggestion(suggestions.value[idx].name);
-    }
-    emit("submit");
+    emit("submit", resolveFinalName());
   }
 }
 

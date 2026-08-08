@@ -50,7 +50,11 @@ function splitField(value: unknown): string[] {
 
 function normalizeVersion(v: unknown): string {
   try {
-    return `${parseFloat(String(v).trim())}`;
+    const str = String(v).trim();
+    const num = parseFloat(str);
+    if (!isFinite(num)) return str;
+    // 保留 1 位小数，确保 "1.0" 不会变成 "1" 导致在 _VERSION_ORDER 中 indexOf 返回 -1
+    return Number(num).toFixed(1);
   } catch {
     return String(v).trim();
   }
@@ -318,10 +322,10 @@ export async function applyMultiScore(
     `UPDATE players SET score = MAX(0, score + ?1), wins = wins + 1, matches = matches + 1 WHERE player_id = ?2`
   ).bind(delta, winnerId).run();
 
-  // 败者加比赛次数
+  // 败者扣分并加比赛次数
   await db.prepare(
-    `UPDATE players SET matches = matches + 1 WHERE player_id = ?1`
-  ).bind(loserId).run();
+    `UPDATE players SET score = MAX(0, score - ?1), matches = matches + 1 WHERE player_id = ?2`
+  ).bind(delta, loserId).run();
 }
 
 // ── 记录比赛（简化版） ──

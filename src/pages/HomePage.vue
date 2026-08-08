@@ -95,6 +95,8 @@ onBeforeUnmount(() => {
   ctx?.revert();
 });
 
+const ANNOUNCE_KEY = "phrolova_announcement_v1";
+const showAnnouncement = shallowRef(false);
 const showAuthModal = shallowRef(false);
 const authMode = shallowRef<"login" | "register">("login");
 const resetMode = shallowRef(false);
@@ -229,11 +231,23 @@ function handleLogout() {
 }
 
 onMounted(async () => {
+  // 首次访问公告弹窗
+  try {
+    if (!localStorage.getItem(ANNOUNCE_KEY)) {
+      showAnnouncement.value = true;
+    }
+  } catch { /* ignore */ }
+
   await authStore.hydrate();
   if (authStore.isAuthenticated) {
     await multiGameStore.resumeRoom().catch(() => undefined);
   }
 });
+
+function closeAnnouncement() {
+  showAnnouncement.value = false;
+  try { localStorage.setItem(ANNOUNCE_KEY, "1"); } catch { /* ignore */ }
+}
 </script>
 
 <template>
@@ -325,6 +339,27 @@ onMounted(async () => {
         </a>
       </div>
     </div>
+
+    <ModalOverlay v-if="showAnnouncement" panel-class="announce-modal" max-width="480px" @close="closeAnnouncement">
+      <div class="announce-content">
+        <div class="announce-icon"><Icon icon="ph:megaphone-duotone" /></div>
+        <h2 class="announce-title">网站全面升级公告</h2>
+        <div class="announce-body">
+          <p>欢迎来到「弗一把」！网站已进行全面的功能与 UI 升级，带来更好的游戏体验。</p>
+          <div class="announce-section">
+            <p class="announce-section-title"><Icon icon="ph:warning-circle-duotone" /> 老用户注意</p>
+            <p>首次登录时会要求重置密码以升级安全策略，您可以重置为与原来相同的密码。</p>
+          </div>
+          <div class="announce-section">
+            <p class="announce-section-title"><Icon icon="ph:chat-circle-dots-duotone" /> 加入官方QQ群</p>
+            <p>群号：<strong>457323277</strong>，享受与群友对战、网站最新内容内测、问题反馈等专属功能！</p>
+          </div>
+        </div>
+        <button class="announce-btn" type="button" @click="closeAnnouncement">
+          <Icon icon="ph:check-circle-duotone" /> 我知道了
+        </button>
+      </div>
+    </ModalOverlay>
 
     <ModalOverlay v-if="showAuthModal" panel-class="auth-modal" max-width="400px" @close="closeAuthModal">
       <header class="auth-modal-header">

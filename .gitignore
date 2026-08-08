@@ -27,6 +27,8 @@ node_modules/
 .drizzle/
 dist/
 wrangler.jsonc
+!wrangler.jsonc.example
+!cf-server/wrangler.jsonc.example
 wrangler.local.toml
 wrangler.dev.toml
 apps/server/.venv/

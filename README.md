@@ -240,6 +240,31 @@ pnpm deploy:production
 - Pages 前端：`https://<pages-project>.pages.dev`（或绑定的自定义域）
 - Workers + Durable Objects：由 Pages 通过 Service Binding 内部调用，对外无独立域名
 
+### GitHub Actions 自动部署
+
+项目内置了 [.github/workflows/deploy.yml](.github/workflows/deploy.yml)，push 到 `main` / `master` 分支时自动触发：构建前端 → 应用 D1 迁移 → 部署 Workers → 部署 Pages。也可在 Actions 页面手动触发（`workflow_dispatch`）。
+
+#### 1. 配置 GitHub Secrets
+
+在仓库 **Settings → Secrets and variables → Actions** 中添加以下 4 个 Secrets：
+
+| Secret | 说明 |
+|--------|------|
+| `CLOUDFLARE_API_TOKEN` | Cloudflare API Token（需具备 Workers / Pages / D1 / KV 编辑权限） |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare Account ID（Dashboard 右侧栏可见） |
+| `D1_DATABASE_ID` | D1 数据库 ID（`wrangler d1 create` 返回值或 Dashboard 中查看） |
+| `KV_NAMESPACE_ID` | KV 命名空间 ID |
+
+#### 2. 推送代码
+
+```bash
+git push origin main
+```
+
+推送后 GitHub Actions 会自动执行：从 `wrangler.jsonc.example` 模板 + Secrets 生成配置 → `pnpm build` → `pnpm d1:migrate:remote` → `wrangler deploy`（cf-server）→ `wrangler pages deploy dist --branch production`。
+
+> ⚠️ 首次使用前需确保已完成一次性准备（创建 D1 数据库、KV 命名空间），并将对应 ID 配置为 Secrets。种子数据需手动执行一次 `pnpm d1:seed:remote`。
+
 ---
 
 ## 数据库与迁移
