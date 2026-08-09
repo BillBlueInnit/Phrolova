@@ -41,9 +41,12 @@ const targetCost = computed(() => {
 const answerText = computed(() => {
   const target = singleGameStore.target;
   if (!target) return "";
-  return singleGameStore.quizType === "skeleton"
-    ? `${target.name} / COST ${target.cost} / ${target.skill_attribute}`
-    : `${target.name} / ${target.attribute} / ${target.weapon} / ${target.version}`;
+  if (singleGameStore.quizType === "skeleton") {
+    const t = target;
+    return `${t.name} / COST ${'cost' in t ? t.cost : '?'} / ${'skill_attribute' in t ? t.skill_attribute : '?'}`;
+  }
+  const t = target;
+  return `${t.name} / ${'attribute' in t ? t.attribute : '?'} / ${'weapon' in t ? t.weapon : '?'} / ${'version' in t ? t.version : '?'}`;
 });
 
 const hasGuessHistory = computed(() => singleGameStore.guessHistory.length > 0);

@@ -98,7 +98,7 @@ const filteredSkeletons = computed(() => {
 const currentItems = computed(() => tab.value === "resonator" ? filteredCharacters.value : filteredSkeletons.value);
 const totalCount = computed(() => currentItems.value.length);
 const totalPages = computed(() => Math.ceil(totalCount.value / PAGE_SIZE));
-const pagedItems = computed(() => {
+const pagedItems = computed((): any[] => {
   const start = (page.value - 1) * PAGE_SIZE;
   return currentItems.value.slice(start, start + PAGE_SIZE);
 });

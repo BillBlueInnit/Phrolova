@@ -231,7 +231,7 @@ onMounted(loadList);
               <td>{{ row.id }}</td>
               <td>
                 <template v-if="editing?.id === row.id && editing.field === 'player_id'">
-                  <input ref="(el: any) => { if (el) editInputEl = el as any }" v-model="editing.value!.value"
+                  <input ref="(el: any) => { if (el) editInputEl = el as any }" v-model="editing!.value"
                     class="form-input" @keydown="onEditKey" />
                 </template>
                 <template v-else>
@@ -240,7 +240,7 @@ onMounted(loadList);
               </td>
               <td>
                 <template v-if="editing?.id === row.id && editing.field === 'category'">
-                  <select ref="(el: any) => { if (el) editInputEl = el as any }" v-model="editing.value!.value"
+                  <select ref="(el: any) => { if (el) editInputEl = el as any }" v-model="editing!.value"
                     class="form-input" @keydown="onEditKey">
                     <option v-for="c in CATEGORY_OPTIONS" :key="c.value" :value="c.value">{{ c.label }}</option>
                   </select>
@@ -251,7 +251,7 @@ onMounted(loadList);
               </td>
               <td>
                 <template v-if="editing?.id === row.id && editing.field === 'description'">
-                  <textarea ref="(el: any) => { if (el) editInputEl = el as any }" v-model="editing.value!.value"
+                  <textarea ref="(el: any) => { if (el) editInputEl = el as any }" v-model="editing!.value"
                     class="form-input" rows="2" @keydown="onEditKey"></textarea>
                 </template>
                 <template v-else>
@@ -260,7 +260,7 @@ onMounted(loadList);
               </td>
               <td>
                 <template v-if="editing?.id === row.id && editing.field === 'sort_order'">
-                  <input ref="(el: any) => { if (el) editInputEl = el as any }" v-model="editing.value!.value"
+                  <input ref="(el: any) => { if (el) editInputEl = el as any }" v-model="editing!.value"
                     type="number" class="form-input" @keydown="onEditKey" />
                 </template>
                 <template v-else>

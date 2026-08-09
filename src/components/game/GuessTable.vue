@@ -26,7 +26,7 @@ function isRevealed(row: GuessHistoryRow): boolean {
 }
 
 function getCompareCell(compare: ResonatorCompare | SkeletonCompare, key: string) {
-  return (compare as Record<string, unknown>)[key];
+  return (compare as unknown as Record<string, unknown>)[key];
 }
 
 function isGroupedCompare(value: unknown): value is { cell: CellStatus; items: Array<Record<string, unknown>> } {
@@ -100,14 +100,14 @@ function formatCellValue(row: GuessHistoryRow, key: string) {
             <template v-else-if="isGroupField(row, column.key)">
               <span v-if="!isRevealed(row)" class="guess-table-masked">***</span>
               <div v-else class="compare-token-list">
-                <LoreBadge v-for="item in getGroupItems(row, column.key)" :key="renderGroupItem(item)"
-                  :category="resolveBadgeCategory(column.key, renderGroupItem(item))"
-                  :class="getStatusClass(getItemStatus(item))" :label="renderGroupItem(item)" compact />
+                <LoreBadge v-for="item in getGroupItems(row, column.key)" :key="String(renderGroupItem(item))"
+                  :category="resolveBadgeCategory(column.key, String(renderGroupItem(item)))"
+                  :class="getStatusClass(getItemStatus(item))" :label="String(renderGroupItem(item))" compact />
               </div>
             </template>
 
             <template v-else-if="column.key === 'weapon'">
-              <span v-if="isRevealed(row)" class="gt-weapon-text">{{ row.guess.weapon }}</span>
+              <span v-if="isRevealed(row)" class="gt-weapon-text">{{ ('weapon' in row.guess) ? row.guess.weapon : '' }}</span>
               <span v-else class="guess-table-masked">***</span>
             </template>
 

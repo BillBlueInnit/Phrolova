@@ -86,7 +86,7 @@ const myGuesses = computed(() =>
 // 否则保留原有 revealed 字段（仅在对手猜中时 revealed=true）
 const opponentGuesses = computed(() => {
   const rs = multiGameStore.roomState;
-  const revealAll = rs?.roundStatus === "resolved" || rs?.roundStatus === "finished";
+  const revealAll = rs?.roundStatus === "resolved" || rs?.roomStatus === "finished";
   return (multiGameStore.opponent?.guesses ?? []).map((row) => ({
     ...row,
     revealed: revealAll ? true : Boolean(row.revealed),

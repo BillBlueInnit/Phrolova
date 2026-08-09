@@ -22,6 +22,15 @@ const syncResult = ref<Record<string, unknown> | null>(null);
 const syncError = ref("");
 const syncElapsed = ref(0);
 const preview = ref<Record<string, unknown> | null>(null);
+
+interface DiffResult {
+  ok?: boolean;
+  total_remote?: number;
+  total_local?: number;
+  new?: Array<{ name: string; [key: string]: unknown }>;
+  changed?: Array<{ name: string; before: Record<string, unknown>; after: Record<string, unknown> }>;
+  unchanged?: number;
+}
 const diffActions = ref(new Map<string, Set<string>>());
 const diffPages = reactive<Record<string, number>>({});
 
@@ -181,15 +190,15 @@ onBeforeUnmount(() => stopPolling());
 
     <template v-if="preview">
       <template v-for="(r, key) in { characters: preview.characters, echoes: preview.echoes }" :key="key">
-        <section v-if="r?.ok" class="ad-card">
-          <h3 class="ad-card-title">{{ tableTitle(key as AdminRecordKind) }} — 远程{{ r.total_remote }}/本地{{ r.total_local }}</h3>
+        <section v-if="(r as DiffResult)?.ok" class="ad-card">
+          <h3 class="ad-card-title">{{ tableTitle(key as AdminRecordKind) }} — 远程{{ (r as DiffResult).total_remote }}/本地{{ (r as DiffResult).total_local }}</h3>
           <div class="ad-stat-row">
-            <span class="ad-stat-pill ad-stat-pill--new">新增{{ r.new?.length || 0 }}</span>
-            <span class="ad-stat-pill ad-stat-pill--changed">变更{{ r.changed?.length || 0 }}</span>
-            <span class="ad-stat-pill">未变{{ r.unchanged }}</span>
+            <span class="ad-stat-pill ad-stat-pill--new">新增{{ (r as DiffResult).new?.length || 0 }}</span>
+            <span class="ad-stat-pill ad-stat-pill--changed">变更{{ (r as DiffResult).changed?.length || 0 }}</span>
+            <span class="ad-stat-pill">未变{{ (r as DiffResult).unchanged }}</span>
           </div>
-          <div v-if="!r.new?.length && !r.changed?.length" class="ad-no-diff"><Icon icon="ph:check-circle-duotone" /> 已是最新</div>
-          <template v-if="r.new?.length || r.changed?.length">
+          <div v-if="!(r as DiffResult).new?.length && !(r as DiffResult).changed?.length" class="ad-no-diff"><Icon icon="ph:check-circle-duotone" /> 已是最新</div>
+          <template v-if="(r as DiffResult).new?.length || (r as DiffResult).changed?.length">
             <div class="ad-table-wrap">
               <table class="ad-table"><thead><tr>
                 <th class="ad-th-sel">同步</th><th>名称</th><th>类型</th>

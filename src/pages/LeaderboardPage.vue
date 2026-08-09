@@ -49,7 +49,7 @@ async function loadLeaderboard() {
       page.value,
       PAGE_SIZE,
     );
-    leaderboard.value = data.leaderboard as Array<Record<string, unknown>>;
+    leaderboard.value = data.leaderboard as unknown as Array<Record<string, unknown>>;
     myInfo.value = data.my_info as Record<string, unknown> | null;
     total.value = data.total;
     totalPages.value = data.total_pages;

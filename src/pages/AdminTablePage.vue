@@ -194,7 +194,7 @@ const totalEdited = computed(() => tableEdits.value.size);
                   <template v-if="editing?.kind === kind && editing?.name === row.name && editing?.field === f">
                     <input
                       v-if="editInputType(f) !== 'select'"
-                      :ref="(el) => { editInputEl = el as HTMLInputElement | null; }"
+                      :ref="(el: any) => { editInputEl = el; }"
                       :type="editInputType(f)"
                       :value="editing?.value"
                       v-bind="editNumberMinMax(f)"
@@ -206,7 +206,7 @@ const totalEdited = computed(() => tableEdits.value.size);
                     />
                     <select
                       v-else
-                      :ref="(el) => { editInputEl = el as HTMLSelectElement | null; }"
+                      :ref="(el: any) => { editInputEl = el; }"
                       class="ad-edit-input"
                       :value="editing?.value"
                       @change="(e: Event) => { editing!.value = (e.target as HTMLSelectElement).value; commitEdit(); }"
