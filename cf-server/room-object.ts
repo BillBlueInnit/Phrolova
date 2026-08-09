@@ -459,7 +459,9 @@ export class RoomObject extends DurableObject {
     // 仅当 2 名玩家都在房间时才开始倒计时
     if (this.players.length === 2) {
       this.opponentId = this.players.find(p => p.playerId !== playerId)?.playerId || '';
-      this.startCountdown();
+      // 延迟开始倒计时：给加入的玩家足够时间完成路由跳转和组件挂载
+      // 避免玩家刚进入房间页面时倒计时已过半甚至游戏已开始
+      this.scheduleCountdownStart(2000);
     }
     this.persistState(); // fire-and-forget
   }
@@ -490,6 +492,26 @@ export class RoomObject extends DurableObject {
     });
 
     await this.persistState();
+  }
+
+  /**
+   * 延迟开始倒计时。
+   * 第二名玩家加入后，先保持 waiting 状态一段准备时间，
+   * 让加入的玩家有时间完成前端路由跳转和组件挂载，
+   * 然后再开始正式倒计时，确保双方都能完整看到倒计时。
+   */
+  private scheduleCountdownStart(prepareMs: number): void {
+    if (this.countdownTimer !== null) {
+      clearTimeout(this.countdownTimer);
+      this.countdownTimer = null;
+    }
+    this.countdownTimer = setTimeout(() => {
+      this.countdownTimer = null;
+      // 再次检查：仍处于 waiting 且仍有2名玩家（防止准备期间有人断开）
+      if (this.roomStatus === 'waiting' && this.players.length === 2) {
+        this.startCountdown();
+      }
+    }, prepareMs) as unknown as number;
   }
 
   // ── 倒计时 ──

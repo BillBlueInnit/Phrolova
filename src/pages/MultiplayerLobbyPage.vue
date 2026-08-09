@@ -230,5 +230,33 @@ onMounted(async () => {
         <div v-for="i in 3" :key="i" class="ml-matched-ring" :style="{ animationDelay: `${(i - 1) * 0.2}s` }"></div>
       </div>
     </ModalOverlay>
+
+    <!-- 创建房间弹窗：弥补从点击创建到进入房间页面的延迟 -->
+    <ModalOverlay v-if="multiGameStore.creatingRoom" panel-class="ml-creating-modal" max-width="360px" no-close
+      @close="() => { /* 自动关闭，不可手动关闭 */ }">
+      <div class="ml-creating-icon">
+        <Icon icon="ph:sparkle-duotone" aria-hidden="true" />
+      </div>
+      <p class="ml-creating-kicker">CREATING</p>
+      <h2 class="ml-creating-title">创建成功</h2>
+      <p class="ml-creating-desc">房间已创建，正在进入房间...</p>
+      <div class="ml-creating-spinner" aria-hidden="true">
+        <div v-for="i in 3" :key="i" class="ml-creating-ring" :style="{ animationDelay: `${(i - 1) * 0.2}s` }"></div>
+      </div>
+    </ModalOverlay>
+
+    <!-- 加入房间弹窗：弥补从点击加入到进入房间页面的延迟 -->
+    <ModalOverlay v-if="multiGameStore.joiningRoom" panel-class="ml-joining-modal" max-width="360px" no-close
+      @close="() => { /* 自动关闭，不可手动关闭 */ }">
+      <div class="ml-joining-icon">
+        <Icon icon="ph:sign-in-duotone" aria-hidden="true" />
+      </div>
+      <p class="ml-joining-kicker">JOINING</p>
+      <h2 class="ml-joining-title">加入成功</h2>
+      <p class="ml-joining-desc">已加入房间，正在进入房间...</p>
+      <div class="ml-joining-spinner" aria-hidden="true">
+        <div v-for="i in 3" :key="i" class="ml-joining-ring" :style="{ animationDelay: `${(i - 1) * 0.2}s` }"></div>
+      </div>
+    </ModalOverlay>
   </div>
 </template>

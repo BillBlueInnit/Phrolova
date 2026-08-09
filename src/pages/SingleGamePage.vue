@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, shallowRef, useTemplateRef } from "vue";
+import { computed, nextTick, onMounted, ref, shallowRef, useTemplateRef, watch } from "vue";
 import { useRouter } from "vue-router";
 import gsap from "gsap";
 
@@ -18,6 +18,34 @@ const singleGameStore = useSingleGameStore();
 const router = useRouter();
 const guessName = shallowRef("");
 const guessInputRef = useTemplateRef<{ focus: () => void }>("guessInput");
+
+/** 单人模式猜测记录的滚动容器 */
+const stageBodyRef = ref<HTMLElement | null>(null);
+
+/** 滚到最新一条猜测；同时兼容内层 .guess-table-shell 的 overflow:auto */
+function scrollStageToBottom(el: HTMLElement | null) {
+  if (!el) return;
+  el.scrollTop = el.scrollHeight;
+  const innerShell = el.querySelector<HTMLElement>(".guess-table-shell");
+  if (innerShell) innerShell.scrollTop = innerShell.scrollHeight;
+}
+
+/** 每次提交新猜测后自动滚到底部，和多人模式保持一致体验 */
+let _lastGuessLen = 0;
+watch(
+  () => singleGameStore.guessHistory.length,
+  (len) => {
+    if (len > _lastGuessLen) {
+      nextTick(() => {
+        requestAnimationFrame(() => {
+          scrollStageToBottom(stageBodyRef.value);
+          setTimeout(() => scrollStageToBottom(stageBodyRef.value), 60);
+        });
+      });
+    }
+    _lastGuessLen = len;
+  },
+);
 
 const currentNames = computed(() =>
   singleGameStore.quizType === "skeleton" ? dictionaryStore.skeletonNames : dictionaryStore.resonatorNames,
@@ -168,7 +196,7 @@ onMounted(async () => {
           <FeedbackLegend v-if="hasGuessHistory" />
         </div>
 
-        <div class="stage-body" :class="{ 'game-stage--empty': !hasGuessHistory }">
+        <div ref="stageBodyRef" class="stage-body" :class="{ 'game-stage--empty': !hasGuessHistory }">
           <div v-if="!hasGuessHistory" class="sg-empty-state">
             <div class="sg-empty-glyph"><Icon icon="ph:target-duotone" aria-hidden="true" /></div>
             <h2 class="stage-title">{{ stagePromptTitle }}</h2>
