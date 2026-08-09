@@ -100,7 +100,7 @@ export async function doAdminLogin(): Promise<boolean> {
   try {
     const resp = await axios.request<{ status: string; token?: string; message?: string; error_code?: string }>({
       method: "POST",
-      url: "/api/admin/login",
+      url: "/admin/login",
       baseURL: import.meta.env.VITE_API_BASE || "/api",
       headers: { "Content-Type": "application/json" },
       data: {
@@ -130,7 +130,7 @@ export async function doAdminLogout() {
     const t = adminToken.value ?? localStorage.getItem(TOKEN_KEY) ?? "";
     await axios.request({
       method: "POST",
-      url: "/api/admin/logout",
+      url: "/admin/logout",
       baseURL: import.meta.env.VITE_API_BASE || "/api",
       headers: t ? { "X-Admin-Token": t, "Content-Type": "application/json" } : { "Content-Type": "application/json" },
       timeout: 15000,

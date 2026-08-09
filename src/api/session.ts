@@ -45,7 +45,7 @@ export function initializeIdentity(): Promise<void> {
           error_code?: string;
         }>({
           method: 'GET',
-          url: '/api/auth/me',
+          url: '/auth/me',
           baseURL: import.meta.env.VITE_API_BASE || '/api',
           headers,
           timeout: 15000,
