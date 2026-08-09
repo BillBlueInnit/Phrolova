@@ -295,6 +295,55 @@ pnpm d1:studio
 
 ---
 
+## 贡献
+
+欢迎通过 Issue 和 Pull Request 参与本项目。仓库已内置贡献基建，帮助你标准化地提交反馈与代码。
+
+### 提交 Issue
+
+仓库提供了 4 种 Issue 模板（[`.github/ISSUE_TEMPLATE/`](.github/ISSUE_TEMPLATE/)），新建 Issue 时会自动出现选择器：
+
+| 模板 | 适用场景 |
+|------|----------|
+| 🐛 Bug 报告 | 功能异常、报错、多人连接失败等 |
+| ✨ 功能需求 | 新玩法、新功能或交互改进建议 |
+| 📊 数据勘误 | 角色 / 声骸属性、词条、版本等信息填错 |
+| ©️ 素材版权投诉 | `public/media/` 下美术素材的版权或署名问题 |
+
+> 空白 Issue 已禁用，请选择对应模板填写。想法交流、玩法讨论请前往 [Discussions](https://github.com/MoonCC233/Phrolova/discussions)。
+
+### 提交 Pull Request
+
+1. Fork 仓库并创建功能分支（建议从 `main` 拉取）。
+2. 本地开发后，提交前请确保以下检查通过：
+
+   ```bash
+   pnpm typecheck          # 前端 + API 类型检查（vue-tsc）
+   pnpm typecheck:server   # cf-server Durable Objects 类型检查
+   pnpm build              # 前端 + Pages Worker 构建
+   ```
+
+3. 若修改了数据库 schema，请通过 `pnpm d1:generate` 生成迁移文件并一并提交。
+4. 提交 PR 时会自动加载 [PR 模板](.github/PULL_REQUEST_TEMPLATE.md)，请按清单逐项自检并补充变更说明、影响范围与截图。
+
+### CI 自动检查
+
+每个 PR 都会触发 [.github/workflows/ci.yml](.github/workflows/ci.yml)，依次执行：
+
+- **TypeScript 类型检查**（前端 + cf-server）
+- **构建验证**（确保 `dist/` 与 `dist/_worker.js` 正常产出）
+- **Preview 部署**（自动部署到 Cloudflare Pages Preview 并在 PR 评论中回贴预览链接）
+- **代码审查报告**（聚合各步骤结果，评论在 PR 中）
+
+> Preview 部署需要仓库 Secrets 已配置（`CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` / `D1_DATABASE_ID` / `KV_NAMESPACE_ID`）；未配置时该步骤会跳过，不影响类型与构建检查。
+
+### 代码所有者与依赖
+
+- [`.github/CODEOWNERS`](.github/CODEOWNERS) 标注了关键路径（Durable Objects、认证、数据库 schema、CI 配置等）的所有者，相关变更会自动请求审查。
+- [`.github/dependabot.yml`](.github/dependabot.yml) 每周检查 npm 依赖与 GitHub Actions 版本更新，并按生态分组（Vue / Cloudflare / Drizzle）合并 PR。
+
+---
+
 ## 安全与隐私
 
 - **密码零明文**：注册/登录时前端使用 scrypt（hash-wasm）即时哈希为 32 字节 hex，后端仅存储 hex 摘要并在 D1 中再次用 scrypt 工作因子包装，全程不接触原始密码。

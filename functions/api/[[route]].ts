@@ -46,8 +46,8 @@ const app = new Hono<HonoEnv>();
 app.use('*', logger());
 app.use('*', cors({
   origin: ['*'],
-  allowHeaders: ['Content-Type', 'X-Admin-Token', 'Authorization'],
-  allowMethods: ['GET', 'POST', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'X-Admin-Token', 'Authorization', 'X-Player-Id', 'X-Player-Token'],
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   credentials: false,
 }));
 
@@ -57,12 +57,18 @@ app.use('/api/*', async (c, next) => {
   await next();
 });
 
-// JSON body helper
+// JSON body helper (idempotent: caches parsed body on the context to avoid BodyAlreadyConsumed)
 async function readJson<T = Record<string, unknown>>(c: any): Promise<T> {
+  const cached = c.get('parsed_body');
+  if (cached !== undefined) return cached as T;
   try {
-    return (await c.req.json()) ?? {};
+    const body = (await c.req.json()) ?? {};
+    c.set('parsed_body', body);
+    return body as T;
   } catch {
-    return {} as T;
+    const empty = {} as T;
+    c.set('parsed_body', empty);
+    return empty;
   }
 }
 
@@ -70,11 +76,56 @@ function success<T extends Record<string, unknown>>(data: T) {
   return { status: 'success', ...data };
 }
 
-function error(message: string, status = 400) {
-  return new Response(JSON.stringify({ status: 'error', message }), {
+function error(message: string, status = 400, error_code?: string) {
+  const payload: Record<string, unknown> = { status: 'error', message };
+  if (error_code) payload.error_code = error_code;
+  return new Response(JSON.stringify(payload), {
     status,
     headers: { 'Content-Type': 'application/json; charset=utf-8' },
   });
+}
+
+// ── Player auth helpers (header → body → query, 三级回退) ──────────
+const MIN_TOKEN_LEN = 20;
+
+async function readPlayerAuth(c: any): Promise<{ player_id: string; token: string } | null> {
+  // 1) Headers
+  const h_pid = String(c.req.header('X-Player-Id') ?? '').trim();
+  const h_tok = String(c.req.header('X-Player-Token') ?? '').trim();
+  if (h_pid && h_tok && h_tok.length >= MIN_TOKEN_LEN) {
+    return { player_id: h_pid, token: h_tok };
+  }
+  // 2) Body
+  const body = await readJson(c);
+  const b_pid = String(body.player_id ?? '').trim();
+  const b_tok = String(body.token ?? '').trim();
+  if (b_pid && b_tok && b_tok.length >= MIN_TOKEN_LEN) {
+    return { player_id: b_pid, token: b_tok };
+  }
+  // 3) Query (for GET requests)
+  const q_pid = String(c.req.query('player_id') ?? '').trim();
+  const q_tok = String(c.req.query('token') ?? '').trim();
+  if (q_pid && q_tok && q_tok.length >= MIN_TOKEN_LEN) {
+    return { player_id: q_pid, token: q_tok };
+  }
+  return null;
+}
+
+type PlayerAuthResult =
+  | { ok: false; resp: Response }
+  | { ok: true; player: NonNullable<Awaited<ReturnType<typeof authenticatePlayer>>>; auth: { player_id: string; token: string } };
+
+async function requirePlayerAuth(c: any): Promise<PlayerAuthResult> {
+  const auth = await readPlayerAuth(c);
+  if (!auth) {
+    return { ok: false, resp: error('缺少玩家身份凭证', 401, 'AUTH_REQUIRED') };
+  }
+  const db = c.get('db');
+  const player = await authenticatePlayer(db, auth);
+  if (!player) {
+    return { ok: false, resp: error('玩家身份校验失败或已过期，请重新登录', 401, 'AUTH_EXPIRED') };
+  }
+  return { ok: true, player, auth };
 }
 
 // ── Health ─────────────────────────────────────────────────────────
@@ -92,6 +143,14 @@ app.get('/api/auth/captcha', async (c) => {
 // ── Player routes ──────────────────────────────────────────────────
 app.post('/api/player/init', async (c) => {
   const db = c.get('db');
+  const auth = await readPlayerAuth(c);
+  if (auth) {
+    // 携带鉴权信息 → 必须先校验 token 匹配，再回 player（修复安全漏洞：之前只看 player_id 就回 secret）
+    const player = await authenticatePlayer(db, auth);
+    if (!player) return error('身份校验失败或已过期，请重新登录', 401, 'AUTH_EXPIRED');
+    return c.json(success({ player: publicPlayer(player)!, token: player.secret }));
+  }
+  // 无鉴权 → 匿名创建/查找（仅依据 player_id，保持向后兼容）
   const body = await readJson(c);
   const playerId = String(body.player_id ?? '').trim();
   if (!playerId) return error('缺少玩家ID');
@@ -101,13 +160,16 @@ app.post('/api/player/init', async (c) => {
 
 app.post('/api/player/update_id', async (c) => {
   const db = c.get('db');
+  const authed = await requirePlayerAuth(c);
+  if (!authed.ok) return authed.resp;
   const body = await readJson(c);
-  const oldId = String(body.old_id ?? '').trim();
+  const oldId = authed.auth.player_id;
   const newId = String(body.new_id ?? '').trim();
-  if (!oldId || !newId) return error('参数不完整');
+  if (!newId) return error('缺少新玩家ID');
   if (newId.length > 64) return error('ID 过长');
-  const authed = await authenticatePlayer(db, { player_id: oldId, token: String(body.token ?? '') });
-  if (!authed) return error('身份校验失败', 403);
+  // 允许玩家把自己的 old_id 显式指定为已认证 id 即可
+  const bodyOld = String(body.old_id ?? '').trim();
+  if (bodyOld && bodyOld !== oldId) return error('身份校验失败', 403, 'AUTH_EXPIRED');
   const other = await getPlayer(db, newId);
   if (other && other.playerId !== oldId) return error('该玩家ID已被占用', 409);
   await updatePlayerId(db, oldId, newId);
@@ -117,6 +179,7 @@ app.post('/api/player/update_id', async (c) => {
 
 app.post('/api/player/score', async (c) => {
   const db = c.get('db');
+  // 排行榜是公开查询，所以不强鉴权；有鉴权成功时保持兼容返回公开展示信息
   const body = await readJson(c);
   const playerId = String(body.player_id ?? '').trim();
   if (!playerId) return error('缺少玩家ID');
@@ -208,7 +271,37 @@ app.post('/api/auth/login', async (c) => {
   return c.json(success({ player: publicPlayer({ ...p, secret })!, token: secret, message: '登录成功' }));
 });
 
+app.post('/api/auth/refresh', async (c) => {
+  // 强制 header 鉴权（不接受 body）：每次 refresh 轮换 players.secret，旧 token 立即失效
+  const h_pid = String(c.req.header('X-Player-Id') ?? '').trim();
+  const h_tok = String(c.req.header('X-Player-Token') ?? '').trim();
+  if (!h_pid || h_tok.length < MIN_TOKEN_LEN) {
+    return error('缺少玩家身份凭证', 401, 'AUTH_REQUIRED');
+  }
+  const db = c.get('db');
+  const player = await authenticatePlayer(db, { player_id: h_pid, token: h_tok });
+  if (!player) return error('玩家身份校验失败或已过期，请重新登录', 401, 'AUTH_EXPIRED');
+  const newSecret = await setPlayerSecret(db, h_pid);
+  const refreshed = await getPlayer(db, h_pid);
+  return c.json(success({ player: publicPlayer(refreshed)!, token: newSecret }));
+});
+
+app.get('/api/auth/me', async (c) => {
+  const authed = await requirePlayerAuth(c);
+  if (!authed.ok) return authed.resp;
+  return c.json(success({ player: publicPlayer(authed.player)! }));
+});
+
 app.post('/api/auth/logout', async (c) => {
+  // 服务端失效 secret（best-effort，失败也不让客户端卡住）
+  try {
+    const auth = await readPlayerAuth(c);
+    if (auth) {
+      const db = c.get('db');
+      const player = await authenticatePlayer(db, auth);
+      if (player) await setPlayerSecret(db, auth.player_id);
+    }
+  } catch { /* ignore */ }
   return c.json(success({ message: '已退出登录' }));
 });
 
@@ -351,19 +444,18 @@ app.post('/api/draw', async (c) => {
   const body = await readJson(c);
   const quizType = (String(body.type ?? 'resonator').trim() || 'resonator') as QuizType;
   const difficulty = String(body.difficulty ?? 'normal').trim() || 'normal';
-  const playerId = String(body.player_id ?? '').trim();
-  const token = String(body.token ?? '').trim();
   const row = await drawTargetByType(db, quizType, difficulty);
   if (!row) return error('数据库中没有目标数据', 404);
-  const player = playerId && token ? await authenticatePlayer(db, { player_id: playerId, token }) : null;
-  if (player) {
+  const authed = await requirePlayerAuth(c);
+  if (authed.ok) {
     await upsertPlayerTarget(db, {
-      playerId,
+      playerId: authed.auth.player_id,
       quizType,
       targetJson: JSON.stringify(normalizeRow(row as unknown as Record<string, unknown>, quizType)),
       attempts: 0,
     });
   }
+  // 未鉴权也允许 draw（匿名开局），只是不写服务端 target
   return c.json(success({ type: quizType, character: toFrontendRow(row as unknown as Record<string, unknown>, quizType) }));
 });
 
@@ -372,12 +464,11 @@ app.post('/api/guess', async (c) => {
   const db = c.get('db');
   const body = await readJson(c);
   const guessName = String(body.guess ?? '').trim();
-  const playerId = String(body.player_id ?? '').trim();
-  const token = String(body.token ?? '').trim();
   if (!guessName) return error('请输入名称');
 
-  const player = await authenticatePlayer(db, { player_id: playerId, token });
-  if (player) {
+  const authed = await requirePlayerAuth(c);
+  if (authed.ok) {
+    const playerId = authed.auth.player_id;
     const session = await getPlayerTarget(db, playerId);
     if (!session || !session.target) {
       return error('请先抽取目标再开始猜测');
@@ -412,7 +503,7 @@ app.post('/api/guess', async (c) => {
     }));
   }
 
-  // No player auth — require target in body
+  // No player auth — require target in body（匿名模式保持向后兼容）
   const target = body.target as Record<string, unknown> | undefined;
   const quizType = (String(body.type ?? 'resonator') || 'resonator') as QuizType;
   if (!target) return error('缺少目标数据，请先抽取随机目标');
@@ -457,7 +548,7 @@ app.get('/api/leaderboard', async (c) => {
 
   const top = topRows.map(r => {
     const sortScore = Number(r.sortScore ?? 0);
-    const winRate = r.matches ? Math.round(r.wins * 1000 / r.matches) / 10 : 100.0;
+    const winRate = r.matches ? Math.round(r.wins * 1000 / r.matches) / 10 : null;
     return {
       player_id: r.playerId,
       score: r.score,
@@ -541,7 +632,7 @@ async function verifyAdminToken(env: Bindings, token: string): Promise<boolean> 
 async function requireAdmin(c: any): Promise<Response | null> {
   const token = String(c.req.header('X-Admin-Token') ?? '');
   const ok = await verifyAdminToken(c.env, token);
-  if (!ok) return error('未授权，请先登录', 401);
+  if (!ok) return error('未授权，请先登录', 401, 'ADMIN_AUTH_REQUIRED');
   return null;
 }
 

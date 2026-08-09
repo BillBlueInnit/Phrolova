@@ -24,6 +24,17 @@ const router = useRouter();
 const guessName = shallowRef("");
 const guessInputRef = useTemplateRef<{ focus: () => void }>("guessInput");
 
+type BoardLayout = "rows" | "columns";
+const LAYOUT_STORAGE_KEY = "phrolova_multi_board_layout";
+const boardLayout = ref<BoardLayout>(
+  (localStorage.getItem(LAYOUT_STORAGE_KEY) as BoardLayout) ?? "rows",
+);
+
+function toggleBoardLayout() {
+  boardLayout.value = boardLayout.value === "rows" ? "columns" : "rows";
+  localStorage.setItem(LAYOUT_STORAGE_KEY, boardLayout.value);
+}
+
 const names = computed(() =>
   multiGameStore.roomState?.quizType === "skeleton" ? dictionaryStore.skeletonNames : dictionaryStore.resonatorNames,
 );
@@ -331,7 +342,18 @@ watch(
               <h2 class="stage-title">{{ hasBattleHistory ? "双方猜测进度" : stagePromptTitle }}</h2>
               <p class="stage-sub">{{ hasBattleHistory ? stagePromptSubtitle : roomHintText }}</p>
             </div>
-            <FeedbackLegend v-if="hasBattleHistory" />
+            <div class="stage-head-actions">
+              <FeedbackLegend v-if="hasBattleHistory" />
+              <button
+                v-if="hasBattleHistory"
+                class="mr-layout-toggle"
+                :title="boardLayout === 'rows' ? '切换为左右布局' : '切换为上下布局'"
+                @click="toggleBoardLayout"
+              >
+                <Icon :icon="boardLayout === 'rows' ? 'ph:columns-duotone' : 'ph:rows-duotone'" aria-hidden="true" />
+                <span class="mr-layout-toggle-label">{{ boardLayout === "rows" ? "左右" : "上下" }}</span>
+              </button>
+            </div>
           </div>
 
           <div v-if="!hasBattleHistory" class="empty-state">
@@ -340,7 +362,7 @@ watch(
             <p class="empty-state-desc">{{ stagePromptSubtitle }}</p>
           </div>
 
-          <div v-if="hasBattleHistory" class="mr-boards">
+          <div v-if="hasBattleHistory" class="mr-boards" :class="`mr-boards--${boardLayout}`">
             <div class="mr-board-panel">
               <div class="mr-board-head">
                 <h3 class="mr-board-title"><Icon icon="ph:user-duotone" class="mr-board-head-icon" /> 我的猜测</h3>
@@ -360,7 +382,7 @@ watch(
             <div class="mr-board-panel">
               <div class="mr-board-head">
                 <h3 class="mr-board-title"><Icon icon="ph:user-circle-duotone" class="mr-board-head-icon" /> 对手猜测</h3>
-                <span class="mr-board-meta">{{ multiGameStore.roomState.opponentId || "等待加入" }}</span>
+                <span class="mr-board-meta">{{ multiGameStore.opponent?.playerId || multiGameStore.roomState.opponentId || "等待加入" }}</span>
               </div>
               <div class="mr-board-body">
                 <GuessTable
@@ -443,7 +465,7 @@ watch(
       </div>
       <div class="mr-result-actions">
         <button class="btn-ghost" @click="openFullResultPage">查看完整对局</button>
-        <button v-if="isCreator" class="btn-ghost" @click="closeMatchResult(); leaveRoom();">关闭房间</button>
+        <button class="btn-ghost btn-ghost--danger" @click="closeMatchResult(); leaveRoom();">退出房间</button>
       </div>
     </ModalOverlay>
   </div>

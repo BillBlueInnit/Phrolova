@@ -8,20 +8,25 @@ import type {
   SkeletonNameEntry,
   SkeletonRow,
 } from "@/types/game";
-import { apiPath, requestJson } from "./http";
+import { api } from "./client";
 
 export function health() {
-  return requestJson<{ status: string }>(apiPath("/health"));
+  return api.get<{ status: string }>("/health") as Promise<{ status: string }>;
 }
 
 export function fetchResonatorNames() {
-  return requestJson<{ status: string; names: ResonatorNameEntry[] }>(apiPath("/names"));
+  return api.get<{ status: string; names: ResonatorNameEntry[] }>("/names") as Promise<{ status: string; names: ResonatorNameEntry[] }>;
 }
 
 export function fetchSkeletonNames() {
-  return requestJson<{ status: string; names: SkeletonNameEntry[] }>(apiPath("/skeleton_names"));
+  return api.get<{ status: string; names: SkeletonNameEntry[] }>("/skeleton_names") as Promise<{ status: string; names: SkeletonNameEntry[] }>;
 }
 
+/**
+ * 抽取目标
+ *   过渡期：若有 playerId/token，仍双写 body（后端 header→body 回退）+ 拦截器也注入 header；
+ *          若没有则走匿名 GET（或 POST 匿名，都兼容）
+ */
 export function drawTarget(
   quizType: QuizType,
   difficulty: Difficulty,
@@ -29,15 +34,24 @@ export function drawTarget(
   token?: string,
 ) {
   if (playerId && token) {
-    return requestJson<SingleDrawResponse>(apiPath("/draw"), {
-      method: "POST",
-      body: JSON.stringify({ type: quizType, difficulty, player_id: playerId, token }),
-    });
+    // 过渡期双写：header（拦截器注入）+ body（保证老缓存客户端即使拦截器逻辑未加载也能跑）
+    return api.post<SingleDrawResponse>("/draw", {
+      type: quizType,
+      difficulty,
+      player_id: playerId,
+      token,
+    }) as Promise<SingleDrawResponse>;
   }
-  const url = `${apiPath("/draw")}?type=${quizType}&difficulty=${difficulty}`;
-  return requestJson<SingleDrawResponse>(url);
+  return api.get<SingleDrawResponse>("/draw", {
+    params: { type: quizType, difficulty },
+  }) as Promise<SingleDrawResponse>;
 }
 
+/**
+ * 提交猜测
+ *   - 带 playerId/token → 走服务端 target 模式（过渡期仍双写 body）
+ *   - 不带 → 匿名模式，target/type 必填
+ */
 export function submitGuess(
   guessName: string,
   playerId: string,
@@ -45,13 +59,14 @@ export function submitGuess(
   target?: ResonatorRow | SkeletonRow,
   quizType?: QuizType,
 ) {
-  const body: Record<string, unknown> = { guess: guessName, player_id: playerId, token };
-  if (!playerId || !token) {
+  const body: Record<string, unknown> = { guess: guessName };
+  if (playerId && token) {
+    // 双写 body + header
+    body.player_id = playerId;
+    body.token = token;
+  } else {
     body.target = target;
     body.type = quizType;
   }
-  return requestJson<SingleGuessResponse>(apiPath("/guess"), {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
+  return api.post<SingleGuessResponse>("/guess", body) as Promise<SingleGuessResponse>;
 }

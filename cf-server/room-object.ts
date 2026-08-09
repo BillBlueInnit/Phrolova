@@ -20,8 +20,8 @@ interface WsAttachment {
 
 // ── Room Durable Object ──
 export class RoomObject extends DurableObject {
-  private env: Env;
-  private state: DurableObjectState;
+  protected env: Env;
+  protected state: DurableObjectState;
   
   private roomCode: string = '';
   private quizType: QuizType = 'resonator';
@@ -45,6 +45,8 @@ export class RoomObject extends DurableObject {
   private opponentId: string = '';
   private roundHistory: RoomState['roundHistory'] = [];
   private lastActivity: number = 0;
+  // 游戏结束后已主动退出房间的玩家 ID（保留 players 数组让剩余玩家仍能查看对局数据）
+  private exitedPlayers: Set<string> = new Set();
 
   // WebSocket 管理
   private connections: Map<string, WebSocket> = new Map();
@@ -63,12 +65,16 @@ export class RoomObject extends DurableObject {
       const saved = await state.storage.get('room_state');
       if (saved) {
         try {
-          const data = JSON.parse(saved) as Record<string, unknown>;
+          const data = JSON.parse(saved as string) as Record<string, unknown>;
           // 恢复除 connections 外的所有属性
           for (const key of Object.keys(data)) {
-            if (key !== 'connections' && key !== 'players' && key !== 'gameTimer' && key !== 'countdownTimer' && key !== 'cleanupTimer') {
+            if (key !== 'connections' && key !== 'players' && key !== 'gameTimer' && key !== 'countdownTimer' && key !== 'cleanupTimer' && key !== 'exitedPlayers') {
               (this as Record<string, unknown>)[key] = data[key];
             }
+          }
+          // exitedPlayers 特殊处理：从数组恢复为 Set
+          if (Array.isArray(data.exitedPlayers)) {
+            this.exitedPlayers = new Set(data.exitedPlayers as string[]);
           }
         } catch { /* ignore */ }
       }
@@ -85,6 +91,7 @@ export class RoomObject extends DurableObject {
       const url = new URL(request.url);
       const playerId = url.searchParams.get('playerId') || '';
       const token = url.searchParams.get('token') || '';
+      const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8' };
       
       // 从 URL 路径提取房间号（格式：/ws/room/{roomCode}）
       let roomCode = '';
@@ -97,13 +104,19 @@ export class RoomObject extends DurableObject {
       // 处理 WebSocket 升级
       if (request.headers.get('Upgrade') === 'websocket') {
         if (!playerId || !token) {
-          return new Response('Unauthorized', { status: 401 });
+          return new Response(
+            JSON.stringify({ status: 'error', message: '缺少玩家身份凭证', error_code: 'AUTH_REQUIRED' }),
+            { status: 401, headers: JSON_HEADERS },
+          );
         }
 
         // 验证 token
         const valid = await this.verifyToken(playerId, token);
         if (!valid) {
-          return new Response('Forbidden', { status: 403 });
+          return new Response(
+            JSON.stringify({ status: 'error', message: '玩家身份校验失败或已过期，请重新登录', error_code: 'AUTH_EXPIRED' }),
+            { status: 401, headers: JSON_HEADERS },
+          );
         }
 
         // 创建 WebSocket 对
@@ -234,6 +247,20 @@ export class RoomObject extends DurableObject {
     const wasPlayer = this.players.find(p => p.playerId === playerId);
     
     if (wasPlayer) {
+      // 如果游戏已结束，把断开视为退出房间（让剩余玩家能继续查看数据）
+      if (this.roomStatus === 'finished') {
+        this.exitedPlayers.add(playerId);
+        // 如果两个玩家都已退出/断开，销毁房间
+        if (this.players.every(p => this.exitedPlayers.has(p.playerId))) {
+          this.destroyRoom();
+          return;
+        }
+        // 通知仍在房间的玩家：对手已离开
+        this.broadcastState();
+        this.persistState();
+        return;
+      }
+
       // 如果对手在游戏中退出，对方获胜
       if (this.roomStatus === 'playing' && this.players.length === 2) {
         const opponent = this.players.find(p => p.playerId !== playerId);
@@ -741,12 +768,46 @@ export class RoomObject extends DurableObject {
       // 游戏中离开 = 弃权
       this.forfeitBy = playerId;
       this.endMatch();
+    } else if (this.roomStatus === 'finished') {
+      // 游戏结束后离开：记录退出玩家，保留房间数据给仍在房间的人查看
+      this.exitedPlayers.add(playerId);
+      this.connections.delete(playerId);
+
+      // 如果两个玩家都已退出，立刻销毁房间
+      if (this.players.every(p => this.exitedPlayers.has(p.playerId))) {
+        this.destroyRoom();
+        return;
+      }
+
+      // 只通过 ROOM_STATE 同步 exitedPlayers 状态，不触发 ROOM_EXPIRED（否则剩余玩家的前端会清空 roomState）
+      this.broadcastState();
+      await this.persistState();
     } else {
+      // waiting/countdown 阶段离开：直接清理
       this.broadcast(S2C.ROOM_EXPIRED, { message: '对手已离开' });
       this.players = this.players.filter(p => p.playerId !== playerId);
       this.connections.delete(playerId);
       this.broadcastState();
       await this.persistState();
+    }
+  }
+
+  // ── 销毁房间（当所有玩家都退出时调用） ──
+  private destroyRoom(): void {
+    this.broadcast(S2C.ROOM_EXPIRED, { message: '房间已关闭' });
+    // 关闭所有 WebSocket 连接
+    for (const ws of this.connections.values()) {
+      try { ws.close(1000, 'Room destroyed'); } catch { /* ignore */ }
+    }
+    this.connections.clear();
+    this.players = [];
+    this.exitedPlayers.clear();
+    // 删除持久化状态
+    this.state.storage.delete('room_state').catch(() => {});
+    // 清理定时器
+    if (this.cleanupTimer !== null) {
+      clearTimeout(this.cleanupTimer);
+      this.cleanupTimer = null;
     }
   }
 
@@ -769,6 +830,7 @@ export class RoomObject extends DurableObject {
       this.forfeitBy = null;
       this.rematchVotes = [];
       this.roundHistory = [];
+      this.exitedPlayers.clear();
       this.roomStatus = 'waiting';
       this.roundStatus = 'idle';
       this.target = null;
@@ -849,6 +911,10 @@ export class RoomObject extends DurableObject {
     // 否则 playing/active/waiting/countdown 阶段 target 置 null，
     // 避免"下一回合先显示正确答案再消失"的泄漏竞态
     const safeTarget = shouldRevealAll ? this.target : null;
+    // 注意：targetVersion / targetCost 仅用于 ↑↓ 方向提示，不包含答案信息，
+    // 因此游戏进行中也需要下发，否则前端箭头无法显示
+    const targetVersion = this.target && "version" in this.target ? Number(this.target.version) : null;
+    const targetCost = this.target && "cost" in this.target ? Number(this.target.cost) : null;
     return {
       roomCode: this.roomCode,
       quizType: this.quizType,
@@ -864,8 +930,8 @@ export class RoomObject extends DurableObject {
       timeLimit: this.timeLimit,
       countdownLeft: this.countdownLeft,
       target: safeTarget,
-      targetVersion: safeTarget && "version" in safeTarget ? Number(safeTarget.version) : null,
-      targetCost: safeTarget && "cost" in safeTarget ? Number(safeTarget.cost) : null,
+      targetVersion,
+      targetCost,
       overallWinner: this.overallWinner,
       forfeitBy: this.forfeitBy,
       creator: this.creator,
@@ -881,12 +947,19 @@ export class RoomObject extends DurableObject {
       })),
       opponentId: this.opponentId,
       roundHistory: this.roundHistory,
+      exitedPlayers: Array.from(this.exitedPlayers),
     };
   }
 
   private broadcastState(): void {
     const state = this.buildState();
-    this.broadcast(S2C.ROOM_STATE, state);
+    // 为每个玩家单独发送一份定制化 state（opponentId 必须是对方的 ID，不能共享全局值）
+    for (const [recipientId, ws] of this.connections.entries()) {
+      const playerOpponentId = this.players.find(p => p.playerId !== recipientId)?.playerId || '';
+      try {
+        sendJson(ws, S2C.ROOM_STATE, { ...state, opponentId: playerOpponentId });
+      } catch { /* ignore */ }
+    }
   }
 
   private broadcast(type: string, payload: unknown): void {
@@ -938,6 +1011,7 @@ export class RoomObject extends DurableObject {
         opponentId: this.opponentId,
         roundHistory: this.roundHistory,
         lastActivity: this.lastActivity,
+        exitedPlayers: Array.from(this.exitedPlayers),
       };
       await this.state.storage.put('room_state', JSON.stringify(data));
     } catch { /* ignore */ }
@@ -957,9 +1031,10 @@ export class RoomObject extends DurableObject {
     // 5 分钟后检查
     this.cleanupTimer = setTimeout(() => {
       const now = Date.now();
-      if (now - this.lastActivity > 5 * 60 * 1000 && this.connections.size === 0) {
+      const allExited = this.players.length > 0 && this.players.every(p => this.exitedPlayers.has(p.playerId));
+      if ((now - this.lastActivity > 5 * 60 * 1000 && this.connections.size === 0) || allExited) {
         // 清理房间
-        this.state.storage.delete('room_state').catch(() => {});
+        this.destroyRoom();
       } else {
         this.scheduleCleanup();
       }

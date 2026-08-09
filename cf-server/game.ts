@@ -2,35 +2,7 @@
 // 直接使用 D1Database API（不依赖 drizzle-orm，因为 Worker 环境中 Drizzle 需要特殊配置）
 
 import type { QuizType, Difficulty } from './protocol';
-
-// ── 字段映射（与 compare.ts 保持一致） ──
-const _COLOR_GROUPS: Record<string, string> = {
-  green: 'green', teal: 'green',
-  blue: 'blue', cyan: 'blue',
-  purple: 'purple',
-  red: 'warm', orange: 'warm', magenta: 'warm', pink: 'warm',
-  yellow: 'yellow',
-  gray: 'neutral', white: 'neutral', black: 'neutral',
-};
-
-const _STATUS_BG_GROUP: Record<string, string> = {
-  match: 'green', near: 'warm', different: 'neutral',
-};
-
-const _SET_COLOR_FAMILY: Record<string, string> = {
-  '逆光跃彩之约': 'purple', '流金溯真之式': 'yellow', '浮星祛暗': 'blue', '此间永驻之光': 'warm',
-  '冥途夜行之灯': 'warm', '斑驳粉饰之沫': 'warm', '长路启航之星': 'warm',
-  '熔山裂谷': 'warm', '奔狼燎原之焰': 'red', '焚羽猎魔之影': 'warm',
-  '剪心辑梦之影': 'blue', '雪落无声之愿': 'neutral', '凝夜白霜': 'blue', '凌冽决断之心': 'blue',
-  '彻空冥雷': 'yellow',
-  '沉日劫明': 'purple', '幽夜隐匿之帷': 'purple', '失序彼岸之梦': 'neutral', '命理崩毁之弦': 'purple',
-  '清邪荡煞之心': 'green', '听唤语义之愿': 'green', '星构寻辉之环': 'green',
-  '啸谷长风': 'green', '隐世回光': 'green', '流云逝尽之空': 'green', '愿戴荣光之旅': 'green',
-  '羽落空尘之歌': 'neutral', '轻云出月': 'neutral', '无惧浪涛之勇': 'neutral',
-  '不绝余音': 'purple', '高天共奏之曲': 'yellow',
-  '荣斗铸锋之冠': 'warm', '息界同调之律': 'neutral',
-  '碎梦亡鬼之魇': 'purple', '战歌重奏-烬夜天启之章': 'warm',
-};
+import { buildDivideSetToAttrs, buildDivideMemberGroups } from '../src/lib/divide-data';
 
 const _VERSION_ORDER = [
   '1.0', '1.1', '1.2', '1.3', '1.4',
@@ -39,10 +11,6 @@ const _VERSION_ORDER = [
 ];
 
 // ── 辅助函数 ──
-function setColorFamily(name: string): string {
-  return _SET_COLOR_FAMILY[name] ?? 'neutral';
-}
-
 function splitField(value: unknown): string[] {
   if (!value) return [];
   return String(value).replace(/，/g, ',').split(',').map(s => s.trim()).filter(Boolean);
@@ -141,33 +109,16 @@ function compareField(target: unknown, guess: unknown, fieldName: string): Field
   return 'different';
 }
 
-// 套装名 → 属性映射（简化版）
-const SET_TO_ATTRS: Record<string, string[]> = {
-  '逆光跃彩之约': ['光谱属性'],
-  '熔山裂谷': ['热熔'],
-  '沉日劫明': ['湮灭'],
-  '清邪荡煞之心': ['气动'],
-  '彻空冥雷': ['导电'],
-};
-
-// 套装名 → 掉落地点分组（简化版）
-const DROP_LOCATION_GROUPS: Record<string, string[]> = {
-  '黑塔': ['黑塔'],
-  '残象': ['残象'],
-  '无名遗冢': ['无名遗冢'],
-  '灰烬战线': ['灰烬战线'],
-  '无音区': ['无音区'],
-};
-
 function compareSkillAttributes(
   targetAttrs: string[],
   guessAttrs: string[],
   targetSets?: string[],
 ): Array<{ attr: string; status: TokenStatus }> {
+  const setToAttrs = buildDivideSetToAttrs();
   const inferred = new Set<string>();
   if (targetSets) {
     for (const setName of targetSets) {
-      for (const a of SET_TO_ATTRS[setName] ?? []) inferred.add(a);
+      for (const a of setToAttrs[setName] ?? []) inferred.add(a);
     }
   }
   const result: Array<{ attr: string; status: TokenStatus }> = [];
@@ -184,21 +135,22 @@ function compareSets(
   targetSets: string[],
   guessSets: string[],
 ): Array<{ set: string; status: TokenStatus; has_image: boolean; whiten: boolean }> {
-  const targetGroups = new Set(
-    targetSets.map(n => _COLOR_GROUPS[setColorFamily(n)] ?? 'neutral')
-  );
+  const memberGroups = buildDivideMemberGroups();
+  const targetGroups = new Set<string>();
+  for (const s of targetSets) {
+    for (const g of memberGroups[s] ?? []) targetGroups.add(g);
+  }
+
   const result: Array<{ set: string; status: TokenStatus; has_image: boolean; whiten: boolean }> = [];
   for (const setName of guessSets) {
     let status: TokenStatus = 'different';
     if (targetSets.includes(setName)) status = 'match';
-    else if (targetGroups.has(_COLOR_GROUPS[setColorFamily(setName)] ?? 'neutral')) {
-      status = 'near';
-    }
+    else if ([...(memberGroups[setName] ?? [])].some(g => targetGroups.has(g))) status = 'near';
     result.push({
       set: setName,
       status,
       has_image: true,
-      whiten: _COLOR_GROUPS[setColorFamily(setName)] === (_STATUS_BG_GROUP[status] ?? 'neutral'),
+      whiten: false,
     });
   }
   return result;
@@ -208,15 +160,16 @@ function compareDropLocations(
   targetLocs: string[],
   guessLocs: string[],
 ): Array<{ loc: string; status: TokenStatus }> {
+  const memberGroups = buildDivideMemberGroups();
   const targetGroups = new Set<string>();
   for (const loc of targetLocs) {
-    for (const g of DROP_LOCATION_GROUPS[loc] ?? []) targetGroups.add(g);
+    for (const g of memberGroups[loc] ?? []) targetGroups.add(g);
   }
   const result: Array<{ loc: string; status: TokenStatus }> = [];
   for (const loc of guessLocs) {
     let status: TokenStatus = 'different';
     if (targetLocs.includes(loc)) status = 'match';
-    else if ((DROP_LOCATION_GROUPS[loc] ?? []).some(g => targetGroups.has(g))) status = 'near';
+    else if ([...(memberGroups[loc] ?? [])].some(g => targetGroups.has(g))) status = 'near';
     result.push({ loc, status });
   }
   return result;

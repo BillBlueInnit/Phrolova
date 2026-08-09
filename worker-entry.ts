@@ -42,8 +42,8 @@ type Bindings = {
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Token, Authorization',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Token, Authorization, X-Player-Id, X-Player-Token',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
 };
 
 // ────────────────────────────────────────────────────────────────────
@@ -102,17 +102,47 @@ function handleWs(request: Request, env: Bindings, url: URL): Response | Promise
   }
 
   const isUpgrade = request.headers.get('Upgrade') === 'websocket';
-  const playerId = url.searchParams.get('playerId') || '';
-  const token = url.searchParams.get('token') || '';
+  // 玩家鉴权优先 URL query；query 缺失时尝试从 Sec-WebSocket-Protocol 解析
+  //   格式：x-pid.<base64url(playerId)> 和 x-tok.<base64url(token)> 两个子协议
+  //   解析成功后：从 header 中剥离自定义子协议 forward，避免 DO 未回子协议导致浏览器 1002 关闭
+  let playerId = url.searchParams.get('playerId') || '';
+  let token = url.searchParams.get('token') || '';
+  let strippedRequest = request;
+  if (!playerId || !token) {
+    const protoHeader = request.headers.get('Sec-WebSocket-Protocol') || '';
+    const protos = protoHeader.split(',').map(s => s.trim()).filter(Boolean);
+    let decodedPid = '';
+    let decodedTok = '';
+    const keepProtos: string[] = [];
+    for (const p of protos) {
+      if (p.startsWith('x-pid.')) {
+        try { decodedPid = atob(p.slice('x-pid.'.length)); } catch { decodedPid = ''; }
+      } else if (p.startsWith('x-tok.')) {
+        try { decodedTok = atob(p.slice('x-tok.'.length)); } catch { decodedTok = ''; }
+      } else {
+        keepProtos.push(p);
+      }
+    }
+    if (!playerId && decodedPid) playerId = decodedPid;
+    if (!token && decodedTok) token = decodedTok;
+    // 剥离自定义子协议（forward 时 DO 不再处理，避免浏览器因子协议不匹配关闭）
+    const headers = new Headers(request.headers);
+    if (keepProtos.length) headers.set('Sec-WebSocket-Protocol', keepProtos.join(', '));
+    else headers.delete('Sec-WebSocket-Protocol');
+    strippedRequest = new Request(request, { headers });
+    // 把解析出的参数塞回 url.searchParams，后续 routeWs 以及 DO fetch 用 URL query 的能直接读到
+    if (playerId) url.searchParams.set('playerId', playerId);
+    if (token) url.searchParams.set('token', token);
+  }
 
   if (isUpgrade) {
     if (!playerId || !token) {
       return new Response(
-        JSON.stringify({ error: '缺少 playerId 或 token 参数' }),
-        { status: 401, headers: { 'Content-Type': 'application/json', ...CORS_HEADERS } },
+        JSON.stringify({ status: 'error', message: '缺少 playerId 或 token 参数', error_code: 'AUTH_REQUIRED' }),
+        { status: 401, headers: { 'Content-Type': 'application/json; charset=utf-8', ...CORS_HEADERS } },
       );
     }
-    return routeWs(request, env, url);
+    return routeWs(strippedRequest, env, url);
   }
 
   return routeHttp(request, env, url);

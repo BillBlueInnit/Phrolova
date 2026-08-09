@@ -2,7 +2,7 @@
 import { computed, onMounted, reactive, ref, shallowRef } from "vue";
 import { Icon } from "@iconify/vue";
 import AdminShell from "@/components/admin/AdminShell.vue";
-import { useAdmin, handleAdminApiError } from "@/composables/useAdmin";
+import { useAdmin } from "@/composables/useAdmin";
 import {
   adminFetchAcknowledgements,
   adminAddAcknowledgement,
@@ -10,8 +10,11 @@ import {
   adminDeleteAcknowledgement,
   type AcknowledgementItem,
 } from "@/api";
+import { errMsg as apiErrMsg } from "@/api/client";
 
-const { adminHeaders } = useAdmin();
+// 管理员 token 注入现在由 client.ts 请求拦截器统一处理（根据 hasAdminHint）
+// useAdmin 仅用于登录态展示 / 登出
+useAdmin();
 
 const loading = ref(false);
 const saving = ref(false);
@@ -77,13 +80,14 @@ async function commitEdit() {
     } else {
       payload[e.field] = e.value.trim();
     }
-    await adminUpdateAcknowledgement(adminHeaders(), e.id, payload);
+    // 过渡期：adminUpdateAcknowledgement 已改为直接用拦截器注入，不再传 headers
+    await adminUpdateAcknowledgement(e.id, payload);
     await loadList();
     editing.value = null;
   } catch (err) {
-    if (!handleAdminApiError(err)) {
-      errorMsg.value = err instanceof Error ? err.message : "更新失败";
-    }
+    // 管理员 401 已由 client.ts 拦截器统一处理（清 token + 跳登录页），
+    //   此处仅展示剩余业务错误即可
+    errorMsg.value = apiErrMsg(err) || "更新失败";
   } finally {
     saving.value = false;
   }
@@ -99,12 +103,10 @@ async function loadList() {
   loading.value = true;
   errorMsg.value = "";
   try {
-    const data = await adminFetchAcknowledgements(adminHeaders());
+    const data = await adminFetchAcknowledgements();
     list.value = data.list ?? [];
   } catch (err) {
-    if (!handleAdminApiError(err)) {
-      errorMsg.value = err instanceof Error ? err.message : "加载失败";
-    }
+    errorMsg.value = apiErrMsg(err) || "加载失败";
   } finally {
     loading.value = false;
   }
@@ -118,7 +120,7 @@ async function doAdd() {
   saving.value = true;
   errorMsg.value = "";
   try {
-    await adminAddAcknowledgement(adminHeaders(), {
+    await adminAddAcknowledgement({
       player_id: addForm.player_id.trim(),
       category: addForm.category,
       description: addForm.description.trim(),
@@ -128,9 +130,7 @@ async function doAdd() {
     showAddForm.value = false;
     await loadList();
   } catch (err) {
-    if (!handleAdminApiError(err)) {
-      errorMsg.value = err instanceof Error ? err.message : "添加失败";
-    }
+    errorMsg.value = apiErrMsg(err) || "添加失败";
   } finally {
     saving.value = false;
   }
@@ -141,12 +141,10 @@ async function doDelete(row: AcknowledgementItem) {
   saving.value = true;
   errorMsg.value = "";
   try {
-    await adminDeleteAcknowledgement(adminHeaders(), row.id);
+    await adminDeleteAcknowledgement(row.id);
     await loadList();
   } catch (err) {
-    if (!handleAdminApiError(err)) {
-      errorMsg.value = err instanceof Error ? err.message : "删除失败";
-    }
+    errorMsg.value = apiErrMsg(err) || "删除失败";
   } finally {
     saving.value = false;
   }
@@ -178,49 +176,45 @@ onMounted(loadList);
     </section>
 
     <!-- Add form -->
-    <section v-if="showAddForm" class="ad-card">
-      <h3 class="ad-card-title"><Icon icon="ph:plus-circle-duotone" /> 新增致谢条目</h3>
+    <section class="ad-card" v-if="showAddForm">
+      <h3 class="ad-card-title"><Icon icon="ph:plus-circle-duotone" class="ad-card-icon" /> 新增致谢记录</h3>
       <div class="ad-form-grid">
-        <label class="ad-form-field">
-          <span class="ad-form-label">玩家 ID <em>*</em></span>
-          <input v-model="addForm.player_id" class="ad-form-input" type="text" placeholder="输入玩家ID" maxlength="64" />
+        <label class="ad-field">
+          <span class="ad-field-label">玩家 ID</span>
+          <input v-model="addForm.player_id" class="form-input" type="text" placeholder="如：MoonCC" />
         </label>
-        <label class="ad-form-field">
-          <span class="ad-form-label">类别</span>
-          <select v-model="addForm.category" class="ad-form-input">
+        <label class="ad-field">
+          <span class="ad-field-label">类别</span>
+          <select v-model="addForm.category" class="form-input">
             <option v-for="c in CATEGORY_OPTIONS" :key="c.value" :value="c.value">{{ c.label }}</option>
           </select>
         </label>
-        <label class="ad-form-field ad-form-field--w100">
-          <span class="ad-form-label">描述（可选）</span>
-          <input v-model="addForm.description" class="ad-form-input" type="text" placeholder="例如：报告了XX页面崩溃问题" maxlength="200" />
+        <label class="ad-field">
+          <span class="ad-field-label">描述</span>
+          <textarea v-model="addForm.description" class="form-input" rows="3" placeholder="贡献详情"></textarea>
         </label>
-        <label class="ad-form-field">
-          <span class="ad-form-label">排序值</span>
-          <input v-model.number="addForm.sort_order" class="ad-form-input" type="number" placeholder="0" />
+        <label class="ad-field">
+          <span class="ad-field-label">排序 (sort_order)</span>
+          <input v-model.number="addForm.sort_order" class="form-input" type="number" />
         </label>
       </div>
-      <div class="ad-btn-row">
-        <button class="btn btn-accent" :disabled="saving" @click="doAdd">
+      <div class="ad-btn-row" style="margin-top: 16px; justify-content: flex-end;">
+        <button class="btn-ghost" :disabled="saving" @click="resetAddForm(); showAddForm = false">取消</button>
+        <button class="btn btn-accent" :disabled="saving || !addForm.player_id.trim()" @click="doAdd">
           <Icon v-if="saving" icon="ph:spinner-gap-bold" class="ph-spin" />
-          {{ saving ? "提交中..." : "确认添加" }}
+          {{ saving ? "提交中..." : "提交" }}
         </button>
-        <button class="btn-ghost" @click="showAddForm = false; resetAddForm()">取消</button>
       </div>
     </section>
 
     <!-- List -->
-    <section v-if="!loading" class="ad-card">
-      <div v-if="errorMsg" class="ad-error">{{ errorMsg }}</div>
-      <h3 class="ad-card-title">
-        列表 — 共 {{ totalCount }} 条
-        <span class="ad-sub-hint">（点击单元格编辑）</span>
-      </h3>
-
-      <div v-if="!list.length" class="ad-empty">暂无数据，点击「新增条目」添加</div>
-
-      <div v-else class="ad-table-wrap">
-        <table class="ad-table">
+    <section class="ad-card">
+      <div class="ad-list-head">
+        <h3 class="ad-card-title" style="margin:0"><Icon icon="ph:list-bullets-duotone" class="ad-card-icon" /> 全部记录 ({{ totalCount }})</h3>
+      </div>
+      <StatusBanner v-if="errorMsg" :message="errorMsg" tone="error" style="margin-bottom: 12px;" />
+      <div class="ad-list-table-wrap">
+        <table class="ad-list-table" v-if="list.length">
           <thead>
             <tr>
               <th>ID</th>
@@ -228,110 +222,69 @@ onMounted(loadList);
               <th>类别</th>
               <th>描述</th>
               <th>排序</th>
+              <th>创建时间</th>
               <th>操作</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="row in list" :key="row.id">
-              <td class="ad-td-mono">#{{ row.id }}</td>
-
-              <!-- player_id -->
-              <td
-                class="ad-td-val"
-                :class="{ 'ad-td-editing': editing?.id === row.id && editing.field === 'player_id' }"
-                @click.stop="!editing ? startEdit(row, 'player_id') : null"
-              >
+              <td>{{ row.id }}</td>
+              <td>
                 <template v-if="editing?.id === row.id && editing.field === 'player_id'">
-                  <input
-                    :ref="(el) => { editInputEl = el as HTMLInputElement | null; }"
-                    class="ad-edit-input"
-                    type="text"
-                    :value="editing.value"
-                    maxlength="64"
-                    @input="(e) => { editing!.value = (e.target as HTMLInputElement).value; }"
-                    @blur="commitEdit"
-                    @keydown="onEditKey"
-                    @click.stop
-                  />
+                  <input ref="(el: any) => { if (el) editInputEl = el as any }" v-model="editing.value!.value"
+                    class="form-input" @keydown="onEditKey" />
                 </template>
-                <template v-else>{{ row.player_id }}</template>
+                <template v-else>
+                  <span class="ad-cell-edit" @dblclick="startEdit(row, 'player_id')">{{ row.player_id }}</span>
+                </template>
               </td>
-
-              <!-- category -->
-              <td
-                class="ad-td-val"
-                :class="{ 'ad-td-editing': editing?.id === row.id && editing.field === 'category' }"
-                @click.stop="!editing ? startEdit(row, 'category') : null"
-              >
+              <td>
                 <template v-if="editing?.id === row.id && editing.field === 'category'">
-                  <select
-                    :ref="(el) => { editInputEl = el as HTMLSelectElement | null; }"
-                    class="ad-edit-input"
-                    :value="editing.value"
-                    @change="(e) => { editing!.value = (e.target as HTMLSelectElement).value; commitEdit(); }"
-                    @click.stop
-                  >
+                  <select ref="(el: any) => { if (el) editInputEl = el as any }" v-model="editing.value!.value"
+                    class="form-input" @keydown="onEditKey">
                     <option v-for="c in CATEGORY_OPTIONS" :key="c.value" :value="c.value">{{ c.label }}</option>
                   </select>
                 </template>
-                <template v-else>{{ categoryLabel(row.category) }}</template>
+                <template v-else>
+                  <span class="ad-cell-edit" @dblclick="startEdit(row, 'category')">{{ categoryLabel(row.category) }}</span>
+                </template>
               </td>
-
-              <!-- description -->
-              <td
-                class="ad-td-val ad-td-desc"
-                :class="{ 'ad-td-editing': editing?.id === row.id && editing.field === 'description' }"
-                @click.stop="!editing ? startEdit(row, 'description') : null"
-              >
+              <td>
                 <template v-if="editing?.id === row.id && editing.field === 'description'">
-                  <input
-                    :ref="(el) => { editInputEl = el as HTMLInputElement | null; }"
-                    class="ad-edit-input"
-                    type="text"
-                    :value="editing.value"
-                    maxlength="200"
-                    @input="(e) => { editing!.value = (e.target as HTMLInputElement).value; }"
-                    @blur="commitEdit"
-                    @keydown="onEditKey"
-                    @click.stop
-                  />
+                  <textarea ref="(el: any) => { if (el) editInputEl = el as any }" v-model="editing.value!.value"
+                    class="form-input" rows="2" @keydown="onEditKey"></textarea>
                 </template>
                 <template v-else>
-                  <template v-if="row.description">{{ row.description }}</template>
-                  <span v-else class="ad-td-empty">—</span>
+                  <span class="ad-cell-edit ad-cell-desc" @dblclick="startEdit(row, 'description')">{{ row.description }}</span>
                 </template>
               </td>
-
-              <!-- sort_order -->
-              <td
-                class="ad-td-val ad-td-num"
-                :class="{ 'ad-td-editing': editing?.id === row.id && editing.field === 'sort_order' }"
-                @click.stop="!editing ? startEdit(row, 'sort_order') : null"
-              >
+              <td>
                 <template v-if="editing?.id === row.id && editing.field === 'sort_order'">
-                  <input
-                    :ref="(el) => { editInputEl = el as HTMLInputElement | null; }"
-                    class="ad-edit-input ad-edit-input--num"
-                    type="number"
-                    :value="editing.value"
-                    @input="(e) => { editing!.value = (e.target as HTMLInputElement).value; }"
-                    @blur="commitEdit"
-                    @keydown="onEditKey"
-                    @click.stop
-                  />
+                  <input ref="(el: any) => { if (el) editInputEl = el as any }" v-model="editing.value!.value"
+                    type="number" class="form-input" @keydown="onEditKey" />
                 </template>
-                <template v-else>{{ row.sort_order }}</template>
+                <template v-else>
+                  <span class="ad-cell-edit" @dblclick="startEdit(row, 'sort_order')">{{ row.sort_order }}</span>
+                </template>
               </td>
-
-              <!-- actions -->
-              <td class="ad-td-actions">
-                <button class="ad-del-btn" :disabled="saving" @click.stop="doDelete(row)">
-                  <Icon icon="ph:trash-duotone" />
-                </button>
+              <td>{{ row.created_at ? new Date(row.created_at).toLocaleString() : '—' }}</td>
+              <td class="ad-actions-col">
+                <template v-if="editing?.id === row.id">
+                  <button class="btn btn-accent btn-sm" :disabled="saving" @click="commitEdit">
+                    <Icon v-if="saving" icon="ph:spinner-gap-bold" class="ph-spin" />
+                    保存
+                  </button>
+                  <button class="btn-ghost btn-sm" @click="cancelEdit">取消</button>
+                </template>
+                <template v-else>
+                  <button class="btn-ghost btn-sm danger" :disabled="saving" @click="doDelete(row)">删除</button>
+                </template>
               </td>
             </tr>
           </tbody>
         </table>
+        <div v-else-if="!loading" class="ad-empty">暂无记录，点击「新增条目」开始添加。</div>
+        <div v-else class="ad-empty">加载中...</div>
       </div>
     </section>
   </AdminShell>

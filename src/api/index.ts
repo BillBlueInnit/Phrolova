@@ -8,6 +8,8 @@ export {
   logout,
   fetchScryptParams,
   upgradePassword,
+  refreshSession,
+  me,
 } from "./auth";
 export type { LoginPayload, RegisterPayload, UpdatePlayerIdPayload, ScryptParams, UpgradePasswordPayload } from "./auth";
 

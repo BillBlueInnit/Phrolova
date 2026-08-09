@@ -6,6 +6,7 @@ import GlassHeader from "@/components/shared/GlassHeader.vue";
 import StatusBanner from "@/components/shared/StatusBanner.vue";
 import { useAuthStore } from "@/stores/auth";
 import { useMultiGameStore } from "@/stores/multiGame";
+import { errMsg } from "@/api/client";
 
 const authStore = useAuthStore();
 const multiGameStore = useMultiGameStore();
@@ -19,7 +20,7 @@ if (!authStore.isAuthenticated) {
 }
 
 const winRate = computed(() => {
-  if (!authStore.stats.matches) return 0;
+  if (!authStore.stats.matches) return null;
   return Math.round((authStore.stats.wins / authStore.stats.matches) * 100);
 });
 
@@ -31,7 +32,7 @@ async function savePlayerId() {
     await authStore.updatePlayerId(form.newPlayerId.trim());
     form.newPlayerId = "";
   } catch (reason) {
-    localError.value = reason instanceof Error ? reason.message : "修改 ID 失败";
+    localError.value = errMsg(reason) || "修改 ID 失败";
   }
 }
 
@@ -68,7 +69,7 @@ function logout() {
             </div>
             <div class="ap-stat ap-stat--accent">
               <Icon icon="ph:trophy-duotone" class="ap-stat-icon" />
-              <span class="ap-stat-value">{{ winRate }}%</span>
+              <span class="ap-stat-value">{{ winRate !== null ? winRate + '%' : '-' }}</span>
               <span class="ap-stat-label">胜率</span>
             </div>
             <div class="ap-stat">

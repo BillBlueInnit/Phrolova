@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, shallowRef, useTemplateRef } from "vue";
+import { computed, shallowRef, useTemplateRef, watch } from "vue";
 import { getCharacterAvatar, getSkeletonAvatar } from "@/utils/game";
 import type { QuizType } from "@/types/game";
 
@@ -23,6 +23,14 @@ const suggestions = computed(() => {
   if (!keyword) return [];
   return props.names
     .filter((item) => item.name.toLowerCase().includes(keyword));
+});
+
+watch(suggestions, () => {
+  if (suggestions.value.length > 0) {
+    activeIndex.value = 0;
+  } else {
+    activeIndex.value = -1;
+  }
 });
 
 /** 根据当前输入计算最终要提交的名称：优先用激活项，否则用第一个补全，否则直接用输入内容。 */

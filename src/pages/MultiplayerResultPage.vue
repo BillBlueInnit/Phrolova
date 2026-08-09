@@ -5,6 +5,7 @@ import { Icon } from "@iconify/vue";
 import GuessTable from "@/components/game/GuessTable.vue";
 import { readLocalStorage, removeLocalStorage } from "@/composables/useStorage";
 import type { MultiplayerRoomState } from "@/types";
+import { useMultiGameStore } from "@/stores/multiGame";
 
 const router = useRouter();
 const roomState = ref<MultiplayerRoomState | null>(null);
@@ -56,13 +57,11 @@ const resultIcon = computed(() => {
   return "ph:hand-waving-duotone";
 });
 
-function backToRoom() {
+function leaveRoom() {
   removeLocalStorage("phrolova_match_result");
-  router.push({ name: "multi-room" });
-}
-
-function backToLobby() {
-  removeLocalStorage("phrolova_match_result");
+  // 如果还在房间中，发送退出房间消息
+  const multiGameStore = useMultiGameStore();
+  multiGameStore.leaveRoom().catch(() => undefined);
   router.push({ name: "multi-lobby" });
 }
 </script>
@@ -75,8 +74,7 @@ function backToLobby() {
       <p v-if="matchScoreText" class="mrp-score">{{ matchScoreText }}</p>
       <p class="mrp-sub">第 {{ roomState.round }} 局 · {{ roomState.quizType === "skeleton" ? "声骸" : "共鸣者" }}模式</p>
       <div class="mrp-back-row">
-        <button class="mrp-back" @click="backToRoom">返回房间</button>
-        <button class="mrp-back mrp-back--ghost" @click="backToLobby">返回大厅</button>
+        <button class="mrp-back mrp-back--danger" @click="leaveRoom">退出房间</button>
       </div>
     </header>
 

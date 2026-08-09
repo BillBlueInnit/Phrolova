@@ -129,7 +129,7 @@ export interface LeaderboardRow {
   single_skeleton_score?: number;
   wins: number;
   matches: number;
-  win_rate: number;
+  win_rate: number | null;
 }
 
 export interface LeaderboardResponse extends ApiStatusResponse {
@@ -189,4 +189,6 @@ export interface MultiplayerRoomState {
       guesses: GuessHistoryRow[];
     }>;
   }>;
+  // 游戏结束后已主动退出房间的玩家 ID（供前端判断对手是否已离开）
+  exitedPlayers?: string[];
 }

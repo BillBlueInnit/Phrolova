@@ -7,8 +7,8 @@ import ModalOverlay from "@/components/shared/ModalOverlay.vue";
 import { useAuthStore } from "@/stores/auth";
 import { useMultiGameStore } from "@/stores/multiGame";
 import type { CaptchaResponse } from "@/types";
-import { apiPath, requestJson, ApiError } from "@/utils/http";
-import { fetchScryptParams } from "@/api";
+import { errMsg } from "@/api/client";
+import { fetchCaptcha, fetchScryptParams } from "@/api";
 import { computeScryptHex } from "@/lib/scrypt-client";
 
 const route = useRoute();
@@ -126,7 +126,7 @@ const menuItems = [
 ] as const;
 
 async function loadCaptcha() {
-  const data = await requestJson<CaptchaResponse>(apiPath("/auth/captcha"));
+  const data = await fetchCaptcha();
   captchaImage.value = data.image || "";
   captchaId.value = data.captcha_id || "";
 }
@@ -147,7 +147,9 @@ async function submitAuth() {
     }
     closeAuthModal();
   } catch (reason) {
-    if (reason instanceof ApiError && reason.status === 426 && reason.errorCode === 'SCRYPT_UNAVAILABLE') {
+    const errCode = String((reason as any)?.error_code ?? (reason as any)?.response?.data?.error_code ?? "");
+    const httpStatus = (reason as any)?.response?.status ?? 0;
+    if ((httpStatus === 426 || httpStatus === 400) && errCode === 'SCRYPT_UNAVAILABLE') {
       resetMode.value = true;
       resetForm.oldPassword = "";
       resetForm.newPassword = "";
@@ -157,7 +159,7 @@ async function submitAuth() {
       loadCaptcha().catch(() => { /* ignore */ });
       return;
     }
-    localError.value = reason instanceof Error ? reason.message : "账号操作失败";
+    localError.value = errMsg(reason) || "账号操作失败";
     await loadCaptcha();
     form.captchaText = "";
   }
@@ -196,7 +198,7 @@ async function submitResetPassword() {
     });
     closeAuthModal();
   } catch (reason) {
-    localError.value = reason instanceof Error ? reason.message : "密码升级失败";
+    localError.value = errMsg(reason) || "密码升级失败";
     await loadCaptcha();
     resetForm.captchaText = "";
   } finally {
@@ -239,7 +241,7 @@ onMounted(async () => {
     }
   } catch { /* ignore */ }
 
-  await authStore.hydrate();
+  // hydrate() 已由 App.vue 初始化时调用，此处不再重复
   if (authStore.isAuthenticated) {
     await multiGameStore.resumeRoom().catch(() => undefined);
   }

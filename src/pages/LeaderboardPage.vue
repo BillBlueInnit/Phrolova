@@ -107,7 +107,7 @@ onMounted(loadLeaderboard);
               </div>
               <span class="lb-podium-name">{{ row.player_id }}</span>
               <span class="lb-podium-score">{{ row.sort_score ?? row.score }}</span>
-              <span class="lb-podium-rate">{{ row.win_rate ?? 100 }}%</span>
+              <span class="lb-podium-rate">{{ row.win_rate !== null && row.win_rate !== undefined ? row.win_rate + '%' : '-' }}</span>
             </div>
           </div>
 
@@ -116,7 +116,7 @@ onMounted(loadLeaderboard);
               <span class="lb-row-rank">{{ row.rank ?? (showPodium ? index + 4 : (page - 1) * PAGE_SIZE + index + 1) }}</span>
               <span class="lb-row-name">{{ row.player_id }}</span>
               <span class="lb-row-score">{{ row.sort_score ?? row.score }}</span>
-              <span class="lb-row-rate">{{ row.win_rate ?? 100 }}%</span>
+              <span class="lb-row-rate">{{ row.win_rate !== null && row.win_rate !== undefined ? row.win_rate + '%' : '-' }}</span>
             </div>
           </div>
         </template>

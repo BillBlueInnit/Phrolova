@@ -88,6 +88,8 @@ export interface RoomState {
       guesses: Array<{ revealed: boolean; guess: Record<string, unknown>; compare: Record<string, unknown> }>;
     }>;
   }>;
+  // 游戏结束后已主动退出房间的玩家 ID（供前端判断对手是否已离开）
+  exitedPlayers: string[];
 }
 
 // ── 消息工具 ──

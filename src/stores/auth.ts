@@ -1,9 +1,11 @@
-import { computed, reactive, shallowRef } from "vue";
+import { computed, reactive, shallowRef, watch } from "vue";
 import { defineStore } from "pinia";
 
 import { useLocalStorage, removeLocalStorage } from "@/composables/useStorage";
 import type { AuthResponse } from "@/types";
 import * as api from "@/api";
+import { markAuthenticated, clearAuthenticated } from "@/api/authSession";
+import { errMsg } from "@/api/client";
 
 export const useAuthStore = defineStore("auth", () => {
   const playerId = useLocalStorage("phrolova_player_id", "");
@@ -21,6 +23,38 @@ export const useAuthStore = defineStore("auth", () => {
   });
 
   const isAuthenticated = computed(() => loggedIn.value && Boolean(playerId.value) && Boolean(token.value));
+
+  // ── 跟 authSession hint 对齐（用户/拦截器 refresh 成功后都保持 hint 同步） ──
+  //   playerId/token 是 useLocalStorage，watch 响应式变化：是 refresh 写回、login、logout 导致。
+  watch(
+    () => ({ pid: playerId.value, tok: token.value }),
+    ({ pid, tok }) => {
+      if (pid && tok) markAuthenticated();
+      else clearAuthenticated();
+    },
+    { immediate: true },
+  );
+
+  // 订阅 authSession 广播的 refresh/init 结果（解决循环依赖 authSession 不能直接 import store）
+  if (typeof window !== 'undefined') {
+    try {
+      window.addEventListener('phrolova:session-refreshed', ((ev: Event) => {
+        const detail = (ev as CustomEvent<{ player?: AuthResponse['player']; token?: string }>).detail ?? {};
+        if (detail.player) applyPlayer(detail.player);
+        if (detail.token) token.value = detail.token;
+      }) as EventListener);
+      window.addEventListener('phrolova:session-cleared', () => {
+        clearSession();
+      });
+      window.addEventListener('phrolova:session-identity', ((ev: Event) => {
+        const detail = (ev as CustomEvent<{ player?: AuthResponse['player'] }>).detail ?? {};
+        if (detail.player) applyPlayer(detail.player);
+      }) as EventListener);
+      window.addEventListener('phrolova:session-initialized', () => {
+        // initializeIdentity 结束，给 hydrate 兜底（若此时仍未加载 player 信息但 hasAuthHint，则按现有 strategy 不做操作）
+      });
+    } catch { /* ignore */ }
+  }
 
   function applyPlayer(player?: AuthResponse["player"]) {
     if (!player) return;
@@ -44,28 +78,43 @@ export const useAuthStore = defineStore("auth", () => {
     removeLocalStorage("phrolova_player_id");
     removeLocalStorage("phrolova_player_token");
     removeLocalStorage("phrolova_logged_in");
+    _hydrated = false;
+    // 让 refresh/socket 侧感知到清态（已由 watch 同步 clearAuthenticated，这里双保险）
+    clearAuthenticated();
   }
 
   async function refreshPlayer() {
     if (!loggedIn.value || !playerId.value) return;
-    const data = await api.initPlayer(playerId.value);
+    const data = await api.me();
     applyPlayer(data.player);
-    if (data.token) {
-      token.value = data.token;
-    }
   }
+
+  let _hydrated = false;
 
   async function hydrate() {
     if (!loggedIn.value || !playerId.value) {
       clearSession();
       return;
     }
+    // 已成功 hydrate 过则不重复调用（App.vue 初始化时已执行一次）
+    if (_hydrated) return;
     try {
       await refreshPlayer();
       error.value = "";
+      _hydrated = true;
     } catch (reason) {
-      clearSession();
-      error.value = reason instanceof Error ? reason.message : "登录态已失效，请重新登录";
+      // 仅认证类错误（401 且 refresh 也失败）才清会话；
+      // 网络/服务器等瞬态错误不清会话，避免用户被迫重新登录
+      const err = reason as { response?: { status?: number }; error_code?: string };
+      const isAuthError = err?.response?.status === 401 ||
+        err?.error_code === 'AUTH_EXPIRED' ||
+        err?.error_code === 'AUTH_REQUIRED';
+      if (isAuthError) {
+        clearSession();
+        error.value = errMsg(reason) || "登录态已失效，请重新登录";
+      } else {
+        error.value = errMsg(reason) || "网络异常，稍后重试";
+      }
     }
   }
 
@@ -79,7 +128,8 @@ export const useAuthStore = defineStore("auth", () => {
       token.value = data.token || "";
       return data;
     } catch (reason) {
-      error.value = reason instanceof Error ? reason.message : "登录失败";
+      const msg = errMsg(reason);
+      error.value = msg || "登录失败";
       throw reason;
     } finally {
       loading.value = false;
@@ -96,7 +146,8 @@ export const useAuthStore = defineStore("auth", () => {
       token.value = data.token || "";
       return data;
     } catch (reason) {
-      error.value = reason instanceof Error ? reason.message : "注册失败";
+      const msg = errMsg(reason);
+      error.value = msg || "注册失败";
       throw reason;
     } finally {
       loading.value = false;
@@ -113,7 +164,8 @@ export const useAuthStore = defineStore("auth", () => {
       token.value = data.token || "";
       return data;
     } catch (reason) {
-      error.value = reason instanceof Error ? reason.message : "密码升级失败";
+      const msg = errMsg(reason);
+      error.value = msg || "密码升级失败";
       throw reason;
     } finally {
       loading.value = false;
@@ -136,7 +188,8 @@ export const useAuthStore = defineStore("auth", () => {
       token.value = data.token || token.value;
       return data;
     } catch (reason) {
-      error.value = reason instanceof Error ? reason.message : "修改 ID 失败";
+      const msg = errMsg(reason);
+      error.value = msg || "修改 ID 失败";
       throw reason;
     } finally {
       loading.value = false;

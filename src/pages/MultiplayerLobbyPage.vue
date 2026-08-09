@@ -10,6 +10,7 @@ import EmptyState from "@/components/shared/EmptyState.vue";
 import { useAuthStore } from "@/stores/auth";
 import { useMultiGameStore } from "@/stores/multiGame";
 import type { Difficulty, QuizType, TabOption } from "@/types";
+import { errMsg } from "@/api/client";
 
 const authStore = useAuthStore();
 const multiGameStore = useMultiGameStore();
@@ -56,14 +57,14 @@ async function createRoom() {
   // 共鸣者模式没有难度区分，统一强制为 'easy'，避免匹配时 difficulty 不同导致无法匹配
   const effectiveDifficulty = config.quizType === "skeleton" ? config.difficulty : "easy";
   try { await multiGameStore.createRoom(config.quizType, config.bestOf, effectiveDifficulty); }
-  catch (reason) { multiGameStore.error = reason instanceof Error ? reason.message : "创建房间失败"; }
+  catch (reason) { multiGameStore.error = errMsg(reason) || "创建房间失败"; }
 }
 
 async function joinRoom() {
   if (!config.roomCode.trim()) return;
   if (multiGameStore.roomState) { promptStillInRoom(); return; }
   try { await multiGameStore.joinRoom(config.roomCode.trim().toUpperCase()); }
-  catch (reason) { multiGameStore.error = reason instanceof Error ? reason.message : "加入房间失败"; }
+  catch (reason) { multiGameStore.error = errMsg(reason) || "加入房间失败"; }
 }
 
 async function randomMatch() {
@@ -72,7 +73,7 @@ async function randomMatch() {
   const effectiveDifficulty = config.quizType === "skeleton" ? config.difficulty : "easy";
   // 按游戏规则文档：随机匹配固定 BO3 赛制
   try { await multiGameStore.joinQueue(config.quizType, effectiveDifficulty, 3); }
-  catch (reason) { multiGameStore.error = reason instanceof Error ? reason.message : "进入匹配队列失败"; }
+  catch (reason) { multiGameStore.error = errMsg(reason) || "进入匹配队列失败"; }
 }
 
 watch(() => multiGameStore.roomState?.roomCode, (roomCode) => {

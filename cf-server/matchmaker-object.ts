@@ -27,8 +27,8 @@ interface MatchmakerWsAttachment {
 }
 
 export class MatchmakerObject extends DurableObject {
-  private state: DurableObjectState;
-  private env: Env;
+  protected state: DurableObjectState;
+  protected env: Env;
   private queue: QueueEntry[] = [];
   private connections: Map<string, WebSocket> = new Map();
   private matchTimer: number | null = null;
@@ -44,7 +44,7 @@ export class MatchmakerObject extends DurableObject {
       const saved = await state.storage.get('matchmaker_state');
       if (saved) {
         try {
-          const data = JSON.parse(saved) as Record<string, unknown>;
+          const data = JSON.parse(saved as string) as Record<string, unknown>;
           if (Array.isArray(data.queue)) {
             // 恢复时：所有 ws 必须置为 null（无法跨 DO 重启），connected 默认 false
             // 注意：恢复时 difficulty 和 bestOf 使用当前协议的默认值（强制 bestOf=3）
@@ -103,16 +103,23 @@ export class MatchmakerObject extends DurableObject {
       const url = new URL(request.url);
       const playerId = url.searchParams.get('playerId') || '';
       const token = url.searchParams.get('token') || '';
+      const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8' };
 
       if (request.headers.get('Upgrade') === 'websocket') {
         if (!playerId || !token) {
-          return new Response('Unauthorized', { status: 401 });
+          return new Response(
+            JSON.stringify({ status: 'error', message: '缺少玩家身份凭证', error_code: 'AUTH_REQUIRED' }),
+            { status: 401, headers: JSON_HEADERS },
+          );
         }
 
         // 验证 token
         const valid = await this.verifyToken(playerId, token);
         if (!valid) {
-          return new Response('Forbidden', { status: 403 });
+          return new Response(
+            JSON.stringify({ status: 'error', message: '玩家身份校验失败或已过期，请重新登录', error_code: 'AUTH_EXPIRED' }),
+            { status: 401, headers: JSON_HEADERS },
+          );
         }
 
         // 创建 WebSocket 对

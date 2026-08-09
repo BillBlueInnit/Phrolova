@@ -1,12 +1,12 @@
 import type { LeaderboardResponse, QuizType } from "@/types/game";
-import { apiPath, requestJson } from "./http";
+import { api } from "./client";
 
 export function fetchLeaderboard(playerId?: string, mode = "multi", quizType?: QuizType, page = 1, pageSize = 20) {
-  const params = new URLSearchParams();
-  if (playerId) params.set("player_id", playerId);
-  params.set("mode", mode);
-  if (quizType) params.set("type", quizType);
-  params.set("page", String(page));
-  params.set("page_size", String(pageSize));
-  return requestJson<LeaderboardResponse>(`${apiPath("/leaderboard")}?${params.toString()}`);
+  const params: Record<string, string> = {};
+  if (playerId) params.player_id = playerId;
+  params.mode = mode;
+  if (quizType) params.type = quizType;
+  params.page = String(page);
+  params.page_size = String(pageSize);
+  return api.get<LeaderboardResponse>("/leaderboard", { params }) as Promise<LeaderboardResponse>;
 }

@@ -5,153 +5,20 @@ import type { Difficulty, MultiplayerRoomState, QuizType } from "@/types/game";
 import { C2S, S2C } from "@/api";
 import { generateRoomCode } from "@/multiplayer/protocol";
 import { useAuthStore } from "./auth";
+import {
+  GameWebSocket,
+  getGameSocket,
+  releaseGameSocket,
+  closeGameSocketAll,
+  tryRecoverOnWsError,
+} from "@/api/socket";
 
 type ConnectionState = "idle" | "connecting" | "connected" | "error";
 
-// ── WebSocket 客户端封装 ──
-class GameWebSocket {
-  private ws: WebSocket | null = null;
-  private url: string;
-  private playerId: string;
-  private token: string;
-  private reconnectAttempts = 0;
-  private maxReconnectAttempts = 50;
-  private reconnectDelay = 1000;
-  private intentionalClose = false;
-
-  onMessage: ((data: { type: string; payload: Record<string, unknown> }) => void) | null = null;
-  onOpen: (() => void) | null = null;
-  onClose: (() => void) | null = null;
-  onError: ((error: Event) => void) | null = null;
-
-  constructor(baseUrl: string, playerId: string, token: string) {
-    this.url = baseUrl;
-    this.playerId = playerId;
-    this.token = token;
-  }
-
-  connect(path: string = ""): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (this.ws?.readyState === WebSocket.OPEN) {
-        resolve();
-        return;
-      }
-
-      this.intentionalClose = false;
-      const fullUrl = this.buildUrl(path);
-      let didOpen = false;
-      let settled = false;
-
-      // 连接超时保护：10 秒未建立连接则中止
-      const timeoutId = setTimeout(() => {
-        if (!settled) {
-          settled = true;
-          this.intentionalClose = true;
-          try { this.ws?.close(); } catch { /* ignore */ }
-          reject(new Error("连接超时，请重试"));
-        }
-      }, 10000);
-
-      try {
-        this.ws = new WebSocket(fullUrl);
-      } catch (e) {
-        clearTimeout(timeoutId);
-        reject(e);
-        return;
-      }
-
-      this.ws.onopen = () => {
-        if (settled) return;
-        clearTimeout(timeoutId);
-        didOpen = true;
-        this.reconnectAttempts = 0;
-        this.onOpen?.();
-        resolve();
-      };
-
-      this.ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data as string);
-          if (data?.type) {
-            this.onMessage?.(data);
-          }
-        } catch {
-          // 忽略非 JSON 消息
-        }
-      };
-
-      this.ws.onerror = (event) => {
-        // 错误发生，通知上层但不立即 reject
-        // 等 onclose 后再判断连接状态
-        this.onError?.(event);
-      };
-
-      this.ws.onclose = () => {
-        clearTimeout(timeoutId);
-        this.onClose?.();
-
-        // 如果连接从未成功打开，报告连接错误
-        if (!didOpen) {
-          if (!settled) {
-            settled = true;
-            reject(new Error("WebSocket 连接失败，请检查网络或服务状态"));
-          }
-          return;
-        }
-
-        // 连接曾成功打开，处理重连逻辑
-        if (!this.intentionalClose && this.reconnectAttempts < this.maxReconnectAttempts) {
-          this.reconnectAttempts++;
-          const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
-          setTimeout(() => {
-            // 静默重连：重连的 Promise 独立处理
-            this.connect(path).catch(() => {
-              // 重连失败，由上层状态管理处理
-            });
-          }, delay);
-        }
-      };
-    });
-  }
-
-  private buildUrl(path: string): string {
-    const params = new URLSearchParams({
-      playerId: this.playerId,
-      token: this.token,
-    });
-    return `${this.url}${path}?${params.toString()}`;
-  }
-
-  send(type: string, payload: unknown = {}): void {
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ type, payload }));
-    }
-  }
-
-  disconnect(): void {
-    this.intentionalClose = true;
-    if (this.ws) {
-      this.ws.onclose = null;
-      this.ws.onerror = null;
-      this.ws.onmessage = null;
-      this.ws.onopen = null;
-      this.ws.close();
-      this.ws = null;
-    }
-  }
-
-  get connected(): boolean {
-    return this.ws?.readyState === WebSocket.OPEN;
-  }
-
-  updateCredentials(playerId: string, token: string): void {
-    this.playerId = playerId;
-    this.token = token;
-  }
-}
-
 // ── 主 Store ──
 export const useMultiGameStore = defineStore("multiGame", () => {
+  /** 当前活动 path（"/ws/matchmaker" 或 "/ws/room/<code>"），和单例 registry 对齐 */
+  let currentPath: string | null = null;
   let gameWs: GameWebSocket | null = null;
   const connectionState = shallowRef<ConnectionState>("idle");
   const error = shallowRef("");
@@ -195,18 +62,17 @@ export const useMultiGameStore = defineStore("multiGame", () => {
     );
   });
 
-  function getWsBaseUrl(): string {
-    const envBase = import.meta.env.VITE_WS_URL;
-    if (envBase) return envBase;
-    // 开发环境：使用 vite proxy 或本地 worker
-    const dev = import.meta.env.DEV;
-    if (dev) {
-      // 开发时通过 vite proxy 到 wrangler dev server
-      return `ws://${window.location.host}`;
+  /**
+   * 释放上一条 path 的引用计数（切换连接前调用）。
+   *   新的 path 若 == old path，getGameSocket 内部会只 +ref，因此对称 release 不会关闭；
+   *   否则 ref 归零后 registry 条目自动关闭并移除。
+   */
+  function releaseCurrent(): void {
+    if (currentPath) {
+      releaseGameSocket(currentPath);
+      currentPath = null;
+      gameWs = null;
     }
-    // 生产环境：同域 WebSocket
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    return `${protocol}//${window.location.host}`;
   }
 
   function bindEvents() {
@@ -222,14 +88,24 @@ export const useMultiGameStore = defineStore("multiGame", () => {
           infoMessage.value = (payload?.message as string) || "连接已建立";
           break;
 
-        case S2C.ERROR:
-          error.value = (payload?.message as string) || "多人模式发生错误";
+        case S2C.ERROR: {
+          // 先尝试自动处理身份类错误（AUTH_EXPIRED / PLAYER_NOT_FOUND / AUTH_REQUIRED）
+          if (currentPath) {
+            const handled = await tryRecoverOnWsError(currentPath, payload ?? {});
+            if (handled === 'handled') {
+              // 已自动 toast/清态，不再在 error banner 重复显示
+              break;
+            }
+          }
+          const message = (payload?.message as string) || "多人模式发生错误";
+          error.value = message;
           if (_roomStateReject) {
-            _roomStateReject(new Error(error.value));
+            _roomStateReject(new Error(message));
             _roomStateReject = null;
             _roomStateResolve = null;
           }
           break;
+        }
 
         case S2C.MATCHING:
           inQueue.value = (payload?.inQueue as boolean) ?? /匹配队列/.test((payload?.message as string) || "");
@@ -239,7 +115,6 @@ export const useMultiGameStore = defineStore("multiGame", () => {
         case S2C.ROOM_CREATED: {
           infoMessage.value = `房间 ${payload.roomCode} 已创建`;
           inQueue.value = false;
-          // 只有在非 transition 过程中且未在房间中才触发重连（防止无限循环）
           if (!_isTransitioning && !_inRoom) {
             const roomCode = (payload.roomCode as string) || "";
             if (roomCode) {
@@ -265,19 +140,15 @@ export const useMultiGameStore = defineStore("multiGame", () => {
           break;
 
         case S2C.COUNTDOWN_STARTED: {
-          // 如果已在房间中，说明这是 RoomObject 的倒计时广播，仅更新显示
           if (_inRoom || _isTransitioning) {
             infoMessage.value = `倒计时 ${payload.countdownLeft ?? 3} 秒后开局`;
             break;
           }
-          // 首次收到（来自 Matchmaker）：切换到房间 WebSocket
           infoMessage.value = `匹配成功，${payload.countdownLeft ?? 2} 秒后开局`;
           inQueue.value = false;
           _pendingQueue = null;
           const roomCode = (payload.roomCode as string) || "";
           if (roomCode) {
-            // 匹配成功时：必须先设置等待标志，transitionToRoom 内部才会等待 ROOM_STATE
-            // 否则 ROOM_STATE 先到但 promise 没人等，用户会以为匹配没生效
             _waitingForRoomState = true;
             try {
               await transitionToRoom(roomCode, C2S.JOIN_ROOM, {
@@ -300,7 +171,6 @@ export const useMultiGameStore = defineStore("multiGame", () => {
 
         case S2C.ROOM_STATE:
           const rawState = payload as unknown as MultiplayerRoomState;
-          // 为每个玩家添加 isMe 属性（服务端不发送此字段）
           const authStore = useAuthStore();
           const processedState: MultiplayerRoomState = {
             ...rawState,
@@ -319,7 +189,6 @@ export const useMultiGameStore = defineStore("multiGame", () => {
             startHeartbeat();
             saveLastRoomCode(processedState.roomCode);
           }
-          // 解除等待 ROOM_STATE 的 Promise
           if (_waitingForRoomState && _roomStateResolve) {
             _waitingForRoomState = false;
             _isTransitioning = false;
@@ -349,12 +218,10 @@ export const useMultiGameStore = defineStore("multiGame", () => {
               const myIdx = rs.players.findIndex(p => p.isMe);
               const winnerIdx = payload.roundWinner as number | null | undefined;
 
-              // 基于 roundWinner 索引直接判定胜负（最可靠）
               let iWon: boolean | null = null;
               if (winnerIdx === null || winnerIdx === undefined) {
-                iWon = null; // 平局
+                iWon = null;
               } else if (myIdx < 0) {
-                // 找不到自己位置，回退用 roundResult 字符串（players[0] 视角）
                 const resultStr = (payload.roundResult as string) ?? "";
                 if (resultStr === "win") iWon = true;
                 else if (resultStr === "loss") iWon = false;
@@ -363,7 +230,6 @@ export const useMultiGameStore = defineStore("multiGame", () => {
                 iWon = winnerIdx === myIdx;
               }
 
-              // 从 payload.roundWins 取最新的胜负场计数（后端先 ++ 再广播），并映射到我方/对方视角
               const newRoundWins = (payload.roundWins as number[]) ?? [0, 0];
               let myWins: number;
               let oppWins: number;
@@ -392,16 +258,13 @@ export const useMultiGameStore = defineStore("multiGame", () => {
           const rawDelta = (payload.scoreDelta as number) || 0;
           const winner = payload.overallWinner as number | null | undefined;
           const forfeitPid = (payload.forfeitPlayerId as string | null | undefined) ?? null;
-          // 后端发送的是 players[0] 视角的差值；前端修正为“我”的视角
           const rs = roomState.value;
           const myIdx = rs ? rs.players.findIndex(p => p.isMe) : 0;
           const isViewpoint0 = myIdx === 0 || myIdx < 0;
-          // overallWinner === 0 → players[0] 胜，所以非0玩家时scoreDelta必须取反
           let myDelta = isViewpoint0 ? rawDelta : -rawDelta;
           if (winner === null) myDelta = 0;
           matchScoreDelta.value = myDelta;
 
-          // 把 forfeitBy / overallWinner 同步到 roomState；MATCH_FINISHED 可能先于 ROOM_STATE 到达
           if (roomState.value) {
             const s = roomState.value;
             if (forfeitPid) {
@@ -410,10 +273,8 @@ export const useMultiGameStore = defineStore("multiGame", () => {
             if (winner !== undefined) {
               s.overallWinner = winner;
             }
-            // 强制触发响应式更新
             roomState.value = { ...s };
           }
-          // 触发 MATCH_FINISHED 到达信号（供页面 watch 弹窗）
           matchFinishedTrigger.value++;
 
           infoMessage.value =
@@ -429,13 +290,12 @@ export const useMultiGameStore = defineStore("multiGame", () => {
 
         case S2C.OPPONENT_FORFEIT:
           matchScoreDelta.value = (payload.scoreDelta as number) || 0;
-          // 兼容旧协议：OPPONENT_FORFEIT 效果等同于对手弃权的对局结束
           if (roomState.value) {
             const s = roomState.value;
-            const me = s.players.find(p => p.isMe);
-            const opponent = s.players.find(p => !p.isMe);
-            s.forfeitBy = opponent?.playerId ?? null;
-            s.overallWinner = me ? s.players.indexOf(me) : 0;
+            const meP = s.players.find(p => p.isMe);
+            const opponentP = s.players.find(p => !p.isMe);
+            s.forfeitBy = opponentP?.playerId ?? null;
+            s.overallWinner = meP ? s.players.indexOf(meP) : 0;
             s.roomStatus = "finished";
             roomState.value = { ...s };
           }
@@ -450,7 +310,7 @@ export const useMultiGameStore = defineStore("multiGame", () => {
           roomState.value = null;
           inQueue.value = false;
           stopHeartbeat();
-          clearLastRoomCode(); // 房间关闭后也不能再重连
+          clearLastRoomCode();
           break;
 
         case S2C.KICKED:
@@ -461,7 +321,6 @@ export const useMultiGameStore = defineStore("multiGame", () => {
           break;
 
         case S2C.PONG:
-          // 心跳回复，无需处理
           break;
       }
     };
@@ -469,7 +328,6 @@ export const useMultiGameStore = defineStore("multiGame", () => {
     gameWs.onOpen = () => {
       connectionState.value = "connected";
       error.value = "";
-      // 如果之前在匹配队列中，重连后自动重新加入队列
       if (_pendingQueue && !_inRoom) {
         gameWs?.send(C2S.QUEUE_JOIN, _pendingQueue);
       }
@@ -478,8 +336,8 @@ export const useMultiGameStore = defineStore("multiGame", () => {
     gameWs.onClose = () => {
       if (connectionState.value === "connected" || connectionState.value === "connecting") {
         connectionState.value = "idle";
-        error.value = "连接已断开";
-        // 保留 inQueue 状态和 _pendingQueue，等待自动重连后恢复匹配
+        // 仅在 socket 层 toast 没覆盖到时再补充 banner（避免重复报给用户）
+        if (!error.value) error.value = "连接已断开";
         if (!_pendingQueue) {
           inQueue.value = false;
         }
@@ -490,7 +348,6 @@ export const useMultiGameStore = defineStore("multiGame", () => {
 
     gameWs.onError = () => {
       // 错误事件仅通知，具体错误状态由 onClose/onOpen 决定
-      // 避免误报：onerror 可能在连接建立后因网络波动触发
     };
   }
 
@@ -516,44 +373,32 @@ export const useMultiGameStore = defineStore("multiGame", () => {
       throw new Error("请先登录账号，再进入多人模式");
     }
 
-    if (gameWs?.connected) {
-      return gameWs;
-    }
-
-    if (gameWs) {
-      gameWs.disconnect();
-      gameWs = null;
-    }
-
     connectionState.value = "connecting";
-    const baseUrl = getWsBaseUrl();
-
-    gameWs = new GameWebSocket(baseUrl, authStore.playerId, authStore.token);
-    bindEvents();
-
     try {
-      await gameWs.connect(path);
-      return gameWs;
+      const ws = await getGameSocket(path, {
+        /* handlers 占位：bindEvents 在下面会覆盖 onMessage/onOpen/onClose/onError */
+      });
+      // 拿到新 ws 后：更新 release 配对（只有路径变化时才需要 release 旧的）
+      if (currentPath && currentPath !== path) {
+        releaseGameSocket(currentPath);
+      }
+      currentPath = path;
+      gameWs = ws;
+      bindEvents();
+      return ws;
     } catch (e) {
       connectionState.value = "error";
       error.value = e instanceof Error ? e.message : "连接失败";
-      gameWs = null;
       throw e;
     }
   }
 
   async function transitionToRoom(roomCode: string, action: string, payload: Record<string, unknown>): Promise<void> {
     _isTransitioning = true;
-    // 断开当前连接（matchmaker）并重新连接到 room
-    if (gameWs) {
-      gameWs.disconnect();
-      gameWs = null;
-    }
-
+    const roomPath = `/ws/room/${roomCode}`;
     try {
-      const ws = await ensureConnected(`/ws/room/${roomCode}`);
+      const ws = await ensureConnected(roomPath);
       ws.send(action, payload);
-      // 等待首次 ROOM_STATE 到达，确保上层 createRoom / joinQueue 等 Promise 能 resolve
       if (_waitingForRoomState) {
         await waitForRoomState();
       }
@@ -566,7 +411,6 @@ export const useMultiGameStore = defineStore("multiGame", () => {
   }
 
   function waitForRoomState(timeoutMs: number = 15000): Promise<void> {
-    // 若已经有在途的等待 Promise，返回同一个（避免重复覆盖 _roomStateResolve/_roomStateReject）
     if (_waitingForRoomState && _roomStateResolve && _roomStateReject) {
       return new Promise<void>((resolve, reject) => {
         const prevResolve = _roomStateResolve!;
@@ -611,7 +455,6 @@ export const useMultiGameStore = defineStore("multiGame", () => {
   async function resumeRoom(): Promise<void> {
     const authStore = useAuthStore();
     if (!authStore.isAuthenticated) return;
-    // 已在房间中或已经有房间状态：无需重复恢复
     if (_inRoom && roomState.value) return;
     const lastRoomCode = getLastRoomCode();
     if (!lastRoomCode) return;
@@ -621,7 +464,6 @@ export const useMultiGameStore = defineStore("multiGame", () => {
       ws.send(C2S.RESUME_ROOM);
       await waitForRoomState();
     } catch (e) {
-      // 恢复失败（房间过期/服务器错误等）：清理缓存避免反复尝试
       clearLastRoomCode();
       roomState.value = null;
       _waitingForRoomState = false;
@@ -631,10 +473,8 @@ export const useMultiGameStore = defineStore("multiGame", () => {
   }
 
   async function createRoom(quizType: QuizType, bestOf: number, difficulty: Difficulty): Promise<void> {
-    // 优化：前端直接生成 roomCode 并连接 RoomDO，跳过 MatchmakerDO 中转
-    // 省掉一次 WS 连接 + D1 鉴权 + 往返延迟
     _waitingForRoomState = true;
-    _isTransitioning = true; // 阻止 ROOM_CREATED 处理器再次触发 transitionToRoom
+    _isTransitioning = true;
     try {
       const roomCode = generateRoomCode();
       const ws = await ensureConnected(`/ws/room/${roomCode}`);
@@ -688,7 +528,7 @@ export const useMultiGameStore = defineStore("multiGame", () => {
         gameWs.send(C2S.LEAVE_ROOM, { roomCode: roomState.value.roomCode });
       }
     }
-    clearLastRoomCode(); // 必须清理：用户主动退出后刷新页面不能再重连
+    clearLastRoomCode();
     roomState.value = null;
     inQueue.value = false;
     _inRoom = false;
@@ -702,8 +542,11 @@ export const useMultiGameStore = defineStore("multiGame", () => {
 
   function disconnect(): void {
     stopHeartbeat();
-    clearLastRoomCode(); // 用户显式断开也清除缓存，避免意外重连
-    gameWs?.disconnect();
+    clearLastRoomCode();
+    // 释放当前 path 的引用（若 ref>1 则 registry 不会立刻关，引用计数会自行归零）
+    releaseCurrent();
+    closeGameSocketAll();
+    currentPath = null;
     gameWs = null;
     connectionState.value = "idle";
     inQueue.value = false;

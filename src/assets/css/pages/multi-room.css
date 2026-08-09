@@ -9,12 +9,18 @@
 .mr-score-panel { flex-shrink: 0; }
 
 .mr-boards { min-height: 0; display: grid; grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 0.8rem; overflow: hidden; }
+.mr-boards--columns { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: none; }
 .mr-board-panel { display: flex; flex-direction: column; min-height: 0; border: 1px solid var(--line-soft); border-radius: 8px; background: var(--surface-panel); overflow: hidden; }
 .mr-board-head { display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; padding: 0.6rem 0.85rem; border-bottom: 1px solid var(--line-soft); flex-shrink: 0; }
 .mr-board-body { min-height: 0; flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; }
 .mr-board-title { margin: 0; font-size: 0.9rem; font-weight: 900; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.35rem; }
 .mr-board-head-icon { font-size: 1rem; color: var(--gold-soft); }
 .mr-board-meta { color: var(--text-faint); font-size: 0.74rem; }
+
+.stage-head-actions { display: flex; align-items: center; gap: 0.5rem; }
+.mr-layout-toggle { display: inline-flex; align-items: center; gap: 0.32rem; padding: 0.3rem 0.55rem; border: 1px solid var(--line-soft); border-radius: 6px; background: var(--surface-panel); color: var(--text-sub); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; cursor: pointer; transition: border-color 0.2s, color 0.2s, background 0.2s; }
+.mr-layout-toggle:hover { border-color: color-mix(in oklab, var(--gold) 40%, var(--line-soft)); color: var(--gold-soft); background: color-mix(in oklab, var(--gold) 5%, var(--surface-panel)); }
+.mr-layout-toggle .mr-layout-toggle-label { white-space: nowrap; }
 
 .mr-empty-shell { max-width: 480px; margin: 4rem auto 0; }
 
@@ -36,7 +42,11 @@
 @keyframes mrSlideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
 /* ── Responsive ── */
-@media (max-width: 1040px) { .mr-boards { grid-template-rows: repeat(2, minmax(200px, 1fr)); } }
+@media (max-width: 1040px) {
+  .mr-boards,
+  .mr-boards--columns { grid-template-columns: none; grid-template-rows: repeat(2, minmax(200px, 1fr)); }
+  .mr-layout-toggle { display: none; }
+}
 @media (max-width: 720px) {
   .mr-glass-chip { display: none; }
   .mr-info-card { flex-direction: column; align-items: stretch; gap: 0.3rem; padding: 0.3rem 0.5rem; border-left: none; border-right: none; border-radius: 0; }

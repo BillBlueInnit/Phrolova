@@ -10,7 +10,7 @@
 #start-menu::before { content: ""; position: absolute; inset: 0; z-index: 0; background-image: linear-gradient(color-mix(in oklab, var(--gold) 4%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in oklab, var(--gold) 4%, transparent) 1px, transparent 1px); background-size: 48px 48px; mask-image: radial-gradient(ellipse at 30% 50%, black 0%, transparent 70%); -webkit-mask-image: radial-gradient(ellipse at 30% 50%, black 0%, transparent 70%); pointer-events: none; }
 
 .home-stage { position: relative; width: 100%; height: 100%; padding: clamp(1.2rem, 2vw, 1.8rem); }
-.home-portrait { position: absolute; right: 0; bottom: 0; z-index: 1; width: min(52%, 680px); height: 100%; display: flex; align-items: flex-end; justify-content: center; pointer-events: none; animation: homePortraitIn 1.5s ease both; }
+.home-portrait { position: absolute; right: 4%; bottom: 0; z-index: 1; width: min(48%, 640px); height: 100%; display: flex; align-items: flex-end; justify-content: center; pointer-events: none; animation: homePortraitIn 1.5s ease both; }
 @keyframes homePortraitIn { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes homeFloat { from { transform: translateY(0) scale(1); } to { transform: translateY(-18px) scale(1.015); } }
 @keyframes homeImgIn { from { opacity: 0; } to { opacity: 1; } }
@@ -18,7 +18,7 @@
 .home-portrait-inner { display: flex; align-items: flex-end; justify-content: center; height: 100%; animation: homeFloat 4s ease-in-out 1.5s infinite alternate; }
 .home-portrait-inner img { max-height: 100%; max-width: 100%; object-fit: contain; object-position: bottom right; animation: homeImgIn 1.2s ease 0.3s both; }
 
-.menu-container { position: relative; z-index: 2; display: grid; gap: 1.45rem; width: min(34rem, 38%); padding: clamp(1rem, 1.8vw, 1.5rem); }
+.menu-container { position: relative; z-index: 2; display: grid; gap: 1.45rem; width: min(34rem, 36%); padding: clamp(1rem, 1.8vw, 1.5rem); margin-left: 3%; }
 .menu-list { display: flex; flex-direction: column; gap: 1.2rem; padding: 0; margin: 0; list-style: none; }
 .menu-item { position: relative; display: flex; align-items: flex-end; gap: 0.85rem; width: 100%; padding: 0.5rem 0.8rem 0.6rem 0.6rem; border-bottom: 1px solid var(--line-strong); border-radius: 8px 8px 0 0; text-decoration: none; transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), border-color 0.4s ease, background 0.3s ease; }
 .menu-item::before { content: ""; position: absolute; bottom: -1px; left: 0; width: 0; height: 1px; background-color: var(--gold); transition: width 0.4s ease; }
@@ -34,7 +34,7 @@
 .menu-item:hover .cn { color: var(--gold); }
 .menu-item:hover .en { color: var(--gold-soft); }
 
-.home-detail { position: relative; align-self: flex-start; width: min(34rem, 38%); padding: 0 clamp(1rem, 1.8vw, 1.5rem); margin-top: auto; z-index: 4; display: grid; gap: 1rem; }
+.home-detail { position: relative; align-self: flex-start; width: min(34rem, 36%); padding: 0 clamp(1rem, 1.8vw, 1.5rem); margin-top: auto; margin-left: 3%; z-index: 4; display: grid; gap: 1rem; }
 .home-detail-card { padding: 1rem 1.05rem; border: 1px solid var(--line-soft); background: linear-gradient(180deg, var(--surface-panel-strong), var(--surface-panel)); }
 .home-detail-card--ghost { position: relative; background: linear-gradient(180deg, var(--surface-panel-strong), var(--surface-panel)); border: 1px solid color-mix(in oklab, var(--gold) 45%, transparent); border-radius: 10px; backdrop-filter: blur(8px); overflow: hidden; }
 .home-detail-card--ghost::before { content: ""; position: absolute; inset: 0; background: radial-gradient(circle at top right, color-mix(in oklab, var(--gold) 16%, transparent), transparent 70%); pointer-events: none; }
