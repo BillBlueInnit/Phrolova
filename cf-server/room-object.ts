@@ -47,6 +47,13 @@ export class RoomObject extends DurableObject {
   private lastActivity: number = 0;
   // 游戏结束后已主动退出房间的玩家 ID（保留 players 数组让剩余玩家仍能查看对局数据）
   private exitedPlayers: Set<string> = new Set();
+  // 游戏中断开连接的玩家 ID（宽限期内允许重连，超时才判负）
+  private disconnectedPlayers: Set<string> = new Set();
+  private reconnectTimer: number | null = null;
+  private graceDeadline: number = 0;
+  private timerPaused: boolean = false;
+  // 重连宽限期：30 秒，覆盖页面刷新 + 自动重连耗时
+  private readonly RECONNECT_GRACE_MS: number = 30000;
 
   // WebSocket 管理
   private connections: Map<string, WebSocket> = new Map();
@@ -66,9 +73,9 @@ export class RoomObject extends DurableObject {
       if (saved) {
         try {
           const data = JSON.parse(saved as string) as Record<string, unknown>;
-          // 恢复除 connections 外的所有属性
+          // 恢复除 connections/players/timers 外的所有属性
           for (const key of Object.keys(data)) {
-            if (key !== 'connections' && key !== 'players' && key !== 'gameTimer' && key !== 'countdownTimer' && key !== 'cleanupTimer' && key !== 'exitedPlayers') {
+            if (key !== 'connections' && key !== 'players' && key !== 'gameTimer' && key !== 'countdownTimer' && key !== 'cleanupTimer' && key !== 'exitedPlayers' && key !== 'disconnectedPlayers' && key !== 'reconnectTimer') {
               (this as Record<string, unknown>)[key] = data[key];
             }
           }
@@ -76,7 +83,33 @@ export class RoomObject extends DurableObject {
           if (Array.isArray(data.exitedPlayers)) {
             this.exitedPlayers = new Set(data.exitedPlayers as string[]);
           }
+          // disconnectedPlayers 特殊处理：从数组恢复为 Set
+          if (Array.isArray(data.disconnectedPlayers)) {
+            this.disconnectedPlayers = new Set(data.disconnectedPlayers as string[]);
+          }
         } catch { /* ignore */ }
+      }
+
+      // 恢复后：处理重连宽限期（DO 冬眠唤醒场景）
+      if (this.roomStatus === 'playing' && this.disconnectedPlayers.size > 0) {
+        const remaining = this.graceDeadline - Date.now();
+        if (remaining <= 0) {
+          // 宽限期在冬眠期间已过期：直接结算
+          if (this.disconnectedPlayers.size >= this.players.length) {
+            this.disconnectedPlayers.clear();
+          } else {
+            this.forfeitBy = this.disconnectedPlayers.values().next().value || null;
+            this.disconnectedPlayers.clear();
+          }
+          this.timerPaused = false;
+          await this.endMatch();
+        } else {
+          // 用剩余时间重启宽限计时器，游戏计时保持暂停
+          this.timerPaused = true;
+          this.reconnectTimer = setTimeout(() => {
+            this.handleGraceExpired();
+          }, remaining) as unknown as number;
+        }
       }
     });
 
@@ -212,7 +245,7 @@ export class RoomObject extends DurableObject {
     }
   }
 
-  // ── WebSocket 连接处理（新玩家加入） ──
+  // ── WebSocket 连接处理（新玩家加入 / 玩家重连） ──
   private async handleConnection(ws: WebSocket, playerId: string): Promise<void> {
     this.lastActivity = Date.now();
     this.scheduleCleanup();
@@ -236,7 +269,21 @@ export class RoomObject extends DurableObject {
       }
     }
 
-    // 注意：不在此处 broadcastState / persistState
+    // 重连宽限期内的玩家重新连接：立即取消弃权计时 + 恢复游戏计时
+    // （必须在 WebSocket 建立时处理，不能等 RESUME_ROOM 消息，否则宽限期可能先超时）
+    if (this.disconnectedPlayers.has(playerId)) {
+      this.disconnectedPlayers.delete(playerId);
+      if (this.disconnectedPlayers.size === 0) {
+        this.cancelReconnectGrace();
+        this.resumeGameTimer();
+      }
+      // 通知对手：玩家已重连（fire-and-forget，不阻塞 101 响应）
+      this.broadcastState();
+      this.persistState();
+      return;
+    }
+
+    // 注意：新玩家加入时不在此处 broadcastState / persistState
     // 房间状态广播和持久化由 CREATE_ROOM / JOIN_ROOM / RESUME_ROOM 等消息处理器负责
     // 这样可以避免发送配置不正确的冗余 ROOM_STATE，也避免 DO storage 写入阻塞 101 响应
   }
@@ -245,7 +292,7 @@ export class RoomObject extends DurableObject {
   private handleDisconnect(playerId: string): void {
     this.lastActivity = Date.now();
     const wasPlayer = this.players.find(p => p.playerId === playerId);
-    
+
     if (wasPlayer) {
       // 如果游戏已结束，把断开视为退出房间（让剩余玩家能继续查看数据）
       if (this.roomStatus === 'finished') {
@@ -261,16 +308,19 @@ export class RoomObject extends DurableObject {
         return;
       }
 
-      // 如果对手在游戏中退出，对方获胜
+      // 游戏中断开连接：启动重连宽限期，而非立即判负
+      // 玩家可能只是刷新页面或网络抖动，给 30 秒重连窗口
       if (this.roomStatus === 'playing' && this.players.length === 2) {
-        const opponent = this.players.find(p => p.playerId !== playerId);
-        if (opponent) {
-          this.forfeitBy = playerId;
-          this.endMatch();
-        }
+        this.disconnectedPlayers.add(playerId);
+        this.pauseGameTimer();
+        this.startReconnectGrace();
+        this.broadcastState();
+        this.persistState();
+        return;
       }
     }
 
+    // waiting/countdown 阶段断开：直接移除玩家
     this.players = this.players.filter(p => p.playerId !== playerId);
     if (this.creator === playerId) {
       this.creator = this.players[0]?.playerId || '';
@@ -518,14 +568,20 @@ export class RoomObject extends DurableObject {
     await this.persistState();
 
     // 启动计时器：每秒 tick 并广播剩余时间
-    this.gameTimer = setInterval(() => {
-      this.timeLeft--;
-      this.broadcastState();
-      if (this.timeLeft <= 0) {
-        this.clearGameTimer();
-        this.resolveRound(null);
-      }
-    }, 1000) as unknown as number;
+    // 若有玩家处于断开重连宽限期，则暂停计时（timerPaused=true），等重连后 resumeGameTimer 恢复
+    if (this.disconnectedPlayers.size === 0) {
+      this.timerPaused = false;
+      this.gameTimer = setInterval(() => {
+        this.timeLeft--;
+        this.broadcastState();
+        if (this.timeLeft <= 0) {
+          this.clearGameTimer();
+          this.resolveRound(null);
+        }
+      }, 1000) as unknown as number;
+    } else {
+      this.timerPaused = true;
+    }
   }
 
   // ── 提交猜测 ──
@@ -662,6 +718,10 @@ export class RoomObject extends DurableObject {
     if (this.gameTimer !== null) {
       this.clearGameTimer();
     }
+    // 清理重连宽限期状态
+    this.cancelReconnectGrace();
+    this.disconnectedPlayers.clear();
+    this.timerPaused = false;
 
     // 同步 class-level roundWins 到每个玩家对象（防止弃权路径绕过 resolveRound 的同步）
     for (let i = 0; i < this.players.length; i++) {
@@ -802,6 +862,9 @@ export class RoomObject extends DurableObject {
     this.connections.clear();
     this.players = [];
     this.exitedPlayers.clear();
+    this.disconnectedPlayers.clear();
+    this.cancelReconnectGrace();
+    this.timerPaused = false;
     // 删除持久化状态
     this.state.storage.delete('room_state').catch(() => {});
     // 清理定时器
@@ -831,6 +894,9 @@ export class RoomObject extends DurableObject {
       this.rematchVotes = [];
       this.roundHistory = [];
       this.exitedPlayers.clear();
+      this.disconnectedPlayers.clear();
+      this.cancelReconnectGrace();
+      this.timerPaused = false;
       this.roomStatus = 'waiting';
       this.roundStatus = 'idle';
       this.target = null;
@@ -948,6 +1014,7 @@ export class RoomObject extends DurableObject {
       opponentId: this.opponentId,
       roundHistory: this.roundHistory,
       exitedPlayers: Array.from(this.exitedPlayers),
+      reconnectingPlayers: Array.from(this.disconnectedPlayers),
     };
   }
 
@@ -986,6 +1053,66 @@ export class RoomObject extends DurableObject {
     }
   }
 
+  // ── 重连宽限期：游戏计时暂停/恢复 + 弃权宽限计时 ──
+
+  private pauseGameTimer(): void {
+    if (this.gameTimer !== null) {
+      this.clearGameTimer();
+      this.timerPaused = true;
+    }
+  }
+
+  private resumeGameTimer(): void {
+    this.timerPaused = false;
+    if (this.roomStatus !== 'playing' || this.roundStatus !== 'active') return;
+    if (this.gameTimer !== null) return; // 已在运行
+    this.gameTimer = setInterval(() => {
+      this.timeLeft--;
+      this.broadcastState();
+      if (this.timeLeft <= 0) {
+        this.clearGameTimer();
+        this.resolveRound(null);
+      }
+    }, 1000) as unknown as number;
+  }
+
+  private startReconnectGrace(): void {
+    if (this.reconnectTimer !== null) {
+      clearTimeout(this.reconnectTimer);
+    }
+    this.graceDeadline = Date.now() + this.RECONNECT_GRACE_MS;
+    this.reconnectTimer = setTimeout(() => {
+      this.handleGraceExpired();
+    }, this.RECONNECT_GRACE_MS) as unknown as number;
+  }
+
+  private cancelReconnectGrace(): void {
+    if (this.reconnectTimer !== null) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    this.graceDeadline = 0;
+  }
+
+  private handleGraceExpired(): void {
+    this.reconnectTimer = null;
+    if (this.roomStatus !== 'playing') return;
+    if (this.disconnectedPlayers.size === 0) return;
+
+    if (this.disconnectedPlayers.size >= this.players.length) {
+      // 所有玩家都断开且未重连：平局，不设胜负
+      this.disconnectedPlayers.clear();
+      this.timerPaused = false;
+      this.endMatch();
+    } else {
+      // 仍有玩家在线：断开的玩家弃权
+      this.forfeitBy = this.disconnectedPlayers.values().next().value || null;
+      this.disconnectedPlayers.clear();
+      this.timerPaused = false;
+      this.endMatch();
+    }
+  }
+
   private async persistState(): Promise<void> {
     try {
       const data = {
@@ -1012,6 +1139,9 @@ export class RoomObject extends DurableObject {
         roundHistory: this.roundHistory,
         lastActivity: this.lastActivity,
         exitedPlayers: Array.from(this.exitedPlayers),
+        disconnectedPlayers: Array.from(this.disconnectedPlayers),
+        graceDeadline: this.graceDeadline,
+        timerPaused: this.timerPaused,
       };
       await this.state.storage.put('room_state', JSON.stringify(data));
     } catch { /* ignore */ }

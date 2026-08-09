@@ -24,6 +24,8 @@ export const useMultiGameStore = defineStore("multiGame", () => {
   const error = shallowRef("");
   const infoMessage = shallowRef("");
   const inQueue = shallowRef(false);
+  /** 随机匹配成功、正在进入房间的过渡态：用于弹窗弥补连接房间期间的视觉空白 */
+  const matched = shallowRef(false);
   const roomState = ref<MultiplayerRoomState | null>(null);
   const kicked = shallowRef(false);
   const matchScoreDelta = ref(0);
@@ -99,6 +101,7 @@ export const useMultiGameStore = defineStore("multiGame", () => {
           }
           const message = (payload?.message as string) || "多人模式发生错误";
           error.value = message;
+          matched.value = false;
           if (_roomStateReject) {
             _roomStateReject(new Error(message));
             _roomStateReject = null;
@@ -147,6 +150,7 @@ export const useMultiGameStore = defineStore("multiGame", () => {
           infoMessage.value = `匹配成功，${payload.countdownLeft ?? 2} 秒后开局`;
           inQueue.value = false;
           _pendingQueue = null;
+          matched.value = true;
           const roomCode = (payload.roomCode as string) || "";
           if (roomCode) {
             _waitingForRoomState = true;
@@ -158,6 +162,7 @@ export const useMultiGameStore = defineStore("multiGame", () => {
                 difficulty: (payload.difficulty as Difficulty) || 'easy',
               });
             } catch (e) {
+              matched.value = false;
               error.value = e instanceof Error ? e.message : "连接房间失败";
               if (_roomStateReject) {
                 _roomStateReject(e instanceof Error ? e : new Error(String(e)));
@@ -165,6 +170,8 @@ export const useMultiGameStore = defineStore("multiGame", () => {
                 _roomStateResolve = null;
               }
             }
+          } else {
+            matched.value = false;
           }
           break;
         }
@@ -181,6 +188,7 @@ export const useMultiGameStore = defineStore("multiGame", () => {
           };
           roomState.value = processedState;
           inQueue.value = false;
+          matched.value = false;
           error.value = "";
           if (processedState.roomStatus === "waiting") {
             roundResult.value = null;
@@ -550,6 +558,7 @@ export const useMultiGameStore = defineStore("multiGame", () => {
     gameWs = null;
     connectionState.value = "idle";
     inQueue.value = false;
+    matched.value = false;
     _inRoom = false;
     _isTransitioning = false;
     _waitingForRoomState = false;
@@ -564,6 +573,7 @@ export const useMultiGameStore = defineStore("multiGame", () => {
     error,
     infoMessage,
     inQueue,
+    matched,
     roomState,
     me,
     opponent,

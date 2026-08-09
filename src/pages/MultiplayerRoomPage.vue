@@ -213,6 +213,14 @@ const isCreator = computed(() =>
   multiGameStore.roomState?.creator === authStore.playerId,
 );
 
+// 对手处于重连宽限期（断开连接但尚未超时弃权）
+const opponentReconnecting = computed(() => {
+  const rs = multiGameStore.roomState;
+  if (!rs?.reconnectingPlayers || rs.reconnectingPlayers.length === 0) return false;
+  const opp = rs.players.find(p => !p.isMe);
+  return opp ? rs.reconnectingPlayers.includes(opp.playerId) : false;
+});
+
 function closeMatchResult() { showMatchResult.value = false; }
 
 function openFullResultPage() {
@@ -312,6 +320,10 @@ watch(
           </template>
         </GlassHeader>
 
+        <div v-if="opponentReconnecting" class="mr-reconnect-banner">
+          <Icon icon="ph:plugs-connected-duotone" class="mr-reconnect-icon" />
+          <span>对手正在重新连接...（30 秒内未重连将判负）</span>
+        </div>
         <div class="mr-info-card">
           <MatchSummary :room-state="multiGameStore.roomState" />
           <div class="mr-info-divider" />

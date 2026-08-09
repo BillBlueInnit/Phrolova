@@ -24,6 +24,11 @@
 
 .mr-empty-shell { max-width: 480px; margin: 4rem auto 0; }
 
+/* ── Reconnect banner (对手断开重连中) ── */
+.mr-reconnect-banner { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.9rem; border: 1px solid color-mix(in oklab, var(--warning, #f0a020) 35%, var(--line-soft)); border-radius: 8px; background: color-mix(in oklab, var(--warning, #f0a020) 8%, var(--surface-panel)); color: var(--warning, #f0a020); font-size: 0.82rem; font-weight: 600; letter-spacing: 0.03em; }
+.mr-reconnect-icon { font-size: 1.1rem; animation: mrReconnectPulse 1.2s ease-in-out infinite; }
+@keyframes mrReconnectPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
 /* ── Result modal ── */
 .mr-result-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1.5rem; background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(6px); animation: mrFadeIn 0.25s ease; }
 .mr-result-modal { display: flex; flex-direction: column; width: 100%; max-width: 1100px; max-height: 95vh; border: 1px solid var(--line-soft); border-radius: 14px; background: var(--surface-panel-strong); overflow: hidden; animation: mrSlideUp 0.3s ease; }

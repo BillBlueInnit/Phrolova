@@ -216,5 +216,19 @@ onMounted(async () => {
         <button class="btn-ghost" @click="closeRoomActiveModal">知道了</button>
       </div>
     </ModalOverlay>
+
+    <!-- 随机匹配成功弹窗：弥补从匹配成功到进入房间期间的视觉空白 -->
+    <ModalOverlay v-if="multiGameStore.matched" panel-class="ml-matched-modal" max-width="360px" no-close
+      @close="() => { /* 自动关闭，不可手动关闭 */ }">
+      <div class="ml-matched-icon">
+        <Icon icon="ph:check-circle-duotone" aria-hidden="true" />
+      </div>
+      <p class="ml-matched-kicker">MATCHED</p>
+      <h2 class="ml-matched-title">匹配成功</h2>
+      <p class="ml-matched-desc">已找到对手，正在进入房间...</p>
+      <div class="ml-matched-spinner" aria-hidden="true">
+        <div v-for="i in 3" :key="i" class="ml-matched-ring" :style="{ animationDelay: `${(i - 1) * 0.2}s` }"></div>
+      </div>
+    </ModalOverlay>
   </div>
 </template>

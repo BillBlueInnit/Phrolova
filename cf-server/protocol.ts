@@ -90,6 +90,8 @@ export interface RoomState {
   }>;
   // 游戏结束后已主动退出房间的玩家 ID（供前端判断对手是否已离开）
   exitedPlayers: string[];
+  // 游戏中断开连接、处于重连宽限期的玩家 ID（供前端显示"对手正在重连..."提示）
+  reconnectingPlayers: string[];
 }
 
 // ── 消息工具 ──
