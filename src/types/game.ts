@@ -1,4 +1,4 @@
-export type QuizType = "resonator" | "skeleton";
+export type QuizType = "resonator" | "skeleton" | "global";
 export type Difficulty = "easy" | "hard";
 export type CompareStatus = "match" | "near" | "different";
 export type CellStatus = "match" | "partial" | "different";

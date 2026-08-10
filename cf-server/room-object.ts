@@ -18,6 +18,11 @@ interface WsAttachment {
   token: string;
 }
 
+// ── MatchmakerObject RPC 接口（避免循环导入） ──
+interface MatchmakerRpc {
+  notifyMatchEnded(roomCode: string): Promise<void>;
+}
+
 // ── Room Durable Object ──
 export class RoomObject extends DurableObject {
   protected env: Env;
@@ -884,6 +889,15 @@ export class RoomObject extends DurableObject {
 
   // ── 销毁房间（当所有玩家都退出时调用） ──
   private destroyRoom(): void {
+    // 通知 MatchmakerObject 减少活跃对局计数（仅随机匹配房间）
+    // fire-and-forget：不阻塞房间销毁流程
+    if (this.isRandomMatch && this.roomCode) {
+      try {
+        const stub = this.env.MATCHMAKER.get(this.env.MATCHMAKER.idFromName('default')) as unknown as MatchmakerRpc;
+        stub.notifyMatchEnded(this.roomCode).catch(() => {});
+      } catch { /* ignore */ }
+    }
+
     this.broadcast(S2C.ROOM_EXPIRED, { message: '房间已关闭' });
     // 关闭所有 WebSocket 连接
     for (const ws of this.connections.values()) {

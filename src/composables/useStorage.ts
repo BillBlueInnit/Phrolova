@@ -216,7 +216,9 @@ function readCookieValue<T>(key: string, fallback: T): T {
 
 function writeCookieValue<T>(key: string, value: T, maxAgeSec: number): void {
   try {
-    if (value === null || value === undefined) {
+    // 空值（null/undefined/空字符串/false）统一删除 cookie，避免写入空字符串 cookie
+    // 导致刷新后 readCookie 返回 "" 而非 null，readCookieValue 误判为有效值
+    if (value === null || value === undefined || value === "" || value === false) {
       removeCookie(key);
     } else if (typeof value === "string") {
       writeCookie(key, value, maxAgeSec);

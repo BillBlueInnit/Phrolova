@@ -116,6 +116,7 @@ api.interceptors.response.use(
       hasAuthHint()
     ) {
       config._authRetried = true;
+      let refreshNetworkFailed = false;
       try {
         const ok = await refreshAuthenticatedSession(false);
         if (ok) {
@@ -125,11 +126,31 @@ api.interceptors.response.use(
           //       所以这里不用手动更新 config.headers
           return api.request(config as any);
         }
-        // refresh 失败：清 hint（authSession 已清），把原错误抛给业务层
+        // refresh 返回 false = 后端明确 401（认证失败）→ 清 hint，抛原 401
         clearAuthenticated();
       } catch (refreshErr) {
-        // refresh 过程抛非 401 错误 → 当作 401 处理，不抛出 refresh 自身的错误
-        clearAuthenticated();
+        // refresh 抛错：区分网络错误 vs 认证错误
+        // 网络错误（无 response）不应判定为认证失败，否则刷新页面时瞬断会导致掉登录
+        const rStatus = (refreshErr as any)?.response?.status ?? 0;
+        const rIsNetwork = rStatus === 0 || (refreshErr as any)?.code === 'ERR_NETWORK';
+        if (rIsNetwork) {
+          refreshNetworkFailed = true;
+          // 不清 hint，保留登录态，让用户网络恢复后重试
+        } else {
+          clearAuthenticated();
+        }
+      }
+      if (refreshNetworkFailed) {
+        // refresh 因网络失败：抛网络错误而非原 401，避免 hydrate 误判为认证失败清会话
+        const wrapped = new AxiosError(
+          'NETWORK_ERROR',
+          AxiosError.ERR_NETWORK,
+          error.config,
+          error.request,
+          undefined,
+        );
+        (wrapped as any).error_code = 'NETWORK_ERROR';
+        throw wrapped;
       }
       throw error;
     }

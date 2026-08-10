@@ -139,10 +139,10 @@ export async function refreshAuthenticatedSession(force = false): Promise<boolea
 
       const code = String(data.error_code ?? '');
       if (res.status === 401 || code === 'AUTH_EXPIRED' || code === 'AUTH_REQUIRED') {
+        // 只清 hint，不 dispatch session-cleared：避免 hydrate 期间的 refresh 失败
+        // 触发 authStore clearSession 导致刷新掉登录。让调用方（拦截器/hydrate）决定后续行为。
+        // token 确实无效时，由 socket.ts 的 WebSocket recoverSessionIfNeeded 触发 clearSession。
         clearAuthenticated();
-        try {
-          window.dispatchEvent(new CustomEvent('phrolova:session-cleared'));
-        } catch { /* ignore */ }
         return false;
       }
       // 服务端 500 / 网络异常 / 其他 → 抛给调用方
@@ -157,8 +157,8 @@ export async function refreshAuthenticatedSession(force = false): Promise<boolea
         const status = e.response?.status;
         const code = String((e.response?.data as Record<string, unknown> | undefined)?.error_code ?? '');
         if (status === 401 || code === 'AUTH_EXPIRED' || code === 'AUTH_REQUIRED') {
+          // 同上：只清 hint，不 dispatch session-cleared，避免刷新掉登录
           clearAuthenticated();
-          try { window.dispatchEvent(new CustomEvent('phrolova:session-cleared')); } catch { /* ignore */ }
           return false;
         }
       }
