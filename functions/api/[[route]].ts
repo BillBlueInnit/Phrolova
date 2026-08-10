@@ -925,6 +925,7 @@ app.get('/api/acknowledgements', async (c) => {
     player_id: acknowledgements.playerId,
     category: acknowledgements.category,
     description: acknowledgements.description,
+    avatar: acknowledgements.avatar,
     sort_order: acknowledgements.sortOrder,
     created_at: acknowledgements.createdAt,
   }).from(acknowledgements).orderBy(acknowledgements.sortOrder, acknowledgements.id);
@@ -941,6 +942,7 @@ app.get('/api/admin/acknowledgements', async (c) => {
     player_id: acknowledgements.playerId,
     category: acknowledgements.category,
     description: acknowledgements.description,
+    avatar: acknowledgements.avatar,
     sort_order: acknowledgements.sortOrder,
     created_at: acknowledgements.createdAt,
   }).from(acknowledgements).orderBy(acknowledgements.sortOrder, acknowledgements.id);
@@ -955,10 +957,11 @@ app.post('/api/admin/acknowledgements', async (c) => {
   const playerId = String(body.player_id ?? '').trim();
   const category = String(body.category ?? 'bug').trim();
   const description = String(body.description ?? '').trim();
+  const avatar = String(body.avatar ?? '').trim();
   const sortOrder = Number(body.sort_order ?? 0);
   if (!playerId) return error('缺少玩家ID');
   const result = await db.insert(acknowledgements).values({
-    playerId, category, description, sortOrder,
+    playerId, category, description, avatar: avatar || null, sortOrder,
   }).returning({ id: acknowledgements.id });
   await appendLog(db, 'INFO', `ack add: ${playerId} (${category})`);
   return c.json(success({ id: result[0]?.id }));
@@ -975,6 +978,7 @@ app.put('/api/admin/acknowledgements/:id', async (c) => {
   if ('player_id' in body) sets.playerId = String(body.player_id ?? '').trim();
   if ('category' in body) sets.category = String(body.category ?? 'bug').trim();
   if ('description' in body) sets.description = String(body.description ?? '').trim();
+  if ('avatar' in body) sets.avatar = String(body.avatar ?? '').trim() || null;
   if ('sort_order' in body) sets.sortOrder = Number(body.sort_order ?? 0);
   if (Object.keys(sets).length === 0) return error('无更新字段');
   const exists = await db.select({ id: acknowledgements.id }).from(acknowledgements).where(eq(acknowledgements.id, id)).limit(1);

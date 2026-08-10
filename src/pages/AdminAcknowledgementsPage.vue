@@ -23,6 +23,7 @@ const list = ref<AcknowledgementItem[]>([]);
 const errorMsg = ref("");
 
 const CATEGORY_OPTIONS = [
+  { value: "dev", label: "开发人员" },
   { value: "bug", label: "Bug 反馈" },
   { value: "feature", label: "功能建议" },
   { value: "support", label: "技术支持" },
@@ -39,6 +40,7 @@ const addForm = reactive({
   player_id: "",
   category: "bug",
   description: "",
+  avatar: "",
   sort_order: 0,
 });
 
@@ -46,17 +48,19 @@ function resetAddForm() {
   addForm.player_id = "";
   addForm.category = "bug";
   addForm.description = "";
+  addForm.avatar = "";
   addForm.sort_order = 0;
 }
 
 // ── Row-level editing ──
-type EditableField = "player_id" | "category" | "description" | "sort_order";
-const EDITABLE_FIELDS: Readonly<EditableField[]> = ["player_id", "category", "description", "sort_order"];
+type EditableField = "player_id" | "category" | "description" | "avatar" | "sort_order";
+const EDITABLE_FIELDS: Readonly<EditableField[]> = ["player_id", "category", "description", "avatar", "sort_order"];
 
 interface RowDraft {
   player_id: string;
   category: string;
   description: string;
+  avatar: string;
   sort_order: number;
 }
 
@@ -69,6 +73,7 @@ function draftOf(row: AcknowledgementItem): RowDraft {
     player_id: row.player_id ?? "",
     category: row.category ?? "bug",
     description: row.description ?? "",
+    avatar: row.avatar ?? "",
     sort_order: Number(row.sort_order) || 0,
   };
 }
@@ -91,6 +96,7 @@ function cancelRowEdit() {
       row.player_id = backup.player_id;
       row.category = backup.category;
       row.description = backup.description;
+      row.avatar = backup.avatar;
       row.sort_order = backup.sort_order;
     }
     delete editDraft[id];
@@ -106,6 +112,7 @@ function rowDraftChanged(rowId: number): boolean {
   return d.player_id.trim() !== b.player_id
     || d.category !== b.category
     || d.description.trim() !== b.description.trim()
+    || d.avatar.trim() !== b.avatar.trim()
     || Number(d.sort_order) !== Number(b.sort_order);
 }
 
@@ -129,12 +136,14 @@ async function commitRowEdit(row: AcknowledgementItem) {
       player_id: string;
       category: string;
       description: string;
+      avatar: string | null;
       sort_order: number;
     }> = {};
     const b = editBackup[id]!;
     if (d.player_id.trim() !== b.player_id) payload.player_id = d.player_id.trim();
     if (d.category !== b.category) payload.category = d.category;
     if (d.description.trim() !== b.description.trim()) payload.description = d.description.trim();
+    if (d.avatar.trim() !== b.avatar.trim()) payload.avatar = d.avatar.trim() || null;
     if (Number(d.sort_order) !== Number(b.sort_order)) payload.sort_order = Number(d.sort_order) || 0;
 
     if (!Object.keys(payload).length) {
@@ -150,6 +159,7 @@ async function commitRowEdit(row: AcknowledgementItem) {
         player_id: d.player_id.trim(),
         category: d.category,
         description: d.description.trim(),
+        avatar: d.avatar.trim() || null,
         sort_order: Number(d.sort_order) || 0,
       };
     }
@@ -191,6 +201,7 @@ async function doAdd() {
       player_id: addForm.player_id.trim(),
       category: addForm.category,
       description: addForm.description.trim(),
+      avatar: addForm.avatar.trim() || null,
       sort_order: Number(addForm.sort_order) || 0,
     });
     resetAddForm();
@@ -271,6 +282,10 @@ onMounted(loadList);
           <span class="ad-field-label">描述</span>
           <textarea v-model="addForm.description" class="form-input" rows="3" placeholder="贡献详情"></textarea>
         </label>
+        <label class="ad-field ad-form-field--w100">
+          <span class="ad-field-label">头像链接（可选，留空则显示首字母）</span>
+          <input v-model="addForm.avatar" class="form-input" type="url" placeholder="https://example.com/avatar.png" />
+        </label>
         <label class="ad-field">
           <span class="ad-field-label">排序 (sort_order)</span>
           <input v-model.number="addForm.sort_order" class="form-input" type="number" />
@@ -299,6 +314,7 @@ onMounted(loadList);
               <th>玩家 ID</th>
               <th>类别</th>
               <th>描述</th>
+              <th>头像链接</th>
               <th>排序</th>
               <th>创建时间</th>
               <th>操作</th>
@@ -341,6 +357,21 @@ onMounted(loadList);
                   class="ad-cell-edit ad-cell-desc"
                   @click.stop="startRowEdit(row)"
                 >{{ row.description || "—" }}</span>
+              </td>
+              <td>
+                <input
+                  v-if="rowEditId === row.id"
+                  v-model="editDraft[row.id].avatar"
+                  class="form-input"
+                  type="url"
+                  placeholder="留空则显示首字母"
+                />
+                <span
+                  v-else
+                  class="ad-cell-edit ad-cell-avatar"
+                  :title="row.avatar || ''"
+                  @click.stop="startRowEdit(row)"
+                >{{ row.avatar || "—" }}</span>
               </td>
               <td>
                 <input
