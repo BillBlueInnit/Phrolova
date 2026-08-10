@@ -195,7 +195,7 @@ onMounted(async () => {
       <footer v-if="!multiGameStore.inQueue" class="ml-foot">
         <span class="ml-foot-status">
           <span class="ml-foot-dot" :class="{ 'ml-foot-dot--on': authStore.isAuthenticated }"></span>
-          {{ authStore.isAuthenticated ? `已登录 · ${authStore.playerId}` : "未登录" }}
+          {{ authStore.isAuthenticated ? `已登录 · ${authStore.playerId}${authStore.dbId != null ? ` #${authStore.dbId}` : ''}` : "未登录" }}
         </span>
         <span class="ml-foot-hint">选择一个模式开始</span>
       </footer>

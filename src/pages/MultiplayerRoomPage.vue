@@ -86,6 +86,12 @@ const dockHintText = computed(() => {
 
 const myWins = computed(() => multiGameStore.me?.roundWins ?? 0);
 const opponentWins = computed(() => multiGameStore.opponent?.roundWins ?? 0);
+const opponentLabel = computed(() => {
+  const opp = multiGameStore.opponent;
+  const oppId = opp?.playerId || multiGameStore.roomState?.opponentId || "";
+  if (!oppId) return "等待加入";
+  return opp?.dbId != null ? `${oppId} #${opp.dbId}` : oppId;
+});
 const targetBestOf = computed(() => multiGameStore.roomState?.bestOf ?? 1);
 const winsNeeded = computed(() => Math.ceil(targetBestOf.value / 2));
 
@@ -431,7 +437,7 @@ watch(
             <div class="mr-board-panel">
               <div class="mr-board-head">
                 <h3 class="mr-board-title"><Icon icon="ph:user-circle-duotone" class="mr-board-head-icon" /> 对手猜测</h3>
-                <span class="mr-board-meta">{{ multiGameStore.opponent?.playerId || multiGameStore.roomState.opponentId || "等待加入" }}</span>
+                <span class="mr-board-meta">{{ opponentLabel }}</span>
               </div>
               <div class="mr-board-body">
                 <GuessTable

@@ -537,6 +537,7 @@ app.get('/api/leaderboard', async (c) => {
 
   const orderCol = players[scoreCol] ?? players.score;
   const topRows = await db.select({
+    id: players.id,
     playerId: players.playerId,
     score: players.score,
     wins: players.wins,
@@ -550,6 +551,7 @@ app.get('/api/leaderboard', async (c) => {
     const sortScore = Number(r.sortScore ?? 0);
     const winRate = r.matches ? Math.round(r.wins * 1000 / r.matches) / 10 : null;
     return {
+      id: r.id,
       player_id: r.playerId,
       score: r.score,
       wins: r.wins,

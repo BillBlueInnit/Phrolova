@@ -1,19 +1,21 @@
 import { computed, reactive, shallowRef, watch } from "vue";
 import { defineStore } from "pinia";
 
-import { useLocalStorage, removeLocalStorage } from "@/composables/useStorage";
+import { useCookieStorage, removeCookieStorage } from "@/composables/useStorage";
 import type { AuthResponse } from "@/types";
 import * as api from "@/api";
 import { markAuthenticated, clearAuthenticated } from "@/api/authSession";
 import { errMsg } from "@/api/client";
 
 export const useAuthStore = defineStore("auth", () => {
-  const playerId = useLocalStorage("phrolova_player_id", "");
-  const token = useLocalStorage("phrolova_player_token", "");
-  const loggedIn = useLocalStorage("phrolova_logged_in", false);
+  // 登录态持久化至 Cookie（替代 localStorage），30 天有效期，实际登录态由后端 token 校验/轮换控制
+  const playerId = useCookieStorage("phrolova_player_id", "");
+  const token = useCookieStorage("phrolova_player_token", "");
+  const loggedIn = useCookieStorage("phrolova_logged_in", false);
 
   const loading = shallowRef(false);
   const error = shallowRef("");
+  const dbId = shallowRef<number | null>(null);
   const stats = reactive({
     score: 0,
     wins: 0,
@@ -59,6 +61,7 @@ export const useAuthStore = defineStore("auth", () => {
   function applyPlayer(player?: AuthResponse["player"]) {
     if (!player) return;
     playerId.value = player.player_id;
+    dbId.value = player.id ?? null;
     stats.score = player.score;
     stats.wins = player.wins;
     stats.matches = player.matches;
@@ -70,14 +73,15 @@ export const useAuthStore = defineStore("auth", () => {
     playerId.value = "";
     token.value = "";
     loggedIn.value = false;
+    dbId.value = null;
     stats.score = 0;
     stats.wins = 0;
     stats.matches = 0;
     stats.single_resonator_score = 0;
     stats.single_skeleton_score = 0;
-    removeLocalStorage("phrolova_player_id");
-    removeLocalStorage("phrolova_player_token");
-    removeLocalStorage("phrolova_logged_in");
+    removeCookieStorage("phrolova_player_id");
+    removeCookieStorage("phrolova_player_token");
+    removeCookieStorage("phrolova_logged_in");
     _hydrated = false;
     // 让 refresh/socket 侧感知到清态（已由 watch 同步 clearAuthenticated，这里双保险）
     clearAuthenticated();
@@ -208,6 +212,7 @@ export const useAuthStore = defineStore("auth", () => {
     loading,
     error,
     stats,
+    dbId,
     isAuthenticated,
     hydrate,
     login,

@@ -43,6 +43,8 @@ export class RoomObject extends DurableObject {
   private rematchVotes: string[] = [];
   private players: RoomPlayer[] = [];
   private opponentId: string = '';
+  // 随机匹配（true）才加减分；创建房间对局（false）不加减分
+  private isRandomMatch: boolean = false;
   private roundHistory: RoomState['roundHistory'] = [];
   private lastActivity: number = 0;
   // 游戏结束后已主动退出房间的玩家 ID（保留 players 数组让剩余玩家仍能查看对局数据）
@@ -371,6 +373,8 @@ export class RoomObject extends DurableObject {
 
   // ── 创建房间 ──
   private async handleCreateRoom(playerId: string, payload: Record<string, unknown>): Promise<void> {
+    // 创建房间路径：不加减分
+    this.isRandomMatch = false;
     // 允许 handleConnection 已自动添加的情况
     const existing = this.players.find(p => p.playerId === playerId);
     if (existing) {
@@ -432,6 +436,8 @@ export class RoomObject extends DurableObject {
     const needInit = this.players.length === 0 ||
       (this.quizType === 'resonator' && this.bestOf === 1 && this.difficulty === 'easy' && this.creator === '');
     if (needInit) {
+      // 随机匹配路径：首位玩家通过 JOIN_ROOM 加入（MatchmakerDO 路由），才加减分
+      this.isRandomMatch = true;
       this.quizType = (payload.quizType as QuizType) || this.quizType;
       this.difficulty = (payload.difficulty as Difficulty) || this.difficulty;
       const bo = Number(payload.bestOf);
@@ -688,6 +694,7 @@ export class RoomObject extends DurableObject {
       target: this.target,
       players: this.players.map(p => ({
         player_id: p.playerId,
+        db_id: p.dbId,
         guesses: p.guesses.map(g => ({ ...g, revealed: true })),
       })),
     });
@@ -766,6 +773,7 @@ export class RoomObject extends DurableObject {
         target: this.target,
         players: this.players.map(p => ({
           player_id: p.playerId,
+          db_id: p.dbId,
           guesses: p.guesses.map(g => ({ ...g, revealed: true })),
         })),
       });
@@ -776,7 +784,7 @@ export class RoomObject extends DurableObject {
     const localScoreDelta = 0;
     let forfeit = false;
 
-    if (this.overallWinner !== null) {
+    if (this.overallWinner !== null && this.isRandomMatch) {
       const winner = this.players[this.overallWinner];
       const loser = this.players[this.overallWinner === 0 ? 1 : 0];
 
@@ -821,7 +829,7 @@ export class RoomObject extends DurableObject {
     // 前端再根据我是否为 players[0] 决定取反
     const meWon = this.overallWinner === 0;
     let myDelta = localScoreDelta;
-    if (this.overallWinner !== null) {
+    if (this.overallWinner !== null && this.isRandomMatch) {
       const scoreTable = this.quizType === 'resonator'
         ? [10, 30, 50]
         : this.difficulty === 'easy' ? [5, 10, 15] : [30, 50, 70];
@@ -959,8 +967,22 @@ export class RoomObject extends DurableObject {
     const existing = this.players.find(p => p.playerId === playerId);
     if (existing) return;
 
+    // 查询数据库获取玩家数字 ID（用于前端展示）
+    let dbId: number | null = null;
+    try {
+      if (this.env?.DB) {
+        const row = await this.env.DB.prepare(
+          'SELECT id FROM players WHERE player_id = ?1 LIMIT 1'
+        ).bind(playerId).first();
+        if (row && typeof row.id === 'number') {
+          dbId = row.id;
+        }
+      }
+    } catch { /* ignore */ }
+
     this.players.push({
       playerId,
+      dbId,
       roundWins: 0,
       attemptsUsed: 0,
       attemptsLimit: this.quizType === 'resonator' ? 4 : 8,
@@ -1026,6 +1048,7 @@ export class RoomObject extends DurableObject {
       rematchVotes: [...this.rematchVotes],
       players: this.players.map(p => ({
         playerId: p.playerId,
+        dbId: p.dbId,
         roundWins: p.roundWins,
         attemptsUsed: p.attemptsUsed,
         attemptsLimit: p.attemptsLimit,
@@ -1034,7 +1057,13 @@ export class RoomObject extends DurableObject {
           : p.guesses,
       })),
       opponentId: this.opponentId,
-      roundHistory: this.roundHistory,
+      roundHistory: this.roundHistory.map(r => ({
+        ...r,
+        players: r.players.map(p => ({
+          ...p,
+          db_id: p.db_id ?? this.players.find(pl => pl.playerId === p.player_id)?.dbId ?? null,
+        })),
+      })),
       exitedPlayers: Array.from(this.exitedPlayers),
       reconnectingPlayers: Array.from(this.disconnectedPlayers),
     };
@@ -1155,10 +1184,11 @@ export class RoomObject extends DurableObject {
         overallWinner: this.overallWinner,
         forfeitBy: this.forfeitBy,
         creator: this.creator,
-        rematchVotes: this.rematchVotes,
-        players: this.players,
-        opponentId: this.opponentId,
-        roundHistory: this.roundHistory,
+      rematchVotes: this.rematchVotes,
+      players: this.players,
+      opponentId: this.opponentId,
+      isRandomMatch: this.isRandomMatch,
+      roundHistory: this.roundHistory,
         lastActivity: this.lastActivity,
         exitedPlayers: Array.from(this.exitedPlayers),
         disconnectedPlayers: Array.from(this.disconnectedPlayers),

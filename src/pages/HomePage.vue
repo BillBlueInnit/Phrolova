@@ -10,6 +10,7 @@ import type { CaptchaResponse } from "@/types";
 import { errMsg } from "@/api/client";
 import { fetchCaptcha, fetchScryptParams } from "@/api";
 import { computeScryptHex } from "@/lib/scrypt-client";
+import { getCookieConsent, setCookieConsent } from "@/composables/useStorage";
 
 const route = useRoute();
 const authStore = useAuthStore();
@@ -97,6 +98,7 @@ onBeforeUnmount(() => {
 
 const ANNOUNCE_KEY = "phrolova_announcement_v1";
 const showAnnouncement = shallowRef(false);
+const showCookieConsent = shallowRef(false);
 const showAuthModal = shallowRef(false);
 const authMode = shallowRef<"login" | "register">("login");
 const resetMode = shallowRef(false);
@@ -241,6 +243,13 @@ onMounted(async () => {
     }
   } catch { /* ignore */ }
 
+  // 首次访问 Cookie 同意提示（仅未做选择时展示）
+  try {
+    if (getCookieConsent() === null) {
+      showCookieConsent.value = true;
+    }
+  } catch { /* ignore */ }
+
   // hydrate() 已由 App.vue 初始化时调用，此处不再重复
   if (authStore.isAuthenticated) {
     await multiGameStore.resumeRoom().catch(() => undefined);
@@ -250,6 +259,16 @@ onMounted(async () => {
 function closeAnnouncement() {
   showAnnouncement.value = false;
   try { localStorage.setItem(ANNOUNCE_KEY, "1"); } catch { /* ignore */ }
+}
+
+function acceptCookies() {
+  showCookieConsent.value = false;
+  setCookieConsent("accepted");
+}
+
+function declineCookies() {
+  showCookieConsent.value = false;
+  setCookieConsent("declined");
 }
 </script>
 
@@ -296,6 +315,7 @@ function closeAnnouncement() {
           <div class="home-identity-header">
             <span class="home-identity-avatar">{{ authStore.playerId?.charAt(0)?.toUpperCase() }}</span>
             <strong class="home-identity-name">{{ authStore.playerId }}</strong>
+            <span v-if="authStore.dbId != null" class="home-identity-dbid">#{{ authStore.dbId }}</span>
           </div>
           <div class="home-identity-stats">
             <div class="home-identity-stat">
@@ -457,6 +477,24 @@ function closeAnnouncement() {
         </template>
       </div>
     </ModalOverlay>
+
+    <Transition name="cookie-slide">
+      <div v-if="showCookieConsent" class="cookie-consent" role="dialog" aria-label="Cookie 使用提示">
+        <div class="cookie-consent-icon"><Icon icon="ph:cookie-duotone" /></div>
+        <div class="cookie-consent-body">
+          <p class="cookie-consent-title">Cookie 使用说明</p>
+          <p class="cookie-consent-desc">本站使用 Cookie 保存您的登录状态，以便下次访问时自动保持登录。继续使用即表示您同意我们使用 Cookie。</p>
+          <div class="cookie-consent-actions">
+            <button class="cookie-consent-btn cookie-consent-btn--primary" type="button" @click="acceptCookies">
+              <Icon icon="ph:check-circle-duotone" /> 同意
+            </button>
+            <button class="cookie-consent-btn cookie-consent-btn--ghost" type="button" @click="declineCookies">
+              拒绝
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </section>
 </template>
 

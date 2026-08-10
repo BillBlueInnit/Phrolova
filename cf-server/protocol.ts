@@ -47,6 +47,7 @@ export type RoundStatus = 'idle' | 'active' | 'resolved';
 
 export interface RoomPlayer {
   playerId: string;
+  dbId: number | null;
   roundWins: number;
   attemptsUsed: number;
   attemptsLimit: number;
@@ -85,6 +86,7 @@ export interface RoomState {
     target: Record<string, unknown> | null;
     players: Array<{
       player_id: string;
+      db_id: number | null;
       guesses: Array<{ revealed: boolean; guess: Record<string, unknown>; compare: Record<string, unknown> }>;
     }>;
   }>;
