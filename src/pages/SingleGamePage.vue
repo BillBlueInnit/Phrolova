@@ -17,7 +17,7 @@ const dictionaryStore = useDictionaryStore();
 const singleGameStore = useSingleGameStore();
 const router = useRouter();
 const guessName = shallowRef("");
-const guessInputRef = useTemplateRef<{ focus: () => void }>("guessInput");
+const guessInputRef = useTemplateRef<{ focus: () => void; resolveFinalName: () => string }>("guessInput");
 
 /** 单人模式猜测记录的滚动容器 */
 const stageBodyRef = ref<HTMLElement | null>(null);
@@ -131,16 +131,10 @@ async function submitGuess(finalName?: string) {
   }
 }
 
-/** 点击提交按钮：自动补全到第一个匹配项再提交，与按 Enter 键效果一致。 */
+/** 点击提交按钮：使用组件内部逻辑 resolveFinalName 获取最终名称（考虑 activeIndex）。 */
 function handleClickSubmit() {
-  const keyword = guessName.value.trim().toLowerCase();
-  if (keyword) {
-    const match = currentNames.value.find((n) => n.name.toLowerCase().includes(keyword));
-    if (match) {
-      guessName.value = match.name;
-    }
-  }
-  submitGuess(guessName.value);
+  const finalName = guessInputRef.value?.resolveFinalName() ?? guessName.value;
+  submitGuess(finalName);
 }
 
 onMounted(async () => {

@@ -25,7 +25,7 @@ const isGameRoute = computed(() => {
   return name === "single" || name === "single-play" || name === "multi-lobby" || name === "multi-room";
 });
 const isAdminLoginRoute = computed(() => route.name === "admin-login");
-const isAdminRoute = computed(() => isAdminLoginRoute.value || route.name === "admin-diff" || route.name === "admin-table");
+const isAdminRoute = computed(() => isAdminLoginRoute.value || route.name === "admin-diff" || route.name === "admin-table" || route.name === "admin-acknowledgements");
 
 const ACCENTS: AccentPreset[] = [
   {
