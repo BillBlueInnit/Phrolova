@@ -7,6 +7,7 @@ import TabGroup from "@/components/shared/TabGroup.vue";
 import type { QuizType, ResonatorNameEntry, SkeletonNameEntry, TabOption } from "@/types";
 import { useDictionaryStore } from "@/stores/dictionary";
 import { getCharacterAvatar, getSkeletonAvatar } from "@/utils/game";
+import { normalizeSearchText } from "@/utils/chinese-convert";
 
 const router = useRouter();
 const dictionaryStore = useDictionaryStore();
@@ -69,7 +70,7 @@ function hasFilter(field: string, value: string | number): boolean {
 
 // ── Filtered + searched data ──
 const filteredCharacters = computed(() => {
-  const q = search.value.toLowerCase();
+  const q = normalizeSearchText(search.value);
   const filters = activeResFilter.value;
   return characters.value.filter(c => {
     if (q && !matchResonator(c, q)) return false;
@@ -82,7 +83,7 @@ const filteredCharacters = computed(() => {
 });
 
 const filteredSkeletons = computed(() => {
-  const q = search.value.toLowerCase();
+  const q = normalizeSearchText(search.value);
   const filters = activeSkelFilter.value;
   return skeletons.value.filter(s => {
     if (q && !matchSkeleton(s, q)) return false;
@@ -104,19 +105,19 @@ const pagedItems = computed((): any[] => {
 });
 
 function matchResonator(c: ResonatorNameEntry, q: string) {
-  return c.name.toLowerCase().includes(q)
-    || c.attribute.toLowerCase().includes(q)
-    || c.weapon.toLowerCase().includes(q)
-    || c.birthplace.toLowerCase().includes(q)
+  return normalizeSearchText(c.name).includes(q)
+    || normalizeSearchText(c.attribute).includes(q)
+    || normalizeSearchText(c.weapon).includes(q)
+    || normalizeSearchText(c.birthplace).includes(q)
     || String(c.version).includes(q);
 }
 
 function matchSkeleton(s: SkeletonNameEntry, q: string) {
-  return s.name.toLowerCase().includes(q)
-    || s.skill_attribute.toLowerCase().includes(q)
-    || s.set_name.toLowerCase().includes(q)
-    || s.drop_location.toLowerCase().includes(q)
-    || s.is_aberration.toLowerCase().includes(q)
+  return normalizeSearchText(s.name).includes(q)
+    || normalizeSearchText(s.skill_attribute).includes(q)
+    || normalizeSearchText(s.set_name).includes(q)
+    || normalizeSearchText(s.drop_location).includes(q)
+    || normalizeSearchText(s.is_aberration).includes(q)
     || String(s.cost).includes(q);
 }
 

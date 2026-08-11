@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, shallowRef, useTemplateRef, watch } from "vue";
 import { getCharacterAvatar, getSkeletonAvatar } from "@/utils/game";
+import { normalizeSearchText } from "@/utils/chinese-convert";
 import type { QuizType } from "@/types/game";
 
 const props = defineProps<{
@@ -19,10 +20,10 @@ const inputRef = useTemplateRef<HTMLInputElement>("inputRef");
 const activeIndex = shallowRef(-1);
 
 const suggestions = computed(() => {
-  const keyword = model.value.trim().toLowerCase();
+  const keyword = normalizeSearchText(model.value.trim());
   if (!keyword) return [];
   return props.names
-    .filter((item) => item.name.toLowerCase().includes(keyword));
+    .filter((item) => normalizeSearchText(item.name).includes(keyword));
 });
 
 watch(suggestions, (newSuggestions) => {
@@ -32,7 +33,7 @@ watch(suggestions, (newSuggestions) => {
   }
   // 如果当前 model 值精确匹配列表中的某一项，则定位到那一项（保留用户点击选择的结果）
   const exactIndex = newSuggestions.findIndex(
-    (item) => item.name.toLowerCase() === model.value.trim().toLowerCase(),
+    (item) => normalizeSearchText(item.name) === normalizeSearchText(model.value.trim()),
   );
   activeIndex.value = exactIndex >= 0 ? exactIndex : 0;
 });
@@ -55,7 +56,7 @@ function selectSuggestion(name: string) {
   model.value = name;
   // 直接定位到被点击的项，保持高亮（即使重复点击同一项也不会丢失索引）
   const idx = suggestions.value.findIndex(
-    (item) => item.name.toLowerCase() === name.toLowerCase(),
+    (item) => normalizeSearchText(item.name) === normalizeSearchText(name),
   );
   activeIndex.value = idx >= 0 ? idx : 0;
   inputRef.value?.focus();
