@@ -131,59 +131,6 @@ async function requirePlayerAuth(c: any): Promise<PlayerAuthResult> {
 // ── Health ─────────────────────────────────────────────────────────
 app.get('/api/health', (c) => c.json(success({})));
 
-// ── 全站在线人数统计 ──────────────────────────────────────────────
-// 基于 KV online:{clientId} 心跳记录（TTL=60s），统计仍活跃的访客数
-// 前端在 App.vue 全局发送心跳（已登录用 playerId，匿名用 localStorage 生成的 guest ID）
-const ONLINE_KV_PREFIX_STATS = 'online:';
-const ONLINE_KV_TTL_STATS = 60;
-
-app.post('/api/stats/heartbeat', async (c) => {
-  try {
-    const body = await readJson(c);
-    const clientId = String(body.client_id ?? '').trim();
-    if (!clientId || clientId.length > 128) {
-      return error('无效的 client_id');
-    }
-    await c.env.KV.put(ONLINE_KV_PREFIX_STATS + clientId, String(Date.now()), {
-      expirationTtl: ONLINE_KV_TTL_STATS,
-    });
-    return c.json(success({}));
-  } catch (e) {
-    console.warn('[stats/heartbeat] KV error:', e);
-    return c.json(success({})); // 静默失败
-  }
-});
-
-app.get('/api/stats/online', async (c) => {
-  try {
-    // KV.list() 最多一次返回 1000 条，对于中小规模站点足够；
-    // 若后续超过 1000 在线，需要改为计数器方案
-    let onlineCount = 0;
-    let cursor: string | undefined = undefined;
-    const MAX_PAGES = 10; // 最多翻 10 页（10000 在线），防止无限循环
-    let pages = 0;
-    do {
-      const list: KVNamespaceListResult<unknown> = await c.env.KV.list({ prefix: ONLINE_KV_PREFIX_STATS, cursor });
-      onlineCount += list.keys.length;
-      cursor = list.list_complete ? undefined : list.cursor;
-      pages += 1;
-      if (pages >= MAX_PAGES) break;
-    } while (cursor);
-    return c.json(success({
-      online_count: onlineCount,
-      updated_at: Date.now(),
-    }));
-  } catch (e) {
-    // KV 出错时降级：返回 0，不影响前端其他功能
-    console.warn('[stats/online] KV error:', e);
-    return c.json(success({
-      online_count: 0,
-      updated_at: Date.now(),
-      degraded: true,
-    }));
-  }
-});
-
 // ── Captcha ────────────────────────────────────────────────────────
 app.get('/api/auth/captcha', async (c) => {
   const captcha = libCreateCaptcha();

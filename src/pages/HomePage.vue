@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, reactive, shallowRef, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, shallowRef, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import gsap from "gsap";
 
@@ -8,9 +8,10 @@ import { useAuthStore } from "@/stores/auth";
 import { useMultiGameStore } from "@/stores/multiGame";
 import type { CaptchaResponse } from "@/types";
 import { errMsg } from "@/api/client";
-import { fetchCaptcha, fetchOnlineStats, fetchScryptParams } from "@/api";
+import { fetchCaptcha, fetchScryptParams } from "@/api";
 import { computeScryptHex } from "@/lib/scrypt-client";
 import { getCookieConsent, setCookieConsent } from "@/composables/useStorage";
+import { useOnlineCount } from "@/composables/useOnlineCount";
 
 const route = useRoute();
 const authStore = useAuthStore();
@@ -94,7 +95,6 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   ctx?.revert();
-  stopOnlinePoll();
 });
 
 const ANNOUNCE_KEY = "phrolova_announcement_v1";
@@ -102,37 +102,10 @@ const showAnnouncement = shallowRef(false);
 const showCookieConsent = shallowRef(false);
 const showAuthModal = shallowRef(false);
 
-// ── 全站在线人数 ──
-const onlineCount = ref(0);
-const onlineLoading = shallowRef(true);
-let onlinePollTimer: number | null = null;
-const ONLINE_POLL_INTERVAL = 30 * 1000; // 30 秒轮询
+// ── 全站在线人数（WebSocket 实时推送，由 App.vue 全局管理连接） ──
+const { onlineCount, onlineConnected } = useOnlineCount();
+const onlineLoading = computed(() => !onlineConnected.value && onlineCount.value === 0);
 
-async function loadOnlineCount() {
-  try {
-    const data = await fetchOnlineStats();
-    onlineCount.value = Math.max(0, Number(data.online_count) || 0);
-  } catch {
-    // 静默失败，不影响首页体验
-  } finally {
-    onlineLoading.value = false;
-  }
-}
-
-function startOnlinePoll() {
-  stopOnlinePoll();
-  loadOnlineCount();
-  onlinePollTimer = window.setInterval(() => {
-    loadOnlineCount();
-  }, ONLINE_POLL_INTERVAL);
-}
-
-function stopOnlinePoll() {
-  if (onlinePollTimer !== null) {
-    clearInterval(onlinePollTimer);
-    onlinePollTimer = null;
-  }
-}
 const authMode = shallowRef<"login" | "register">("login");
 const resetMode = shallowRef(false);
 const captchaImage = shallowRef("");
@@ -269,9 +242,6 @@ function handleLogout() {
 }
 
 onMounted(async () => {
-  // 启动在线人数轮询
-  startOnlinePoll();
-
   // 首次访问公告弹窗
   try {
     if (!localStorage.getItem(ANNOUNCE_KEY)) {
@@ -314,11 +284,11 @@ function declineCookies() {
       <div class="home-title-block">
         <h1 class="home-title">弗一把</h1>
         <p class="home-subtitle">Phrolova</p>
-        <div class="home-online-badge" :title="`${onlineCount} 位玩家在线`">
+        <div class="home-online-badge" :title="`${onlineCount} 人在线`">
           <span class="home-online-dot" :class="{ 'home-online-dot--active': !onlineLoading && onlineCount > 0 }"></span>
           <span class="home-online-text">
-            <template v-if="onlineLoading">加载中...</template>
-            <template v-else>{{ onlineCount }} 位玩家在线</template>
+            <template v-if="onlineLoading">连接中...</template>
+            <template v-else>{{ onlineCount }} 人在线</template>
           </span>
         </div>
       </div>

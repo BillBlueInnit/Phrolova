@@ -18,7 +18,8 @@ import type { DurableObjectNamespace } from '@cloudflare/workers-types';
 //   `export { MatchmakerObject, RoomObject }`
 import { MatchmakerObject } from './cf-server/matchmaker-object';
 import { RoomObject } from './cf-server/room-object';
-export { MatchmakerObject, RoomObject };
+import { OnlineCounterObject } from './cf-server/online-counter-object';
+export { MatchmakerObject, RoomObject, OnlineCounterObject };
 
 // Hono 应用 (functions/api/[[route]].ts 中 `export default app;`)
 import apiApp from './functions/api/[[route]]';
@@ -31,6 +32,7 @@ type Bindings = {
   KV: KVNamespace;
   ROOM: DurableObjectNamespace<RoomObject>;
   MATCHMAKER: DurableObjectNamespace<MatchmakerObject>;
+  ONLINE_COUNTER: DurableObjectNamespace<OnlineCounterObject>;
   SECRET_KEY: string;
   ADMIN_USER: string;
   ADMIN_PASSWORD: string;
@@ -99,6 +101,12 @@ function handleWs(request: Request, env: Bindings, url: URL): Response | Promise
     return new Response(JSON.stringify({ status: 'ok', server: 'pages-custom-worker' }), {
       headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
     });
+  }
+
+  // /ws/online: 全站在线人数统计，公共端点无需鉴权
+  if (pathname === '/ws/online') {
+    const id = env.ONLINE_COUNTER.idFromName('global');
+    return env.ONLINE_COUNTER.get(id).fetch(request);
   }
 
   const isUpgrade = request.headers.get('Upgrade') === 'websocket';

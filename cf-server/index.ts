@@ -11,8 +11,9 @@
 
 import { RoomObject } from './room-object';
 import { MatchmakerObject } from './matchmaker-object';
+import { OnlineCounterObject } from './online-counter-object';
 
-export { RoomObject, MatchmakerObject };
+export { RoomObject, MatchmakerObject, OnlineCounterObject };
 
 // ── 环境绑定类型 ──
 export interface Env {
@@ -20,6 +21,7 @@ export interface Env {
   KV: KVNamespace;
   ROOM: DurableObjectNamespace<RoomObject>;
   MATCHMAKER: DurableObjectNamespace<MatchmakerObject>;
+  ONLINE_COUNTER: DurableObjectNamespace<OnlineCounterObject>;
   SESSION_TTL: string;
   CAPTCHA_TTL: string;
   ADMIN_USER: string;
