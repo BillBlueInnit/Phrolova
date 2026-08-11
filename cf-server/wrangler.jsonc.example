@@ -12,6 +12,10 @@
     },
     {
       "tag": "v3-online-counter"
+    },
+    {
+      "tag": "v4-remove-online-counter",
+      "deleted_classes": ["OnlineCounterObject"]
     }
   ],
   "d1_databases": [

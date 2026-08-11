@@ -1,0 +1,54 @@
+name: Cleanup OnlineCounter DO Namespace (One-time)
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup-do-namespace:
+    name: Delete ONLINE_COUNTER Durable Object Namespace
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Find and delete ONLINE_COUNTER Durable Object Namespace
+        env:
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          BASE="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/workers/durable_objects/namespaces"
+          AUTH_HDR="Authorization: Bearer $CF_API_TOKEN"
+
+          echo "::group::List all Durable Object namespaces"
+          LIST=$(curl -sS -X GET "$BASE" -H "$AUTH_HDR")
+          echo "$LIST" | jq . || echo "$LIST"
+          echo "::endgroup::"
+
+          NS_ID=$(echo "$LIST" | jq -r '.result[] | select(.name=="ONLINE_COUNTER" or .class=="OnlineCounterObject") | .id' | head -n1)
+
+          if [ -z "$NS_ID" ] || [ "$NS_ID" = "null" ]; then
+            echo "✅ ONLINE_COUNTER namespace not found (already deleted). Nothing to do."
+            exit 0
+          fi
+
+          echo "Found ONLINE_COUNTER namespace id: $NS_ID"
+          echo "::group::Deleting namespace $NS_ID"
+          RESP=$(curl -sS -X DELETE "$BASE/$NS_ID" -H "$AUTH_HDR")
+          SUCCESS=$(echo "$RESP" | jq -r '.success // false')
+          echo "$RESP" | jq . || echo "$RESP"
+          echo "::endgroup::"
+
+          if [ "$SUCCESS" = "true" ]; then
+            echo "✅ ONLINE_COUNTER Durable Object namespace deleted successfully."
+          else
+            ERR=$(echo "$RESP" | jq -r '.errors[0].message // "unknown"')
+            CODE=$(echo "$RESP" | jq -r '.errors[0].code // "?"')
+            echo "::error::Failed to delete ONLINE_COUNTER namespace [$CODE]: $ERR"
+            exit 1
+          fi

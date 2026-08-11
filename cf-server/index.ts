@@ -14,18 +14,6 @@ import { MatchmakerObject } from './matchmaker-object';
 
 export { RoomObject, MatchmakerObject };
 
-// Permanent stub: avoids Cloudflare 10064 DO class-deletion deadlock.
-// No binding references this class; it exists solely to satisfy Cloudflare's
-// "new script must still export all classes that have live DO instances" check.
-// The ONLINE_COUNTER namespace binding is already removed; this is an empty no-op.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export class OnlineCounterObject {
-  constructor(_state: DurableObjectState, _env: Env) {}
-  fetch(_req: Request): Response {
-    return new Response('stub', { status: 410 });
-  }
-}
-
 // ── 环境绑定类型 ──
 export interface Env {
   DB: D1Database;
