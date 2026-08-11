@@ -48,6 +48,8 @@ export default {
     logout: "登出",
     friendLink: "友鏈",
     qqGroup: "QQ群 457323277",
+    onlineCount: "{count} 人線上",
+    connecting: "連線中...",
     announcementTitle: "網站全面升級公告",
     announcementBody: "歡迎來到「弗一把」！網站已進行全面的功能與 UI 升級，帶來更好的遊戲體驗。",
     announcementOldUserTitle: "老使用者注意",

@@ -14,11 +14,13 @@ import { errMsg } from "@/api/client";
 import { fetchCaptcha, fetchScryptParams } from "@/api";
 import { computeScryptHex } from "@/lib/scrypt-client";
 import { getCookieConsent, setCookieConsent } from "@/composables/useStorage";
+import { useOnlineCount } from "@/composables/useOnlineCount";
 
 const route = useRoute();
 const authStore = useAuthStore();
 const multiGameStore = useMultiGameStore();
 const { t, locale } = useI18n();
+const { onlineCount, onlineConnected } = useOnlineCount();
 
 const PORTRAIT_POOL = [
   { src: "/media/frolova.png", alt: "弗洛洛" },
@@ -288,6 +290,14 @@ function declineCookies() {
       <div class="home-title-block">
         <h1 class="home-title">{{ t('home.title') }}</h1>
         <p class="home-subtitle">{{ t('home.subtitle') }}</p>
+        <div v-if="onlineConnected" class="home-online-badge">
+          <span class="home-online-dot home-online-dot--active"></span>
+          <span class="home-online-text">{{ t('home.onlineCount', { count: onlineCount }) }}</span>
+        </div>
+        <div v-else class="home-online-badge">
+          <span class="home-online-dot"></span>
+          <span class="home-online-text">{{ t('home.connecting') }}</span>
+        </div>
       </div>
       <div class="home-portrait" :key="frolovaKey" ref="frolovaRef">
         <div class="home-portrait-inner">

@@ -8,6 +8,8 @@ interface __BaseEnv_Env {
 	CAPTCHA_TTL: "180";
 	SECRET_KEY: string;
 	ADMIN_PASSWORD: string;
+	UPSTASH_REDIS_URL: string;
+	UPSTASH_REDIS_TOKEN: string;
 	ROOM: DurableObjectNamespace /* RoomObject from phrolova-multiplayer */;
 	MATCHMAKER: DurableObjectNamespace /* MatchmakerObject from phrolova-multiplayer */;
 }
@@ -19,7 +21,7 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "ADMIN_USER" | "SESSION_TTL" | "CAPTCHA_TTL" | "SECRET_KEY" | "ADMIN_PASSWORD">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "ADMIN_USER" | "SESSION_TTL" | "CAPTCHA_TTL" | "SECRET_KEY" | "ADMIN_PASSWORD" | "UPSTASH_REDIS_URL" | "UPSTASH_REDIS_TOKEN">> {}
 }
 
 // Begin runtime types

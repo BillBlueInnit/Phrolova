@@ -31,6 +31,8 @@ type Bindings = {
   ADMIN_PASSWORD: string;
   SESSION_TTL: string;
   CAPTCHA_TTL: string;
+  UPSTASH_REDIS_URL: string;
+  UPSTASH_REDIS_TOKEN: string;
 };
 
 type HonoEnv = {
@@ -939,6 +941,93 @@ app.delete('/api/admin/acknowledgements/:id', async (c) => {
   if (!exists.length) return error('记录不存在', 404);
   await db.delete(acknowledgements).where(eq(acknowledgements.id, id));
   await appendLog(db, 'INFO', `ack delete #${id}`);
+  return c.json(success({}));
+});
+
+// ── Online count (Upstash Redis) ────────────────────────────────────
+const ONLINE_KEY = 'online';
+const ONLINE_TTL_SEC = 60; // 60s 无心跳即视为离线
+
+async function upstashPipeline(env: Bindings, commands: string[][]): Promise<any[]> {
+  const res = await fetch(`${env.UPSTASH_REDIS_URL}/pipeline`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${env.UPSTASH_REDIS_TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(commands),
+  });
+  if (!res.ok) {
+    throw new Error(`Upstash error: ${res.status}`);
+  }
+  return res.json();
+}
+
+function hasUpstash(env: Bindings): boolean {
+  return !!(env.UPSTASH_REDIS_URL && env.UPSTASH_REDIS_TOKEN);
+}
+
+// 心跳：ZADD + 清理过期 + ZCOUNT，一次 pipeline 搞定
+app.post('/api/online/heartbeat', async (c) => {
+  const body = await readJson(c);
+  const clientId = String(body.client_id ?? '').trim();
+  if (!clientId || clientId.length > 64) return error('无效的客户端ID');
+
+  const configured = hasUpstash(c.env);
+  if (!configured) {
+    return c.json(success({ count: 0, configured: false }));
+  }
+  try {
+    const now = Date.now();
+    const cutoff = now - ONLINE_TTL_SEC * 1000;
+    const results = await upstashPipeline(c.env, [
+      ['ZADD', ONLINE_KEY, String(now), clientId],
+      ['ZREMRANGEBYSCORE', ONLINE_KEY, '0', String(cutoff)],
+      ['ZCOUNT', ONLINE_KEY, String(cutoff), String(now)],
+    ]);
+    const count = results?.[2]?.result ?? 0;
+    return c.json(success({ count, configured: true }));
+  } catch (e) {
+    console.warn('[online] heartbeat upstash error:', e);
+    return c.json(success({ count: 0, configured: false }));
+  }
+});
+
+// 仅查询在线人数（不心跳）
+app.get('/api/online/count', async (c) => {
+  const configured = hasUpstash(c.env);
+  if (!configured) {
+    return c.json(success({ count: 0, configured: false }));
+  }
+  try {
+    const now = Date.now();
+    const cutoff = now - ONLINE_TTL_SEC * 1000;
+    const results = await upstashPipeline(c.env, [
+      ['ZREMRANGEBYSCORE', ONLINE_KEY, '0', String(cutoff)],
+      ['ZCOUNT', ONLINE_KEY, String(cutoff), String(now)],
+    ]);
+    const count = results?.[1]?.result ?? 0;
+    return c.json(success({ count, configured: true }));
+  } catch (e) {
+    console.warn('[online] count upstash error:', e);
+    return c.json(success({ count: 0, configured: false }));
+  }
+});
+
+// 离开：ZREM 移除自身
+app.post('/api/online/leave', async (c) => {
+  if (!hasUpstash(c.env)) {
+    return c.json(success({}));
+  }
+  try {
+    const body = await readJson(c);
+    const clientId = String(body.client_id ?? '').trim();
+    if (clientId) {
+      await upstashPipeline(c.env, [['ZREM', ONLINE_KEY, clientId]]);
+    }
+  } catch (e) {
+    console.warn('[online] leave upstash error:', e);
+  }
   return c.json(success({}));
 });
 

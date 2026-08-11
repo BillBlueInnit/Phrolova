@@ -48,6 +48,8 @@ export default {
     logout: "Log Out",
     friendLink: "Friends",
     qqGroup: "QQ Group 457323277",
+    onlineCount: "{count} online",
+    connecting: "Connecting...",
     announcementTitle: "Website Upgrade Notice",
     announcementBody: "Welcome to Phrolova! The website has been fully upgraded with new features and UI for a better gaming experience.",
     announcementOldUserTitle: "Attention Existing Users",
