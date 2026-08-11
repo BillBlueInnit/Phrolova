@@ -18,6 +18,11 @@ interface WsAttachment {
   token: string;
 }
 
+// ── MatchmakerObject RPC 接口（避免循环导入） ──
+interface MatchmakerRpc {
+  notifyMatchEnded(roomCode: string): Promise<void>;
+}
+
 // ── Room Durable Object ──
 export class RoomObject extends DurableObject {
   protected env: Env;
@@ -56,6 +61,8 @@ export class RoomObject extends DurableObject {
   private timerPaused: boolean = false;
   // 重连宽限期：30 秒，覆盖页面刷新 + 自动重连耗时
   private readonly RECONNECT_GRACE_MS: number = 30000;
+  // 是否已向 MatchmakerObject 发送过 notifyMatchEnded（防止 endMatch+destroyRoom 重复 RPC）
+  private _matchEndedNotified: boolean = false;
 
   // WebSocket 管理
   private connections: Map<string, WebSocket> = new Map();
@@ -857,6 +864,17 @@ export class RoomObject extends DurableObject {
 
     this.broadcastState();
     await this.persistState();
+
+    // 比赛正式结束：立即通知 MatchmakerObject 从活跃对局计数中移除
+    // （之前放在 destroyRoom 导致延迟——玩家查看比分时仍被计入"对局中"）
+    // fire-and-forget：不阻塞 broadcast/101 响应；destroyRoom 处的重复调用由 MatchmakerObject has() 判断幂等忽略
+    if (this.isRandomMatch && this.roomCode && !this._matchEndedNotified) {
+      this._matchEndedNotified = true;
+      try {
+        const stub = this.env.MATCHMAKER.get(this.env.MATCHMAKER.idFromName('default')) as unknown as MatchmakerRpc;
+        stub.notifyMatchEnded(this.roomCode).catch(() => {});
+      } catch { /* ignore */ }
+    }
   }
 
   // ── 玩家离开 ──
@@ -891,6 +909,15 @@ export class RoomObject extends DurableObject {
 
   // ── 销毁房间（当所有玩家都退出时调用） ──
   private destroyRoom(): void {
+    // 通知 MatchmakerObject 减少活跃对局计数（仅随机匹配房间）
+    // fire-and-forget：不阻塞房间销毁流程，RPC 失败由 30 分钟兜底清理修正
+    if (this.isRandomMatch && this.roomCode) {
+      try {
+        const stub = this.env.MATCHMAKER.get(this.env.MATCHMAKER.idFromName('default')) as unknown as MatchmakerRpc;
+        stub.notifyMatchEnded(this.roomCode).catch(() => {});
+      } catch { /* ignore */ }
+    }
+
     this.broadcast(S2C.ROOM_EXPIRED, { message: '房间已关闭' });
     // 关闭所有 WebSocket 连接
     for (const ws of this.connections.values()) {
@@ -948,6 +975,22 @@ export class RoomObject extends DurableObject {
       }
 
       if (this.isRandomMatch) {
+        // 重赛：重置 notify 标记并重新向 MatchmakerObject 注册为活跃对局
+        // （roomCode 不变，notifyMatchEnded 在 endMatch 时已经移除，需重新 set）
+        this._matchEndedNotified = false;
+        // 通过 RPC 反向通道 re-register：复用 MatchmakerObject 已通过 HTTP 暴露的 GET 路径不便做写入
+        // 改为 fire-and-forget 专用 reRegister 方法不存在的情况下，直接通过 fetch 发 POST：
+        // 简化方案：在 MatchmakerObject 上暴露 reRegisterRoom。但 RPC 更简洁——我们新增一个 reRegisterRoom RPC。
+        // 为避免接口膨胀，这里直接构造一个简单的 RPC 风格调用：
+        // MatchmakerObject 通过 fetch(method=GET) 只读，我们走 notifyMatchEnded 对称的接口：
+        // 新增 registerRoom(roomCode) RPC 方法，见 matchmaker-object.ts。
+        try {
+          type MmRpcWithRegister = MatchmakerRpc & {
+            registerRoom(roomCode: string): Promise<void>;
+          };
+          const stub = this.env.MATCHMAKER.get(this.env.MATCHMAKER.idFromName('default')) as unknown as MmRpcWithRegister;
+          stub.registerRoom(this.roomCode).catch(() => {});
+        } catch { /* ignore */ }
         // 随机匹配路径：双方同意后自动开始倒计时
         this.startCountdown();
       }

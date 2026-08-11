@@ -16,6 +16,7 @@ import {
   authenticatePlayer, applySingleScore, setPassword,
   updatePlayerId, upsertPlayerTarget, getPlayerTarget, deletePlayerTarget,
   incrementPlayerTargetAttempts, verifyPasswordDetailed,
+  markPlayerTargetExpired, cleanupExpiredPlayerTargets,
 } from '../../src/lib/players';
 import {
   createCaptcha as libCreateCaptcha, storeCaptcha, verifyCaptcha as libVerifyCaptcha,
@@ -185,6 +186,20 @@ app.post('/api/player/score', async (c) => {
   if (!playerId) return error('缺少玩家ID');
   const p = await getPlayer(db, playerId);
   return c.json(success({ player: publicPlayer(p), delta: 0 }));
+});
+
+// ── 玩家离开页面：标记目标会话 10s 后过期 ─────────────────────────
+//   前端 pagehide 事件通过 sendBeacon 调用，sendBeacon 不支持自定义 header，
+//   所以 auth 走 body/query 回退（readPlayerAuth 三级回退已覆盖）。
+app.post('/api/player/leave', async (c) => {
+  const db = c.get('db');
+  const authed = await requirePlayerAuth(c);
+  if (authed.ok) {
+    await markPlayerTargetExpired(db, authed.auth.player_id);
+  }
+  // 顺带惰性清理已过期会话
+  await cleanupExpiredPlayerTargets(db);
+  return c.json(success({}));
 });
 
 // ── Auth (Register / Login / Logout) ───────────────────────────────
@@ -441,6 +456,8 @@ app.get('/api/draw', async (c) => {
 
 app.post('/api/draw', async (c) => {
   const db = c.get('db');
+  // 惰性清理：删除已过期的目标会话（玩家关闭网页 10s 后到期）
+  await cleanupExpiredPlayerTargets(db);
   const body = await readJson(c);
   const quizType = (String(body.type ?? 'resonator').trim() || 'resonator') as QuizType;
   const difficulty = String(body.difficulty ?? 'normal').trim() || 'normal';
@@ -462,6 +479,8 @@ app.post('/api/draw', async (c) => {
 // ── Guess ───────────────────────────────────────────────────────────
 app.post('/api/guess', async (c) => {
   const db = c.get('db');
+  // 惰性清理：删除已过期的目标会话（玩家关闭网页 10s 后到期）
+  await cleanupExpiredPlayerTargets(db);
   const body = await readJson(c);
   const guessName = String(body.guess ?? '').trim();
   if (!guessName) return error('请输入名称');

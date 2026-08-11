@@ -109,3 +109,9 @@ CREATE TABLE IF NOT EXISTS "admin_sync_state" (
 );
 
 --> drizzle statement: statement-end
+
+-- player_targets 新增 expires_at 字段：玩家关闭网页时设置，10s 后延迟清理
+
+ALTER TABLE "player_targets" ADD COLUMN "expires_at" text DEFAULT CURRENT_TIMESTAMP;
+
+--> drizzle statement: statement-end

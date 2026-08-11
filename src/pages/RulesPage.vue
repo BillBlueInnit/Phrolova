@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { useRouter } from "vue-router";
 import { Icon } from "@iconify/vue";
+import { useI18n } from "vue-i18n";
 
 const router = useRouter();
+const { t } = useI18n();
 
 // 共鸣者猜谜演示：目标「维里奈」(无音,5,长刀)，4 轮猜测
 const resonatorDemo = {
@@ -39,15 +41,15 @@ function fbClass(r: string) {
   <div class="rules-page">
     <header class="rules-top">
       <button class="back-btn" @click="router.push('/')">
-        <Icon icon="ph:arrow-left-duotone" /> BACK
+        <Icon icon="ph:arrow-left-duotone" /> {{ t("leaderboard.back") }}
       </button>
-      <h1 class="page-title">玩法规则</h1>
+      <h1 class="page-title">{{ t("rules.pageTitle") }}</h1>
       <div class="rules-top-right" />
     </header>
 
     <section class="page-heading">
-      <p class="page-kicker">Phrolova · Play Rules</p>
-      <p class="page-desc">快速了解单人演算与多人对战的核心机制</p>
+      <p class="page-kicker">{{ t("rules.pageKicker") }}</p>
+      <p class="page-desc">{{ t("rules.pageDesc") }}</p>
     </section>
 
     <div class="rules-grid">
@@ -56,24 +58,24 @@ function fbClass(r: string) {
         <header class="rules-section-head">
           <div class="rules-section-icon"><Icon icon="ph:user-duotone" /></div>
           <div>
-            <h2>单人演算</h2>
-            <span class="rules-section-en">SOLO MODE</span>
+            <h2>{{ t("rules.soloTitle") }}</h2>
+            <span class="rules-section-en">{{ t("rules.soloEn") }}</span>
           </div>
         </header>
 
         <div class="rules-block">
-          <h3>共鸣者 · 猜谜示例</h3>
-          <p>目标角色：<strong class="rules-emph">「{{ resonatorDemo.target }}」</strong>（无音 · 5 星 · 长刀）。每轮猜测比较三列字段，颜色表示与目标的匹配度。</p>
+          <h3>{{ t("rules.resonatorDemoTitle") }}</h3>
+          <p>{{ t("rules.resonatorDemoTargetPrefix") }}<strong class="rules-emph">「{{ resonatorDemo.target }}」</strong>{{ t("rules.resonatorDemoTargetDesc") }}</p>
 
           <div class="demo-table-wrap">
             <table class="demo-table">
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th>猜测角色</th>
-                  <th>属性</th>
-                  <th>星级</th>
-                  <th>武器</th>
+                  <th>{{ t("rules.colIdx") }}</th>
+                  <th>{{ t("rules.colGuess") }}</th>
+                  <th>{{ t("rules.colAttribute") }}</th>
+                  <th>{{ t("rules.colStar") }}</th>
+                  <th>{{ t("rules.colWeapon") }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -89,15 +91,15 @@ function fbClass(r: string) {
           </div>
 
           <div class="rules-feedback">
-            <span class="rules-fb rules-fb--match">完全匹配</span>
-            <span class="rules-fb rules-fb--near">部分匹配</span>
-            <span class="rules-fb rules-fb--diff">完全不同</span>
+            <span class="rules-fb rules-fb--match">{{ t("rules.fbMatch") }}</span>
+            <span class="rules-fb rules-fb--near">{{ t("rules.fbNear") }}</span>
+            <span class="rules-fb rules-fb--diff">{{ t("rules.fbDiff") }}</span>
           </div>
         </div>
 
         <div class="rules-block">
-          <h3>声骸 · 简单（分组色彩）</h3>
-          <p>同组同色，跨组异色。示例展示 COST 与分组的关系：</p>
+          <h3>{{ t("rules.skeletonEasyTitle") }}</h3>
+          <p>{{ t("rules.skeletonEasyDesc") }}</p>
           <div class="demo-cost-list">
             <div v-for="(g, i) in costGroups" :key="i" class="demo-cost-row" :class="`demo-cost-${g.group}`">
               <span class="demo-cost-label">{{ g.cost }} · {{ g.group }}</span>
@@ -107,13 +109,13 @@ function fbClass(r: string) {
         </div>
 
         <div class="rules-block">
-          <h3>声骸 · 困难</h3>
-          <p>反馈技能属性、所属套装、掉落位置三类信息，每种反馈以独立颜色区分。异相与套装使用分组色彩标记。</p>
+          <h3>{{ t("rules.skeletonHardTitle") }}</h3>
+          <p>{{ t("rules.skeletonHardDesc") }}</p>
         </div>
 
         <div class="rules-block">
-          <h3>胜负判定</h3>
-          <p>在限制次数内猜对即获胜，次数越少得分越高。未猜中则本局结束。</p>
+          <h3>{{ t("rules.winJudgeTitle") }}</h3>
+          <p>{{ t("rules.winJudgeDesc") }}</p>
         </div>
       </section>
 
@@ -122,23 +124,23 @@ function fbClass(r: string) {
         <header class="rules-section-head">
           <div class="rules-section-icon"><Icon icon="ph:users-three-duotone" /></div>
           <div>
-            <h2>多人对战</h2>
-            <span class="rules-section-en">MULTIPLAYER</span>
+            <h2>{{ t("rules.multiTitle") }}</h2>
+            <span class="rules-section-en">{{ t("rules.multiEn") }}</span>
           </div>
         </header>
 
         <div class="rules-block">
-          <h3>BO3 · 回合流程示例</h3>
-          <p>赛制：BO3（先赢 2 回合获胜）。<strong class="rules-emph">对手名称以 *** 隐藏</strong>，但反馈颜色完整可见。</p>
+          <h3>{{ t("rules.bo3Title") }}</h3>
+          <p>{{ t("rules.bo3DescPrefix") }}<strong class="rules-emph">{{ t("rules.bo3DescHidden") }}</strong>{{ t("rules.bo3DescSuffix") }}</p>
 
           <div class="demo-table-wrap">
             <table class="demo-table demo-table-compact">
               <thead>
                 <tr>
-                  <th>回合</th>
-                  <th>P1（你）</th>
-                  <th>P2（对手）</th>
-                  <th>胜者</th>
+                  <th>{{ t("rules.colRound") }}</th>
+                  <th>{{ t("rules.colP1") }}</th>
+                  <th>{{ t("rules.colP2") }}</th>
+                  <th>{{ t("rules.colWinner") }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -151,20 +153,20 @@ function fbClass(r: string) {
               </tbody>
             </table>
           </div>
-          <p class="demo-hint"><em>注：每回合结束后双方各自查看完整反馈表。P1 最终以 2:1 赢得整场对战。</em></p>
+          <p class="demo-hint"><em>{{ t("rules.bo3Hint") }}</em></p>
         </div>
 
         <div class="rules-block">
-          <h3>创建房间</h3>
-          <p>房主选择题型（共鸣者 / 声骸）与赛制（BO1 / BO3 / BO5），生成 6 位房间码邀请对手。</p>
+          <h3>{{ t("rules.createRoomTitle") }}</h3>
+          <p>{{ t("rules.createRoomDesc") }}</p>
         </div>
         <div class="rules-block">
-          <h3>加入房间</h3>
-          <p>输入房间码加入已有房间，双方就绪后房主启动对局。</p>
+          <h3>{{ t("rules.joinRoomTitle") }}</h3>
+          <p>{{ t("rules.joinRoomDesc") }}</p>
         </div>
         <div class="rules-block">
-          <h3>随机匹配</h3>
-          <p>系统自动匹配在线玩家，固定采用 BO3 赛制。匹配成功即进入房间。</p>
+          <h3>{{ t("rules.randomMatchTitle") }}</h3>
+          <p>{{ t("rules.randomMatchDesc") }}</p>
         </div>
       </section>
 
@@ -173,13 +175,13 @@ function fbClass(r: string) {
         <header class="rules-section-head">
           <div class="rules-section-icon"><Icon icon="ph:trophy-duotone" /></div>
           <div>
-            <h2>积分结算</h2>
-            <span class="rules-section-en">SCORING</span>
+            <h2>{{ t("rules.scoringTitle") }}</h2>
+            <span class="rules-section-en">{{ t("rules.scoringEn") }}</span>
           </div>
         </header>
 
         <div class="rules-block">
-          <h3>共鸣者</h3>
+          <h3>{{ t("rules.scoringResonatorTitle") }}</h3>
           <table class="rules-score-table">
             <tr><td>BO1</td><td>±10</td></tr>
             <tr><td>BO3</td><td>±30</td></tr>
@@ -187,7 +189,7 @@ function fbClass(r: string) {
           </table>
         </div>
         <div class="rules-block">
-          <h3>声骸 · 简单</h3>
+          <h3>{{ t("rules.scoringSkeletonEasyTitle") }}</h3>
           <table class="rules-score-table">
             <tr><td>BO1</td><td>±5</td></tr>
             <tr><td>BO3</td><td>±10</td></tr>
@@ -195,7 +197,7 @@ function fbClass(r: string) {
           </table>
         </div>
         <div class="rules-block">
-          <h3>声骸 · 困难</h3>
+          <h3>{{ t("rules.scoringSkeletonHardTitle") }}</h3>
           <table class="rules-score-table">
             <tr><td>BO1</td><td>±30</td></tr>
             <tr><td>BO3</td><td>±50</td></tr>
@@ -204,12 +206,12 @@ function fbClass(r: string) {
         </div>
 
         <div class="rules-block rules-block-example">
-          <h3>结算示例</h3>
-          <p>你在共鸣者 BO3 中 2:1 战胜对手：</p>
+          <h3>{{ t("rules.scoringExampleTitle") }}</h3>
+          <p>{{ t("rules.scoringExampleDesc") }}</p>
           <div class="demo-settle">
-            <div class="demo-settle-row"><span>对战模式</span><span class="demo-settle-val">共鸣者 · BO3</span></div>
-            <div class="demo-settle-row"><span>对战结果</span><span class="demo-settle-val demo-win">胜（2 : 1）</span></div>
-            <div class="demo-settle-row"><span>积分变动</span><span class="demo-settle-val demo-plus">+30</span></div>
+            <div class="demo-settle-row"><span>{{ t("rules.settleMode") }}</span><span class="demo-settle-val">{{ t("rules.settleModeVal") }}</span></div>
+            <div class="demo-settle-row"><span>{{ t("rules.settleResult") }}</span><span class="demo-settle-val demo-win">{{ t("rules.settleResultWin") }}</span></div>
+            <div class="demo-settle-row"><span>{{ t("rules.settleScoreChange") }}</span><span class="demo-settle-val demo-plus">+30</span></div>
           </div>
         </div>
       </section>
@@ -219,26 +221,26 @@ function fbClass(r: string) {
         <header class="rules-section-head">
           <div class="rules-section-icon"><Icon icon="ph:gavel-duotone" /></div>
           <div>
-            <h2>对局判定</h2>
-            <span class="rules-section-en">MATCH RULES</span>
+            <h2>{{ t("rules.matchRulesTitle") }}</h2>
+            <span class="rules-section-en">{{ t("rules.matchRulesEn") }}</span>
           </div>
         </header>
 
         <div class="rules-block">
-          <h3>逃逸判定</h3>
-          <p>主动退出对战视为逃逸，对方直接赢得整场并全额结算积分。逃逸者按对应模式扣减。</p>
+          <h3>{{ t("rules.forfeitTitle") }}</h3>
+          <p>{{ t("rules.forfeitDesc") }}</p>
         </div>
         <div class="rules-block">
-          <h3>断线重连</h3>
-          <p>异常断线后有 60 秒重连窗口，超时未恢复按逃逸处理。返回首页可使用「恢复房间」续接。</p>
+          <h3>{{ t("rules.reconnectTitle") }}</h3>
+          <p>{{ t("rules.reconnectDesc") }}</p>
         </div>
         <div class="rules-block">
-          <h3>平局处理</h3>
-          <p>BO1 中若双方均未在限制次数内猜对，判定平局，双方积分不变。BO3 / BO5 允许单回合平局，继续下一回合。</p>
+          <h3>{{ t("rules.drawTitle") }}</h3>
+          <p>{{ t("rules.drawDesc") }}</p>
         </div>
         <div class="rules-block">
-          <h3>积分保护</h3>
-          <p>每日最多结算 5 场有效对局，超过后积分不再变动，避免异常刷分。</p>
+          <h3>{{ t("rules.scoreProtectTitle") }}</h3>
+          <p>{{ t("rules.scoreProtectDesc") }}</p>
         </div>
       </section>
     </div>

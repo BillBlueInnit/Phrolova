@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { computed, shallowRef, useTemplateRef, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { getCharacterAvatar, getSkeletonAvatar } from "@/utils/game";
 import { normalizeSearchText } from "@/utils/chinese-convert";
 import type { QuizType } from "@/types/game";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   names: Array<{ name: string }>;
@@ -101,8 +104,8 @@ defineExpose({ focus, resolveFinalName });
       ref="inputRef"
       v-model="model"
       :disabled="disabled"
-      :placeholder="placeholder || '输入名称开始猜测'"
-      aria-label="输入猜测名称"
+      :placeholder="placeholder || t('common.inputPlaceholder')"
+      :aria-label="t('common.inputAriaLabel')"
       class="guess-input"
       type="text"
       autocomplete="off"

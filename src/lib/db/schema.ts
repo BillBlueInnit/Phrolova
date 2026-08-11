@@ -59,6 +59,8 @@ export const playerTargets = sqliteTable('player_targets', {
   targetJson: text('target_json').notNull(), // JSON serialized target row
   attempts: integer('attempts').notNull().default(0),
   createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
+  // 玩家关闭网页时设置，10s 后过期；用于延迟清理（区分刷新和真正离开）
+  expiresAt: text('expires_at'),
 });
 
 export type PlayerTarget = typeof playerTargets.$inferSelect;
