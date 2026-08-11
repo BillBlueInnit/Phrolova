@@ -7,10 +7,6 @@
     {
       "tag": "v2-sqlite",
       "new_sqlite_classes": ["RoomObject", "MatchmakerObject"]
-    },
-    {
-      "tag": "v3-online-counter",
-      "new_sqlite_classes": ["OnlineCounterObject"]
     }
   ],
   "d1_databases": [
@@ -31,10 +27,6 @@
       {
         "name": "MATCHMAKER",
         "class_name": "MatchmakerObject"
-      },
-      {
-        "name": "ONLINE_COUNTER",
-        "class_name": "OnlineCounterObject"
       }
     ]
   },

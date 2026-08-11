@@ -9,7 +9,6 @@ import { useMultiGameStore } from "@/stores/multiGame";
 import { useTheme } from "@/composables/useTheme";
 import { useSettings } from "@/composables/useSettings";
 import { useLocalStorage } from "@/composables/useStorage";
-import { useOnlineCount } from "@/composables/useOnlineCount";
 import { useLocale } from "@/i18n";
 import type { AccentPreset } from "@/types";
 
@@ -24,7 +23,6 @@ const { locale, setLocale, availableLocales } = useLocale();
 const { theme, toggleTheme } = useTheme();
 const { settings, toggleAnimations } = useSettings();
 
-const { onlineCount } = useOnlineCount();
 const isHomeRoute = computed(() => route.name === "home");
 const isGameRoute = computed(() => {
   const name = route.name;

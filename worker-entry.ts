@@ -15,11 +15,10 @@ import type { DurableObjectNamespace } from '@cloudflare/workers-types';
 
 // Durable Object 类 **import + re-export**：这两行是 wrangler 能否找到
 // DO 类的关键。生成的 dist/_worker.js 顶部必须出现
-//   `export { MatchmakerObject, RoomObject, OnlineCounterObject }`
+//   `export { MatchmakerObject, RoomObject }`
 import { MatchmakerObject } from './cf-server/matchmaker-object';
 import { RoomObject } from './cf-server/room-object';
-import { OnlineCounterObject } from './cf-server/online-counter-object';
-export { MatchmakerObject, RoomObject, OnlineCounterObject };
+export { MatchmakerObject, RoomObject };
 
 // Hono 应用 (functions/api/[[route]].ts 中 `export default app;`)
 import apiApp from './functions/api/[[route]]';
@@ -31,7 +30,6 @@ type Bindings = {
   DB: D1Database;
   ROOM: DurableObjectNamespace<RoomObject>;
   MATCHMAKER: DurableObjectNamespace<MatchmakerObject>;
-  ONLINE_COUNTER: DurableObjectNamespace<OnlineCounterObject>;
   SECRET_KEY: string;
   ADMIN_USER: string;
   ADMIN_PASSWORD: string;
@@ -46,15 +44,6 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Token, Authorization, X-Player-Id, X-Player-Token, X-Auth-Expected, X-Request-Id',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
 };
-
-// ────────────────────────────────────────────────────────────────────
-// 全站在线人数统计（OnlineCounterObject Durable Object 全局单例）
-// 所有 /ws/online 请求直接路由到 ONLINE_COUNTER DO (idFromName('global'))
-// ────────────────────────────────────────────────────────────────────
-function handleOnlineWebSocket(request: Request, env: Bindings): Response | Promise<Response> {
-  const counterId = env.ONLINE_COUNTER.idFromName('global');
-  return env.ONLINE_COUNTER.get(counterId).fetch(request);
-}
 
 // ────────────────────────────────────────────────────────────────────
 // Worker Fetch Handler
@@ -109,11 +98,6 @@ function handleWs(request: Request, env: Bindings, url: URL): Response | Promise
     return new Response(JSON.stringify({ status: 'ok', server: 'pages-custom-worker' }), {
       headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
     });
-  }
-
-  // /ws/online: 全站在线人数统计（OnlineCounterObject DO 全局单例）
-  if (pathname === '/ws/online') {
-    return handleOnlineWebSocket(request, env);
   }
 
   const isUpgrade = request.headers.get('Upgrade') === 'websocket';

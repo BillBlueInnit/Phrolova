@@ -23,11 +23,6 @@
         "name": "MATCHMAKER",
         "class_name": "MatchmakerObject",
         "script_name": "phrolova-multiplayer"
-      },
-      {
-        "name": "ONLINE_COUNTER",
-        "class_name": "OnlineCounterObject",
-        "script_name": "phrolova-multiplayer"
       }
     ]
   },

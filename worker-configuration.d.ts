@@ -10,7 +10,6 @@ interface __BaseEnv_Env {
 	ADMIN_PASSWORD: string;
 	ROOM: DurableObjectNamespace /* RoomObject from phrolova-multiplayer */;
 	MATCHMAKER: DurableObjectNamespace /* MatchmakerObject from phrolova-multiplayer */;
-	ONLINE_COUNTER: DurableObjectNamespace /* OnlineCounterObject from phrolova-multiplayer */;
 }
 declare namespace Cloudflare {
 	interface Env extends __BaseEnv_Env {}

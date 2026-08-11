@@ -36,8 +36,6 @@ export default {
   home: {
     title: "Phrolova",
     subtitle: "Phrolova",
-    onlineCount: "{count} online",
-    connecting: "Connecting...",
     signInKicker: "SIGN IN",
     signInCta: "Sign in to save progress & ranking",
     signInDesc: "Sign in to unlock multiplayer, leaderboard, and room reconnection.",

@@ -11,16 +11,14 @@
 
 import { RoomObject } from './room-object';
 import { MatchmakerObject } from './matchmaker-object';
-import { OnlineCounterObject } from './online-counter-object';
 
-export { RoomObject, MatchmakerObject, OnlineCounterObject };
+export { RoomObject, MatchmakerObject };
 
 // ── 环境绑定类型 ──
 export interface Env {
   DB: D1Database;
   ROOM: DurableObjectNamespace<RoomObject>;
   MATCHMAKER: DurableObjectNamespace<MatchmakerObject>;
-  ONLINE_COUNTER: DurableObjectNamespace<OnlineCounterObject>;
   SESSION_TTL: string;
   CAPTCHA_TTL: string;
   ADMIN_USER: string;
@@ -53,21 +51,11 @@ export default {
 
       // WebSocket 升级请求
       if (request.headers.get('Upgrade') === 'websocket') {
-        // /ws/online → 在线人数统计（不需要 playerId/token 鉴权）
-        if (url.pathname === '/ws/online') {
-          const counterId = env.ONLINE_COUNTER.idFromName('global');
-          return env.ONLINE_COUNTER.get(counterId).fetch(request);
-        }
         return await routeWebSocket(request, env, ctx, url);
       }
 
       // HTTP 请求路由（用于状态查询等）
       if (url.pathname.startsWith('/ws/')) {
-        // /ws/online HTTP 查询（非 WS）
-        if (url.pathname === '/ws/online') {
-          const counterId = env.ONLINE_COUNTER.idFromName('global');
-          return env.ONLINE_COUNTER.get(counterId).fetch(request);
-        }
         return await routeHttp(request, env, ctx, url);
       }
 

@@ -36,8 +36,6 @@ export default {
   home: {
     title: "弗一把",
     subtitle: "Phrolova",
-    onlineCount: "{count} 人在线",
-    connecting: "连接中...",
     signInKicker: "SIGN IN",
     signInCta: "登录后保存进度与排行",
     signInDesc: "登录后才能解锁多人对战、排行榜和房间续连。",

@@ -14,7 +14,6 @@ import { errMsg } from "@/api/client";
 import { fetchCaptcha, fetchScryptParams } from "@/api";
 import { computeScryptHex } from "@/lib/scrypt-client";
 import { getCookieConsent, setCookieConsent } from "@/composables/useStorage";
-import { useOnlineCount } from "@/composables/useOnlineCount";
 
 const route = useRoute();
 const authStore = useAuthStore();
@@ -105,10 +104,6 @@ const ANNOUNCE_KEY = "phrolova_announcement_v1";
 const showAnnouncement = shallowRef(false);
 const showCookieConsent = shallowRef(false);
 const showAuthModal = shallowRef(false);
-
-// ── 全站在线人数（WebSocket 实时推送，由 App.vue 全局管理连接） ──
-const { onlineCount, onlineConnected } = useOnlineCount();
-const onlineLoading = computed(() => !onlineConnected.value && onlineCount.value === 0);
 
 const authMode = shallowRef<"login" | "register">("login");
 const resetMode = shallowRef(false);
@@ -293,13 +288,6 @@ function declineCookies() {
       <div class="home-title-block">
         <h1 class="home-title">{{ t('home.title') }}</h1>
         <p class="home-subtitle">{{ t('home.subtitle') }}</p>
-        <div class="home-online-badge" :title="t('home.onlineCount', { count: onlineCount })">
-          <span class="home-online-dot" :class="{ 'home-online-dot--active': !onlineLoading && onlineCount > 0 }"></span>
-          <span class="home-online-text">
-            <template v-if="onlineLoading">{{ t('home.connecting') }}</template>
-            <template v-else>{{ t('home.onlineCount', { count: onlineCount }) }}</template>
-          </span>
-        </div>
       </div>
       <div class="home-portrait" :key="frolovaKey" ref="frolovaRef">
         <div class="home-portrait-inner">
