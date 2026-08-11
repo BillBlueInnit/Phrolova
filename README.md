@@ -2,7 +2,7 @@
 
 > 鸣潮角色猜谜游戏 — 基于角色属性与声骸信息的 Web 多人猜谜对战平台
 
-面向中文用户的全栈 TypeScript 项目，部署在 Cloudflare 全球边缘网络：**Pages** 托管前端，**Workers** 运行 API 与实时 WebSocket，**D1** 提供零配置 SQLite，**Durable Objects** 承担多人房间与匹配队列的有状态协调。
+面向中文用户的全栈 TypeScript 项目，部署在 Cloudflare 全球边缘网络：**Pages** 托管前端，**Workers** 运行 API 与实时 WebSocket，**D1** 提供零配置 SQLite，**Durable Objects** 承担多人房间、匹配队列与在线统计的有状态协调。
 
 ---
 
@@ -31,6 +31,7 @@
 | 实时通信 | Durable Objects WebSocket Hibernation | 低成本长连接管理 |
 | 房间协调 | Durable Object `RoomObject` | 单局状态机（回合/计时/结算） |
 | 匹配队列 | Durable Object `MatchmakerObject` | 跨 Worker 的玩家配对 |
+| 在线统计 | Durable Object `OnlineCounterObject` | 全站实时在线人数（纯内存 Map） |
 | 数据库 | Cloudflare D1 | 零运维、事务性 SQLite |
 
 ### 基础设施
@@ -40,7 +41,7 @@
 | 静态托管 | Cloudflare Pages |
 | 边缘计算 | Cloudflare Workers + Durable Objects |
 | 关系数据库 | Cloudflare D1 |
-| 密码哈希 | scrypt（hash-wasm，前端即时哈希，后端零明文接触） |
+| 密码哈希 | PBKDF2-SHA256（Workers Web Crypto，90,000 次迭代） |
 | 包管理 | pnpm |
 
 ---
@@ -104,11 +105,13 @@
 - ✅ 单人模式（共鸣者 / 声骸简单 / 声骸困难）
 - ✅ 多人对战（创建房间 / 加入房间 / 随机匹配 / BO1·BO3·BO5）
 - ✅ 积分系统与排行榜（模式维度独立累计）
-- ✅ 登录 / 注册 / 验证码（scrypt 全程前端即时哈希）
+- ✅ 登录 / 注册 / 验证码（PBKDF2-SHA256 后端哈希，旧 scrypt 密码可平滑升级）
 - ✅ 玩家昵称修改
 - ✅ 数据图鉴浏览（角色、声骸全条目搜索/分页）
 - ✅ 逃逸判负 / 断线重连 / 平局逻辑
 - ✅ 管理员后台（数据表管理、词条差异对比）
+- ✅ 致谢名单展示（按类别分组，支持头像与自定义排序）
+- ✅ 全站实时在线人数统计（Durable Object + WebSocket 心跳）
 
 ---
 
@@ -120,30 +123,40 @@
 │   ├── game.ts                  # 核心游戏逻辑（抽题/对比/积分）
 │   ├── room-object.ts           # DO：房间状态机（回合/计时/结算）
 │   ├── matchmaker-object.ts     # DO：随机匹配队列
+│   ├── online-counter-object.ts # DO：全站在线人数统计（纯内存 Map）
 │   ├── protocol.ts              # C2S / S2C 消息协议枚举
 │   ├── index.ts                 # Workers fetch 入口
-│   └── wrangler.jsonc           # Worker + DO 部署配置
+│   ├── tsconfig.json            # cf-server 独立类型检查配置
+│   └── wrangler.jsonc.example   # Worker + DO 部署配置模板
 ├── src/                         # Vue 3 前端
-│   ├── pages/                   # 路由页面（单人/多人/登录/排行榜/规则/图鉴/后台）
-│   ├── components/              # 通用组件 + 对局组件
+│   ├── pages/                   # 路由页面（单人/多人/登录/排行榜/规则/图鉴/后台/致谢）
+│   ├── components/              # 通用组件 + 对局组件 + 管理后台组件
+│   ├── composables/             # 组合式函数（管理常量/在线人数/设置/主题/Toast）
 │   ├── stores/                  # Pinia 状态（认证/单人游戏/多人游戏/字典）
-│   ├── lib/compare.ts           # 核心对比逻辑（颜色/箭头/多值 cell）
-│   ├── utils/game.ts            # 猜测值格式化、状态样式映射
-│   ├── api/                     # Hono 前端代理接口
+│   ├── lib/                     # 核心库（对比逻辑/密码哈希/验证码/DB schema）
+│   │   ├── compare.ts           # 核心对比逻辑（颜色/箭头/多值 cell）
+│   │   ├── crypto.ts            # PBKDF2-SHA256 密码哈希（Workers Web Crypto）
+│   │   ├── scrypt-client.ts     # 旧 scrypt 密码升级用（hash-wasm 浏览器端计算）
+│   │   ├── captcha.ts           # SVG 验证码生成与 D1 存储/校验
+│   │   └── db/                  # Drizzle ORM schema 与 D1 连接
+│   ├── multiplayer/             # 多人协议定义
+│   ├── types/                   # TypeScript 类型定义
+│   ├── utils/                   # 工具函数（猜测格式化/HTTP/展示/净化）
+│   ├── api/                     # 前端 API 客户端（axios + WebSocket）
 │   └── assets/css/              # Token 主题 + 组件样式 + 页面样式
 ├── functions/api/[[route]].ts   # Pages Functions（Hono 路由入口，同步 cf-server 逻辑）
 ├── public/media/                # 角色/声骸/属性/武器 图像资源
-├── seed/                        # D1 种子数据（角色、声骸、初始玩家）
-├── drizzle/                     # D1 迁移脚本
+├── seed/                        # D1 种子数据（角色、声骸分片 SQL）
+├── drizzle/                     # D1 迁移脚本（0000 初始化 / 0001 致谢表 / 0002 KV 迁移）
 ├── docs/
 │   ├── 游戏规则.md              # 完整游戏规则文档
 │   └── CHANGELOG.md
 ├── index.html                   # Vite 入口 HTML
 ├── vite.config.ts               # 主应用构建配置
 ├── vite.worker.config.ts        # Pages Functions worker 打包配置
-├── worker-entry.ts              # Pages Functions Worker 入口（导出 Hono fetch）
+├── worker-entry.ts              # Pages Custom Worker 入口（导出 DO + Hono fetch）
 ├── drizzle.config.ts            # Drizzle + D1 配置
-├── wrangler.jsonc               # Pages 项目级 Wrangler 配置（示例见 wrangler.jsonc.example）
+├── wrangler.jsonc.example       # Pages 项目级 Wrangler 配置模板
 ├── .env.example                 # 本地开发环境变量示例
 ├── package.json                 # pnpm 工作区根配置
 └── tsconfig.json
@@ -246,14 +259,13 @@ pnpm deploy:production
 
 #### 1. 配置 GitHub Secrets
 
-在仓库 **Settings → Secrets and variables → Actions** 中添加以下 4 个 Secrets：
+在仓库 **Settings → Secrets and variables → Actions** 中添加以下 3 个 Secrets：
 
 | Secret | 说明 |
 |--------|------|
-| `CLOUDFLARE_API_TOKEN` | Cloudflare API Token（需具备 Workers / Pages / D1 / KV 编辑权限） |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare API Token（需具备 Workers / Pages / D1 编辑权限） |
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare Account ID（Dashboard 右侧栏可见） |
 | `D1_DATABASE_ID` | D1 数据库 ID（`wrangler d1 create` 返回值或 Dashboard 中查看） |
-| `KV_NAMESPACE_ID` | KV 命名空间 ID |
 
 #### 2. 推送代码
 
@@ -263,7 +275,7 @@ git push origin main
 
 推送后 GitHub Actions 会自动执行：从 `wrangler.jsonc.example` 模板 + Secrets 生成配置 → `pnpm build` → `pnpm d1:migrate:remote` → `wrangler deploy`（cf-server）→ `wrangler pages deploy dist --branch production`。
 
-> ⚠️ 首次使用前需确保已完成一次性准备（创建 D1 数据库、KV 命名空间），并将对应 ID 配置为 Secrets。种子数据需手动执行一次 `pnpm d1:seed:remote`。
+> ⚠️ 首次使用前需确保已完成一次性准备（创建 D1 数据库），并将对应 ID 配置为 Secrets。种子数据需手动执行一次 `pnpm d1:seed:remote`。
 
 ---
 
@@ -290,8 +302,13 @@ pnpm d1:studio
 主要数据表：
 - `characters` — 共鸣者（角色）属性
 - `sound_skeletons` — 声骸属性、词条、套装
-- `players` — 玩家账号、scrypt 哈希、积分、胜场/总场
-- `matches` / `match_rounds` — 对战记录（可扩展）
+- `players` — 玩家账号、PBKDF2 密码哈希、积分、胜场/总场
+- `player_targets` — 单人游戏目标会话（替代内存缓存）
+- `captchas` — 登录验证码（D1 存储，一次性使用，DELETE RETURNING 防重放）
+- `admin_sessions` — 管理员会话（token + expiry，替代 KV）
+- `admin_sync_state` — 管理后台同步状态（单行表 upsert）
+- `admin_logs` — 管理后台错误日志
+- `acknowledgements` — 致谢名单（类别/描述/头像/排序）
 
 ---
 
@@ -335,7 +352,7 @@ pnpm d1:studio
 - **Preview 部署**（自动部署到 Cloudflare Pages Preview 并在 PR 评论中回贴预览链接）
 - **代码审查报告**（聚合各步骤结果，评论在 PR 中）
 
-> Preview 部署需要仓库 Secrets 已配置（`CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` / `D1_DATABASE_ID` / `KV_NAMESPACE_ID`）；未配置时该步骤会跳过，不影响类型与构建检查。
+> Preview 部署需要仓库 Secrets 已配置（`CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` / `D1_DATABASE_ID`）；未配置时该步骤会跳过，不影响类型与构建检查。
 
 ### 代码所有者与依赖
 
@@ -346,9 +363,10 @@ pnpm d1:studio
 
 ## 安全与隐私
 
-- **密码零明文**：注册/登录时前端使用 scrypt（hash-wasm）即时哈希为 32 字节 hex，后端仅存储 hex 摘要并在 D1 中再次用 scrypt 工作因子包装，全程不接触原始密码。
-- **会话 token**：登录后下发一次性 token，房间 WebSocket 连接必须携带 token 并校验玩家身份。
-- **CORS / CSRF**：Pages 与 Functions 同域部署，默认同源；外部调用通过 `wrangler.jsonc` 的 `headers` 限制。
+- **密码哈希**：注册/登录时前端通过 HTTPS 明文传输密码，后端使用 PBKDF2-SHA256（90,000 次迭代，Workers Web Crypto API）即时哈希后存入 D1，全程不持久化明文。旧 werkzeug scrypt 密码可通过 `/api/auth/upgrade-password` 端点平滑迁移：前端用 hash-wasm 在浏览器端计算 scrypt 验证旧密码，验证通过后后端升级为 PBKDF2 哈希。
+- **会话 token**：登录后下发基于 `player.secret`（HMAC-SHA256）的 token，`/api/auth/refresh` 与 `/api/auth/logout` 会轮换 secret 以立即失效旧 token；房间 WebSocket 连接必须携带 `X-Player-Id` / `X-Player-Token` 头校验玩家身份。
+- **验证码防重放**：登录验证码存入 D1 `captchas` 表，校验时用 `DELETE ... RETURNING` 单条 SQL 原子完成"读取+删除"，天然防并发重放。
+- **CORS / CSRF**：Pages 与 Functions 同域部署，默认同源；`Access-Control-Allow-Headers` 显式声明 `X-Player-Id` / `X-Player-Token` / `X-Admin-Token` 等自定义头。
 - **房间隔离**：每局使用独立 Durable Object，房间码为一次性随机短码，玩家 ID 通过 token 校验后才能写入 Socket。
 
 ---
@@ -364,13 +382,13 @@ pnpm d1:studio
 ## FAQ
 
 **Q：多人对战连接失败？**
-A：确认 `cf-server` Worker 已部署且 Pages 项目已配置 Service Binding 到该 Worker，`wrangler.jsonc` 中的 `services` 段不能缺失；本地开发时 `pnpm dev:cf` 会通过 `--worker` 绑定本地 dev:ws。
+A：确认 `cf-server` Worker 已部署（`pnpm deploy:ws`），且 Pages 项目的 `wrangler.jsonc` 中 `durable_objects.bindings` 已通过 `script_name: "phrolova-multiplayer"` 引用 cf-server 部署的 DO 类；本地开发时 `pnpm dev:ws` 与 `pnpm dev:cf` 共享同一 `--persist-to=.wrangler/state` 目录，确保 DO 与 D1 状态互通。
 
 **Q：本地 D1 数据如何清空重来？**
-A：删除 `.wrangler/state/v3/d1/`，然后重新 `pnpm d1:migrate:local` + `pnpm d1:seed:local`。
+A：删除 `.wrangler/state/v3/d1/`，然后重新 `pnpm d1:migrate:local` + `pnpm d1:seed:local`。若 Durable Object 逻辑有大改动导致旧状态异常，可一并清除 `.wrangler/state/v3/do/` 目录。
 
 **Q：如何添加新角色 / 声骸？**
 A：更新 `seed/seed.sql` 或使用管理员后台（`/admin/login`，需要在 `players` 表手动把 `is_admin` 改为 1）。
 
-**Q：scrypt 参数怎么调？**
-A：在 `src/lib/scrypt-client.ts`（前端哈希）和 D1 种子/升级脚本（后端二次哈希）中统一调整，两端必须一致。
+**Q：密码哈希用的什么算法？旧 scrypt 密码怎么办？**
+A：新密码统一使用 PBKDF2-SHA256（90,000 次迭代，Workers Web Crypto API，参数见 `src/lib/crypto.ts`）。旧 werkzeug scrypt 哈希在 Workers 免费计划下因 CPU/内存限制不可靠，登录时若后端返回 `SCRYPT_UNAVAILABLE`，前端会引导用户通过 `/api/auth/upgrade-password` 升级：浏览器端用 hash-wasm 计算 scrypt 验证旧密码（`src/lib/scrypt-client.ts`），验证通过后后端改存 PBKDF2 哈希。

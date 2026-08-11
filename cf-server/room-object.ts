@@ -366,6 +366,12 @@ export class RoomObject extends DurableObject {
       case C2S.RESUME_ROOM:
         await this.handleResumeRoom(playerId);
         break;
+      case C2S.PLAYER_READY:
+        this.handlePlayerReady(playerId);
+        break;
+      case C2S.START_MATCH:
+        this.handleStartMatch(playerId);
+        break;
       default:
         this.sendToPlayer(playerId, S2C.ERROR, { message: `未知消息类型: ${type}` });
     }
@@ -462,8 +468,9 @@ export class RoomObject extends DurableObject {
     this.broadcast(S2C.ROOM_JOINED, { roomCode: this.roomCode });
     this.broadcastState();
 
-    // 仅当 2 名玩家都在房间时才开始倒计时
-    if (this.players.length === 2) {
+    // 仅随机匹配路径：2 名玩家都在房间时才自动开始倒计时
+    // 创建房间路径：需玩家点"准备" + 房主点"开始对局"才开始
+    if (this.players.length === 2 && this.isRandomMatch) {
       this.opponentId = this.players.find(p => p.playerId !== playerId)?.playerId || '';
       // 延迟开始倒计时：给加入的玩家足够时间完成路由跳转和组件挂载
       // 避免玩家刚进入房间页面时倒计时已过半甚至游戏已开始
@@ -937,10 +944,14 @@ export class RoomObject extends DurableObject {
         player.attemptsLimit = limit;
         player.guesses = [];
         player.roundWins = 0;
+        player.ready = false;
       }
 
-      // 双方准备就绪，开始倒计时
-      this.startCountdown();
+      if (this.isRandomMatch) {
+        // 随机匹配路径：双方同意后自动开始倒计时
+        this.startCountdown();
+      }
+      // 创建房间路径：双方同意后回到 waiting，不自动倒计时，需重新点准备+开始
     } else {
       this.broadcast(S2C.MATCHING, {
         message: `等待另一位玩家同意重新开始 (${this.rematchVotes.length}/${this.players.length})`,
@@ -959,6 +970,57 @@ export class RoomObject extends DurableObject {
     } else {
       this.sendToPlayer(playerId, S2C.ERROR, { message: '未找到房间会话' });
     }
+  }
+
+  // ── 玩家准备（仅创建房间路径） ──
+  private handlePlayerReady(playerId: string): void {
+    if (this.isRandomMatch) {
+      this.sendToPlayer(playerId, S2C.ERROR, { message: '随机匹配无需手动准备' });
+      return;
+    }
+    if (this.roomStatus !== 'waiting') {
+      this.sendToPlayer(playerId, S2C.ERROR, { message: '当前阶段无法准备' });
+      return;
+    }
+    // 房主不参与准备（ready 恒 false），仅非房主玩家可以 ready
+    if (this.creator === playerId) {
+      this.sendToPlayer(playerId, S2C.ERROR, { message: '房主无需准备，直接开始对局即可' });
+      return;
+    }
+    const player = this.players.find(p => p.playerId === playerId);
+    if (!player) return;
+    player.ready = true;
+    this.broadcastState();
+    this.persistState(); // fire-and-forget
+  }
+
+  // ── 房主开始对局（仅创建房间路径） ──
+  private handleStartMatch(playerId: string): void {
+    if (this.isRandomMatch) {
+      this.sendToPlayer(playerId, S2C.ERROR, { message: '随机匹配会自动开始，无需手动开始' });
+      return;
+    }
+    if (this.roomStatus !== 'waiting') {
+      this.sendToPlayer(playerId, S2C.ERROR, { message: '当前阶段无法开始对局' });
+      return;
+    }
+    if (this.creator !== playerId) {
+      this.sendToPlayer(playerId, S2C.ERROR, { message: '仅房主可以开始对局' });
+      return;
+    }
+    if (this.players.length < 2) {
+      this.sendToPlayer(playerId, S2C.ERROR, { message: '需要 2 名玩家才能开始对局' });
+      return;
+    }
+    // 非房主玩家必须已准备
+    const nonCreator = this.players.find(p => p.playerId !== this.creator);
+    if (!nonCreator || !nonCreator.ready) {
+      this.sendToPlayer(playerId, S2C.ERROR, { message: '等待另一位玩家准备完毕' });
+      return;
+    }
+    this.opponentId = nonCreator.playerId;
+    this.startCountdown();
+    this.persistState(); // fire-and-forget
   }
 
   // ── 辅助方法 ──
@@ -986,6 +1048,7 @@ export class RoomObject extends DurableObject {
       roundWins: 0,
       attemptsUsed: 0,
       attemptsLimit: this.quizType === 'resonator' ? 4 : 8,
+      ready: false,
       guesses: [],
     });
   }
@@ -1052,6 +1115,7 @@ export class RoomObject extends DurableObject {
         roundWins: p.roundWins,
         attemptsUsed: p.attemptsUsed,
         attemptsLimit: p.attemptsLimit,
+        ready: p.ready,
         guesses: shouldRevealAll
           ? p.guesses.map(g => ({ ...g, revealed: true }))
           : p.guesses,
@@ -1066,6 +1130,7 @@ export class RoomObject extends DurableObject {
       })),
       exitedPlayers: Array.from(this.exitedPlayers),
       reconnectingPlayers: Array.from(this.disconnectedPlayers),
+      isRandomMatch: this.isRandomMatch,
     };
   }
 
