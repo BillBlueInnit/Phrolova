@@ -169,11 +169,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Generate cf-server/wrangler.jsonc (step 1: without v4 migration)
-        run: |
-          sed -e "s|REPLACE_WITH_YOUR_D1_DATABASE_ID|${{ secrets.D1_DATABASE_ID }}|g" cf-server/wrangler.jsonc.example > cf-server/wrangler.jsonc
-          # Remove v4 migration for step 1: must remove ONLINE_COUNTER binding
-          # from server BEFORE applying deleted_classes migration in step 2
-          node -e "const fs=require('fs');const c=JSON.parse(fs.readFileSync('cf-server/wrangler.jsonc','utf8'));c.migrations=c.migrations.filter(m=>m.tag!=='v4-remove-online-counter');fs.writeFileSync('cf-server/wrangler.jsonc',JSON.stringify(c,null,2));"
+        run: sed -e "s|REPLACE_WITH_YOUR_D1_DATABASE_ID|${{ secrets.D1_DATABASE_ID }}|g" cf-server/wrangler.step1.jsonc.example > cf-server/wrangler.jsonc
 
       - name: Deploy step 1 (remove ONLINE_COUNTER binding from server)
         uses: cloudflare/wrangler-action@v3
@@ -184,10 +180,7 @@ jobs:
           command: deploy
 
       - name: Generate cf-server/wrangler.jsonc (step 2: with v4 migration)
-        run: |
-          sed \
-            -e "s|REPLACE_WITH_YOUR_D1_DATABASE_ID|${{ secrets.D1_DATABASE_ID }}|g" \
-            cf-server/wrangler.jsonc.example > cf-server/wrangler.jsonc
+        run: sed -e "s|REPLACE_WITH_YOUR_D1_DATABASE_ID|${{ secrets.D1_DATABASE_ID }}|g" cf-server/wrangler.step2.jsonc.example > cf-server/wrangler.jsonc
 
       - name: Deploy step 2 (delete OnlineCounterObject class)
         uses: cloudflare/wrangler-action@v3
