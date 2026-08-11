@@ -141,6 +141,12 @@ function cellClass(r: string) {
 
     <section class="page-heading">
       <p class="page-kicker">{{ t("rules.pageKicker") }}</p>
+      <h2 class="page-title">{{ t("rules.pageTitle") }}</h2>
+      <div class="page-ornament">
+        <span />
+        <Icon icon="ph:squares-four-duotone" class="ph" />
+        <span />
+      </div>
       <p class="page-desc">{{ t("rules.pageDesc") }}</p>
     </section>
 
@@ -148,6 +154,7 @@ function cellClass(r: string) {
       <!-- ═══════════ 单人演算 ═══════════ -->
       <section class="rules-section rules-section--span">
         <header class="rules-section-head">
+          <span class="rules-section-num">01</span>
           <div class="rules-section-icon"><Icon icon="ph:user-duotone" /></div>
           <div>
             <h2>{{ t("rules.soloTitle") }}</h2>
@@ -394,6 +401,7 @@ function cellClass(r: string) {
       <!-- ═══════════ 多人对战 ═══════════ -->
       <section class="rules-section">
         <header class="rules-section-head">
+          <span class="rules-section-num">02</span>
           <div class="rules-section-icon rules-section-icon--multi">
             <Icon icon="ph:users-three-duotone" />
           </div>
@@ -473,16 +481,19 @@ function cellClass(r: string) {
             <Icon icon="ph:flow-arrow-duotone" /> {{ t("rules.readyFlowTitle") }}
           </h3>
           <div class="rules-flow">
-            <div v-for="(s, i) in readySteps" :key="i" class="rules-flow-step">
-              <div class="rules-flow-ico"><Icon :icon="s.icon" /></div>
-              <div class="rules-flow-body">
-                <div class="rules-flow-title">{{ s.title }}</div>
-                <p class="rules-flow-desc">{{ s.desc }}</p>
+            <template v-for="(s, i) in readySteps" :key="i">
+              <div class="rules-flow-step">
+                <span class="rules-flow-num">{{ i + 1 }}</span>
+                <div class="rules-flow-ico"><Icon :icon="s.icon" /></div>
+                <div class="rules-flow-body">
+                  <div class="rules-flow-title">{{ s.title }}</div>
+                  <p class="rules-flow-desc">{{ s.desc }}</p>
+                </div>
               </div>
               <div v-if="i < readySteps.length - 1" class="rules-flow-arrow">
                 <Icon icon="ph:caret-right-duotone" />
               </div>
-            </div>
+            </template>
           </div>
           <p class="rules-flow-sub">{{ t("rules.readyFlowDesc") }}</p>
         </div>
@@ -523,6 +534,7 @@ function cellClass(r: string) {
       <!-- ═══════════ 积分结算 + 对局判定 ═══════════ -->
       <section class="rules-section">
         <header class="rules-section-head">
+          <span class="rules-section-num">03</span>
           <div class="rules-section-icon rules-section-icon--score">
             <Icon icon="ph:trophy-duotone" />
           </div>
