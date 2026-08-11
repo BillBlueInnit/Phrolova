@@ -11,16 +11,14 @@
 
 import { RoomObject } from './room-object';
 import { MatchmakerObject } from './matchmaker-object';
-import { OnlineCounterObject } from './online-counter-object';
 
-export { RoomObject, MatchmakerObject, OnlineCounterObject };
+export { RoomObject, MatchmakerObject };
 
 // ── 环境绑定类型 ──
 export interface Env {
   DB: D1Database;
   ROOM: DurableObjectNamespace<RoomObject>;
   MATCHMAKER: DurableObjectNamespace<MatchmakerObject>;
-  ONLINE_COUNTER: DurableObjectNamespace<OnlineCounterObject>;
   SESSION_TTL: string;
   CAPTCHA_TTL: string;
   ADMIN_USER: string;
@@ -49,12 +47,6 @@ export default {
         return new Response(JSON.stringify({ status: 'ok', server: 'cf-worker' }), {
           headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
         });
-      }
-
-      // /ws/online: 全站在线人数统计，公共端点无需鉴权
-      if (url.pathname === '/ws/online') {
-        const id = env.ONLINE_COUNTER.idFromName('global');
-        return env.ONLINE_COUNTER.get(id).fetch(request);
       }
 
       // WebSocket 升级请求
