@@ -12,13 +12,6 @@
       "migrations_table": "drizzle_migrations"
     }
   ],
-  "kv_namespaces": [
-    {
-      "binding": "KV",
-      "id": "REPLACE_WITH_YOUR_KV_NAMESPACE_ID",
-      "preview_id": "REPLACE_WITH_YOUR_KV_PREVIEW_ID"
-    }
-  ],
   "durable_objects": {
     "bindings": [
       {

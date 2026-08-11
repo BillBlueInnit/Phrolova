@@ -88,3 +88,34 @@ export const acknowledgements = sqliteTable('acknowledgements', {
 
 export type Acknowledgement = typeof acknowledgements.$inferSelect;
 export type NewAcknowledgement = typeof acknowledgements.$inferInsert;
+
+// ── 登录验证码（替代 KV 存储，一次性使用） ─────────────
+export const captchas = sqliteTable('captchas', {
+  captchaId: text('captcha_id').primaryKey(),
+  text: text('text').notNull(),
+  expire: integer('expire').notNull(), // epoch 秒
+}, (table) => ({
+  idx_captchas_expire: index('idx_captchas_expire').on(table.expire),
+}));
+
+export type Captcha = typeof captchas.$inferSelect;
+export type NewCaptcha = typeof captchas.$inferInsert;
+
+// ── 管理员会话（替代 KV 存储） ─────────────────────────
+export const adminSessions = sqliteTable('admin_sessions', {
+  token: text('token').primaryKey(),
+  expiry: integer('expiry').notNull(), // epoch 秒
+}, (table) => ({
+  idx_admin_sessions_expiry: index('idx_admin_sessions_expiry').on(table.expiry),
+}));
+
+export type AdminSession = typeof adminSessions.$inferSelect;
+
+// ── 管理后台同步状态（单行表，id 恒为 1） ───────────────
+export const adminSyncState = sqliteTable('admin_sync_state', {
+  id: integer('id').primaryKey(),
+  status: text('status').notNull().default('idle'),
+  resultJson: text('result_json'),
+});
+
+export type AdminSyncStateRow = typeof adminSyncState.$inferSelect;

@@ -6,7 +6,7 @@ import { logger } from 'hono/logger';
 import { HTTPException } from 'hono/http-exception';
 import { desc, eq, and, gt, lt, sql, lte } from 'drizzle-orm';
 
-import { createDb, characters, soundSkeletons, players, adminLogs, acknowledgements } from '../../src/lib/db';
+import { createDb, characters, soundSkeletons, players, adminLogs, acknowledgements, adminSessions, adminSyncState } from '../../src/lib/db';
 import {
   buildCompareByType, allMatch, normalizeRow, toFrontendRow,
   type QuizType, type CompareResult,
@@ -25,7 +25,6 @@ import { generateToken, hmacSha256Hex, timingSafeEqualStrings } from '../../src/
 // ── Environment types ──────────────────────────────────────────────
 type Bindings = {
   DB: D1Database;
-  KV: KVNamespace;
   SECRET_KEY: string;
   ADMIN_USER: string;
   ADMIN_PASSWORD: string;
@@ -133,10 +132,11 @@ app.get('/api/health', (c) => c.json(success({})));
 
 // ── Captcha ────────────────────────────────────────────────────────
 app.get('/api/auth/captcha', async (c) => {
+  const db = c.get('db');
   const captcha = libCreateCaptcha();
   const ttl = parseInt(c.env.CAPTCHA_TTL ?? '180', 10);
   const expire = Date.now() / 1000 + ttl;
-  await storeCaptcha(c.env.KV, { ...captcha, expire }, ttl);
+  await storeCaptcha(db, { ...captcha, expire });
   return c.json(success({ captcha_id: captcha.captcha_id, image: captcha.image }));
 });
 
@@ -198,7 +198,7 @@ app.post('/api/auth/register', async (c) => {
   if (!username) return error('账号不能为空');
   if (username.length > 64) return error('账号过长（最多64字符）');
   if (password.length < 6) return error('密码至少 6 位');
-  const captchaOk = await libVerifyCaptcha(c.env.KV, captchaId, captchaText);
+  const captchaOk = await libVerifyCaptcha(db, captchaId, captchaText);
   if (!captchaOk) return error('验证码错误或已过期');
 
   try {
@@ -242,7 +242,7 @@ app.post('/api/auth/login', async (c) => {
   const captchaId = String(body.captcha_id ?? '').trim();
   const captchaText = String(body.captcha_text ?? '').trim();
   if (!username || !password) return error('请输入账号和密码');
-  const captchaOk = await libVerifyCaptcha(c.env.KV, captchaId, captchaText);
+  const captchaOk = await libVerifyCaptcha(db, captchaId, captchaText);
   if (!captchaOk) return error('验证码错误或已过期');
   const p = await getPlayer(db, username);
   if (!p) return error('账号不存在', 404);
@@ -348,7 +348,7 @@ app.post('/api/auth/upgrade-password', async (c) => {
   if (!oldPasswordHash) return error('请提供旧密码验证');
   if (newPassword.length < 6) return error('密码至少 6 位');
 
-  const captchaOk = await libVerifyCaptcha(c.env.KV, captchaId, captchaText);
+  const captchaOk = await libVerifyCaptcha(db, captchaId, captchaText);
   if (!captchaOk) return error('验证码错误或已过期');
 
   const p = await getPlayer(db, username);
@@ -590,7 +590,6 @@ app.get('/api/leaderboard', async (c) => {
 });
 
 // ── Admin helpers ───────────────────────────────────────────────────
-const ADMIN_SESSION_PREFIX = 'admin_session:';
 const _rateWindow: Record<string, number[]> = {};
 const RATE_LIMIT = 5;
 const RATE_WINDOW_SEC = 60;
@@ -614,18 +613,12 @@ async function makeAdminToken(env: Bindings, username: string): Promise<string> 
   return `${sig}:${payload}`;
 }
 
-async function verifyAdminToken(env: Bindings, token: string): Promise<boolean> {
+async function verifyAdminToken(db: ReturnType<typeof createDb>, token: string): Promise<boolean> {
   if (!token) return false;
-  const raw = await env.KV.get(ADMIN_SESSION_PREFIX + token);
-  if (!raw) return false;
-  let expiry = 0;
-  try {
-    expiry = JSON.parse(raw).expiry;
-  } catch {
-    return false;
-  }
-  if (Date.now() / 1000 > expiry) {
-    await env.KV.delete(ADMIN_SESSION_PREFIX + token);
+  const rows = await db.select().from(adminSessions).where(eq(adminSessions.token, token)).limit(1);
+  if (rows.length === 0) return false;
+  if (Date.now() / 1000 > rows[0].expiry) {
+    await db.delete(adminSessions).where(eq(adminSessions.token, token));
     return false;
   }
   return true;
@@ -633,7 +626,7 @@ async function verifyAdminToken(env: Bindings, token: string): Promise<boolean> 
 
 async function requireAdmin(c: any): Promise<Response | null> {
   const token = String(c.req.header('X-Admin-Token') ?? '');
-  const ok = await verifyAdminToken(c.env, token);
+  const ok = await verifyAdminToken(c.get('db'), token);
   if (!ok) return error('未授权，请先登录', 401, 'ADMIN_AUTH_REQUIRED');
   return null;
 }
@@ -666,15 +659,16 @@ app.post('/api/admin/login', async (c) => {
   if (!userOk || !passOk) return error('账号或密码错误', 401);
   const token = await makeAdminToken(c.env, username);
   const ttl = parseInt(c.env.SESSION_TTL ?? '7200', 10);
-  await c.env.KV.put(ADMIN_SESSION_PREFIX + token, JSON.stringify({ expiry: Date.now() / 1000 + ttl }), {
-    expirationTtl: ttl + 60,
-  });
+  const db = c.get('db');
+  // 清理过期会话，避免表膨胀
+  await db.delete(adminSessions).where(lt(adminSessions.expiry, Math.floor(Date.now() / 1000)));
+  await db.insert(adminSessions).values({ token, expiry: Math.floor(Date.now() / 1000 + ttl) });
   return c.json(success({ token }));
 });
 
 app.post('/api/admin/logout', async (c) => {
   const token = String(c.req.header('X-Admin-Token') ?? '');
-  if (token) await c.env.KV.delete(ADMIN_SESSION_PREFIX + token);
+  if (token) await c.get('db').delete(adminSessions).where(eq(adminSessions.token, token));
   return c.json(success({}));
 });
 
@@ -764,17 +758,29 @@ app.post('/api/admin/update', async (c) => {
 
 // Simplified sync stubs (since we don't have Python nanoka_scraper in TS)
 // In production these would call the original scraper endpoints or a scheduled Worker
-const SYNC_STATE_KEY = 'admin_sync_state';
 type SyncState = { status: 'running' | 'idle'; result?: unknown };
+
+async function getSyncState(db: ReturnType<typeof createDb>): Promise<SyncState> {
+  const rows = await db.select().from(adminSyncState).where(eq(adminSyncState.id, 1)).limit(1);
+  if (rows.length === 0) return { status: 'idle' };
+  const row = rows[0];
+  let result: unknown;
+  if (row.resultJson) {
+    try { result = JSON.parse(row.resultJson); } catch { /* ignore */ }
+  }
+  return { status: row.status === 'running' ? 'running' : 'idle', result };
+}
+
+async function setSyncState(db: ReturnType<typeof createDb>, status: 'running' | 'idle', result?: unknown): Promise<void> {
+  const resultJson = result !== undefined ? JSON.stringify(result) : null;
+  await db.insert(adminSyncState).values({ id: 1, status, resultJson })
+    .onConflictDoUpdate({ target: adminSyncState.id, set: { status, resultJson } });
+}
 
 app.get('/api/admin/sync/status', async (c) => {
   const denied = await requireAdmin(c);
   if (denied) return denied;
-  const raw = await c.env.KV.get(SYNC_STATE_KEY);
-  let state: SyncState = { status: 'idle' };
-  if (raw) {
-    try { state = JSON.parse(raw); } catch { /* ignore */ }
-  }
+  const state = await getSyncState(c.get('db'));
   return c.json({ status: state.status === 'running' ? 'running' : 'idle', result: state.result ?? null });
 });
 
@@ -804,11 +810,8 @@ app.post('/api/admin/sync/preview', async (c) => {
 app.post('/api/admin/sync', async (c) => {
   const denied = await requireAdmin(c);
   if (denied) return denied;
-  const raw = await c.env.KV.get(SYNC_STATE_KEY);
-  let state: SyncState = { status: 'idle' };
-  if (raw) {
-    try { state = JSON.parse(raw); } catch { /* ignore */ }
-  }
+  const db = c.get('db');
+  const state = await getSyncState(db);
   if (state.status === 'running') {
     return new Response(JSON.stringify({ status: 'busy', message: '同步任务已在运行中' }), {
       status: 409, headers: { 'Content-Type': 'application/json; charset=utf-8' },
@@ -816,11 +819,10 @@ app.post('/api/admin/sync', async (c) => {
   }
   const body = await readJson(c);
   const syncType = String(body.type ?? 'all').trim();
-  const db = c.get('db');
   await appendLog(db, 'INFO', `sync ${syncType} started (stub — TS version placeholder)`);
 
   // Mark running, then complete with stub result (since nanoka_scraper.py isn't ported)
-  await c.env.KV.put(SYNC_STATE_KEY, JSON.stringify({ status: 'running' }));
+  await setSyncState(db, 'running');
   // In a real deployment, this could go to a Queue + Worker
   const stubResult: Record<string, unknown> = {
     ok: false,
@@ -832,7 +834,7 @@ app.post('/api/admin/sync', async (c) => {
     stubResult.characters = { created: 0, updated: 0, deleted: 0 };
     stubResult.echoes = { created: 0, updated: 0, deleted: 0 };
   }
-  await c.env.KV.put(SYNC_STATE_KEY, JSON.stringify({ status: 'idle', result: stubResult }));
+  await setSyncState(db, 'idle', stubResult);
   await appendLog(db, 'INFO', `sync ${syncType} completed (stub)`);
   return c.json({ status: 'started', message: '同步任务已启动（TS版本占位，若需真实爬虫请扩展Queue Worker）' });
 });

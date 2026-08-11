@@ -29,7 +29,6 @@ import apiApp from './functions/api/[[route]]';
 // ────────────────────────────────────────────────────────────────────
 type Bindings = {
   DB: D1Database;
-  KV: KVNamespace;
   ROOM: DurableObjectNamespace<RoomObject>;
   MATCHMAKER: DurableObjectNamespace<MatchmakerObject>;
   ONLINE_COUNTER: DurableObjectNamespace<OnlineCounterObject>;
@@ -105,8 +104,20 @@ function handleWs(request: Request, env: Bindings, url: URL): Response | Promise
 
   // /ws/online: 全站在线人数统计，公共端点无需鉴权
   if (pathname === '/ws/online') {
-    const id = env.ONLINE_COUNTER.idFromName('global');
-    return env.ONLINE_COUNTER.get(id).fetch(request);
+    try {
+      const id = env.ONLINE_COUNTER.idFromName('global');
+      return env.ONLINE_COUNTER.get(id).fetch(request);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('[Worker /ws/online] route error:', message, err);
+      return new Response(
+        JSON.stringify({ status: 'error', message }),
+        {
+          status: 500,
+          headers: { 'Content-Type': 'application/json; charset=utf-8', ...CORS_HEADERS },
+        },
+      );
+    }
   }
 
   const isUpgrade = request.headers.get('Upgrade') === 'websocket';
