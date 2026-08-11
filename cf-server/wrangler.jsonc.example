@@ -5,8 +5,13 @@
   "compatibility_flags": ["nodejs_compat"],
   "migrations": [
     {
-      "tag": "v2-sqlite",
-      "new_sqlite_classes": ["RoomObject", "MatchmakerObject"]
+      "tag": "v1-initial-classes"
+    },
+    {
+      "tag": "v2-sqlite"
+    },
+    {
+      "tag": "v3-online-counter"
     }
   ],
   "d1_databases": [
