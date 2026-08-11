@@ -168,6 +168,18 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: "Patch index.ts - add stub OnlineCounterObject export (step 1)"
+        run: |
+          cat >> cf-server/index.ts <<'EOF'
+
+          // TEMP STUB for CI step 1: avoid 10064 before DO class deletion
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          export class OnlineCounterObject {
+            constructor(state: DurableObjectState, env: Env) {}
+            fetch(req: Request) { return new Response("stub"); }
+          }
+          EOF
+
       - name: "Generate cf-server/wrangler.jsonc - step 1 (no v4 migration)"
         run: sed -e "s|REPLACE_WITH_YOUR_D1_DATABASE_ID|${{ secrets.D1_DATABASE_ID }}|g" cf-server/wrangler.step1.jsonc.example > cf-server/wrangler.jsonc
 
@@ -178,6 +190,9 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: cf-server
           command: deploy
+
+      - name: "Restore index.ts - remove stub export (step 2 prep)"
+        run: git checkout -- cf-server/index.ts
 
       - name: "Generate cf-server/wrangler.jsonc - step 2 (with v4 migration)"
         run: sed -e "s|REPLACE_WITH_YOUR_D1_DATABASE_ID|${{ secrets.D1_DATABASE_ID }}|g" cf-server/wrangler.step2.jsonc.example > cf-server/wrangler.jsonc
