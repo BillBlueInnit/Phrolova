@@ -15,10 +15,11 @@ import type { DurableObjectNamespace } from '@cloudflare/workers-types';
 
 // Durable Object 类 **import + re-export**：这两行是 wrangler 能否找到
 // DO 类的关键。生成的 dist/_worker.js 顶部必须出现
-//   `export { MatchmakerObject, RoomObject }`
+//   `export { MatchmakerObject, RoomObject, OnlineCounterObject }`
 import { MatchmakerObject } from './cf-server/matchmaker-object';
 import { RoomObject } from './cf-server/room-object';
-export { MatchmakerObject, RoomObject };
+import { OnlineCounterObject } from './cf-server/online-counter-object';
+export { MatchmakerObject, RoomObject, OnlineCounterObject };
 
 // Hono 应用 (functions/api/[[route]].ts 中 `export default app;`)
 import apiApp from './functions/api/[[route]]';
@@ -28,9 +29,9 @@ import apiApp from './functions/api/[[route]]';
 // ────────────────────────────────────────────────────────────────────
 type Bindings = {
   DB: D1Database;
-  KV: KVNamespace;
   ROOM: DurableObjectNamespace<RoomObject>;
   MATCHMAKER: DurableObjectNamespace<MatchmakerObject>;
+  ONLINE_COUNTER: DurableObjectNamespace<OnlineCounterObject>;
   SECRET_KEY: string;
   ADMIN_USER: string;
   ADMIN_PASSWORD: string;
@@ -42,116 +43,17 @@ type Bindings = {
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Token, Authorization, X-Player-Id, X-Player-Token',
+  'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Token, Authorization, X-Player-Id, X-Player-Token, X-Auth-Expected, X-Request-Id',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
 };
 
 // ────────────────────────────────────────────────────────────────────
-// 全站在线人数统计（纯 Worker 内存实现，无需 DO）
-//
-// 设计：
-//   - 模块级 Map<clientId, lastSeen> 记录在线用户（按 clientId 去重）
-//   - 模块级 Set<WebSocket> 维护所有活跃 WS 连接
-//   - 客户端每 30 秒发心跳刷新时间戳
-//   - 每 10 秒清理超过 60 秒未心跳的客户端，广播最新人数
-//   - 注意：Worker 无状态，多个 isolate 间计数不共享，
-//     但对在线人数的近似值已足够实用（类似其他统计工具）
+// 全站在线人数统计（OnlineCounterObject Durable Object 全局单例）
+// 所有 /ws/online 请求直接路由到 ONLINE_COUNTER DO (idFromName('global'))
 // ────────────────────────────────────────────────────────────────────
-const onlineClients = new Map<string, number>();
-const onlineSockets = new Set<WebSocket>();
-let onlineTimer: number | null = null;
-
-const ONLINE_HEARTBEAT_TIMEOUT = 60_000; // 60 秒
-const ONLINE_BROADCAST_INTERVAL = 10_000; // 10 秒
-
-function onlineCleanupStale() {
-  const now = Date.now();
-  for (const [id, ts] of onlineClients) {
-    if (now - ts > ONLINE_HEARTBEAT_TIMEOUT) {
-      onlineClients.delete(id);
-    }
-  }
-}
-
-function onlineBroadcast() {
-  onlineCleanupStale();
-  if (onlineSockets.size === 0) return;
-  const msg = JSON.stringify({ type: 'online_count', count: onlineClients.size });
-  for (const ws of onlineSockets) {
-    try { ws.send(msg); } catch { /* ignore */ }
-  }
-}
-
-function onlineEnsureTimer() {
-  if (onlineTimer !== null) return;
-  onlineTimer = setInterval(onlineBroadcast, ONLINE_BROADCAST_INTERVAL) as unknown as number;
-}
-
-function handleOnlineWebSocket(request: Request): Response {
-  const upgrade = request.headers.get('Upgrade');
-  const url = new URL(request.url);
-
-  // HTTP 查询：返回当前在线人数（用于非 WS 请求或健康检查）
-  if (upgrade !== 'websocket') {
-    onlineCleanupStale();
-    return new Response(
-      JSON.stringify({ status: 'ok', count: onlineClients.size }),
-      { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', ...CORS_HEADERS } },
-    );
-  }
-
-  const clientId = (url.searchParams.get('client_id') || '').trim();
-  if (!clientId || clientId.length > 128) {
-    return new Response(
-      JSON.stringify({ status: 'error', message: '缺少 client_id 参数', error_code: 'INVALID_CLIENT_ID' }),
-      { status: 400, headers: { 'Content-Type': 'application/json; charset=utf-8', ...CORS_HEADERS } },
-    );
-  }
-
-  try {
-    const pair = new WebSocketPair();
-    const [client, server] = Object.values(pair) as unknown as [WebSocket, WebSocket];
-
-    server.accept();
-
-    // 注册在线
-    onlineClients.set(clientId, Date.now());
-    onlineSockets.add(server);
-
-    // 立即推送当前人数
-    onlineCleanupStale();
-    try {
-      server.send(JSON.stringify({ type: 'online_count', count: onlineClients.size }));
-    } catch { /* ignore */ }
-
-    // 心跳 → 刷新时间戳
-    server.addEventListener('message', () => {
-      onlineClients.set(clientId, Date.now());
-    });
-
-    // 关闭 → 清理 socket + 广播
-    server.addEventListener('close', () => {
-      onlineSockets.delete(server);
-      // 不立即删除 onlineClients 条目，留 60 秒超时自然清理
-      // （用户可能只是刷新页面，短暂断开）
-      onlineBroadcast();
-    });
-
-    server.addEventListener('error', () => {
-      onlineSockets.delete(server);
-    });
-
-    onlineEnsureTimer();
-
-    return new Response(null, { status: 101, webSocket: client });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error('[online] WebSocket error:', message, err);
-    return new Response(
-      JSON.stringify({ status: 'error', message }),
-      { status: 500, headers: { 'Content-Type': 'application/json; charset=utf-8', ...CORS_HEADERS } },
-    );
-  }
+function handleOnlineWebSocket(request: Request, env: Bindings): Response | Promise<Response> {
+  const counterId = env.ONLINE_COUNTER.idFromName('global');
+  return env.ONLINE_COUNTER.get(counterId).fetch(request);
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -209,9 +111,9 @@ function handleWs(request: Request, env: Bindings, url: URL): Response | Promise
     });
   }
 
-  // /ws/online: 全站在线人数统计（纯 Worker 内存实现，无需 DO）
+  // /ws/online: 全站在线人数统计（OnlineCounterObject DO 全局单例）
   if (pathname === '/ws/online') {
-    return handleOnlineWebSocket(request);
+    return handleOnlineWebSocket(request, env);
   }
 
   const isUpgrade = request.headers.get('Upgrade') === 'websocket';
