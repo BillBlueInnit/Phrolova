@@ -1,7 +1,12 @@
 name: Cleanup OnlineCounter DO Namespace (One-time)
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      pages_project:
+        description: 'Cloudflare Pages project name (default: phrolova)'
+        required: false
+        default: 'phrolova'
 
 permissions:
   contents: read
@@ -15,18 +20,95 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Find and delete ONLINE_COUNTER Durable Object Namespace
+      - name: Find and delete all Workers referencing ONLINE_COUNTER
+        env:
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          PAGES_PROJECT: ${{ inputs.pages_project }}
+        run: |
+          set -uo pipefail
+
+          AUTH_HDR="Authorization: Bearer $CF_API_TOKEN"
+          WORKERS_API="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/workers"
+
+          echo "::group::List all Worker services"
+          ALL_WORKERS=$(curl -sS "$WORKERS_API/services" -H "$AUTH_HDR" | jq -r '.result[].name')
+          echo "$ALL_WORKERS"
+          echo "::endgroup::"
+
+          # Collect workers that still have ONLINE_COUNTER binding
+          BINDING_WORKERS=""
+          while IFS= read -r WNAME; do
+            [ -z "$WNAME" ] && continue
+            BINDINGS=$(curl -sS "$WORKERS_API/scripts/$WNAME" -H "$AUTH_HDR")
+            if echo "$BINDINGS" | jq -e '.result.bindings[]? | select(.name == "ONLINE_COUNTER")' > /dev/null 2>&1; then
+              echo "⚠️  Worker with ONLINE_COUNTER: $WNAME"
+              BINDING_WORKERS="${BINDING_WORKERS}${WNAME}"$'\n'
+            fi
+          done <<< "$ALL_WORKERS"
+
+          if [ -z "$BINDING_WORKERS" ]; then
+            echo "✅ No Workers reference ONLINE_COUNTER binding."
+          else
+            echo "⚠️  Workers still referencing ONLINE_COUNTER:"
+            echo "$BINDING_WORKERS"
+          fi
+
+          # Delete Pages preview deployments (workers named pages-worker-{id}-preview)
+          while IFS= read -r WNAME; do
+            [ -z "$WNAME" ] && continue
+            if [[ "$WNAME" == pages-worker-*-preview ]]; then
+              DEPLOY_ID=$(echo "$WNAME" | sed -n 's/^pages-worker-\([0-9]*\)-preview$/\1/p')
+              if [ -n "$DEPLOY_ID" ]; then
+                echo "::group::Deleting Pages preview deployment $DEPLOY_ID"
+                DEL_RESP=$(curl -sS -X DELETE "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/pages/projects/$PAGES_PROJECT/deployments/$DEPLOY_ID" -H "$AUTH_HDR")
+                DEL_OK=$(echo "$DEL_RESP" | jq -r '.success // false')
+                if [ "$DEL_OK" = "true" ]; then
+                  echo "✅ Deleted Pages preview deployment $DEPLOY_ID → Worker $WNAME removed"
+                else
+                  DEL_ERR=$(echo "$DEL_RESP" | jq -r '.errors[0].message // "unknown"')
+                  echo "::warning::Failed to delete deployment $DEPLOY_ID: $DEL_ERR"
+                  echo "   Manual path: Cloudflare Dashboard → Pages → $PAGES_PROJECT → Deployments"
+                fi
+                echo "::endgroup::"
+              fi
+            elif [[ "$WNAME" != pages-worker-* ]]; then
+              echo "::error::Non-Pages Worker '$WNAME' still has ONLINE_COUNTER binding."
+              echo "   This must be removed manually (re-deploy without the binding or delete the Worker)."
+              echo "   Skipping namespace deletion to avoid 10061 error."
+              exit 1
+            fi
+          done <<< "$BINDING_WORKERS"
+
+          # Final re-check
+          echo "::group::Final verification"
+          REMAINING=""
+          while IFS= read -r WNAME; do
+            [ -z "$WNAME" ] && continue
+            BINDINGS=$(curl -sS "$WORKERS_API/scripts/$WNAME" -H "$AUTH_HDR")
+            if echo "$BINDINGS" | jq -e '.result.bindings[]? | select(.name == "ONLINE_COUNTER")' > /dev/null 2>&1; then
+              REMAINING="${REMAINING}${WNAME} "
+            fi
+          done <<< "$ALL_WORKERS"
+          if [ -n "$REMAINING" ]; then
+            echo "::error::Workers still have ONLINE_COUNTER: $REMAINING"
+            exit 1
+          fi
+          echo "✅ Verified: no Workers reference ONLINE_COUNTER."
+          echo "::endgroup::"
+
+      - name: Delete ONLINE_COUNTER Durable Object Namespace
         env:
           CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
 
-          BASE="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/workers/durable_objects/namespaces"
           AUTH_HDR="Authorization: Bearer $CF_API_TOKEN"
+          BASE="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/workers/durable_objects/namespaces"
 
           echo "::group::List all Durable Object namespaces"
-          LIST=$(curl -sS -X GET "$BASE" -H "$AUTH_HDR")
+          LIST=$(curl -sS "$BASE" -H "$AUTH_HDR")
           echo "$LIST" | jq . || echo "$LIST"
           echo "::endgroup::"
 
