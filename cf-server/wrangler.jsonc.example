@@ -15,7 +15,8 @@
     },
     {
       "tag": "v4-remove-online-counter",
-      "deleted_classes": ["OnlineCounterObject"]
+      "deleted_classes": ["OnlineCounterObject"],
+      "deleted_durable_object_ids": ["ONLINE_COUNTER"]
     }
   ],
   "d1_databases": [
