@@ -993,8 +993,11 @@ export class RoomObject extends DurableObject {
         } catch { /* ignore */ }
         // 随机匹配路径：双方同意后自动开始倒计时
         this.startCountdown();
+      } else {
+        // 创建房间路径：双方同意后回到 waiting，不自动倒计时，需重新点准备+开始
+        // startCountdown 内部会 broadcastState，此分支需显式广播，否则前端无法收到 waiting 状态
+        this.broadcastState();
       }
-      // 创建房间路径：双方同意后回到 waiting，不自动倒计时，需重新点准备+开始
     } else {
       this.broadcast(S2C.MATCHING, {
         message: `等待另一位玩家同意重新开始 (${this.rematchVotes.length}/${this.players.length})`,
